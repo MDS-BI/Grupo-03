@@ -40,22 +40,22 @@ Como usuario de negocio, quiero actualizar o eliminar entidades cuando cambien l
 
 ---
 
-### Historia de Usuario 3 - Panel de inicio con acciones rápidas y estadísticas de registros (Prioridad: P1)
+### Historia de Usuario 3 - Gestión de Entradas y Ubicación en Bodega (Prioridad: P1)
 
-Como usuario de negocio, quiero aterrizar en un panel estilo ERP con botones de acción rápida claramente etiquetados para las tareas clave y totales de registros de un vistazo al abrir la aplicación, para poder empezar a trabajar de inmediato.
+Como Operador 1 de Recepción, quiero registrar documentos de Entrada de Stock y asignar la ubicación física (pasillo, estante, nivel) a los productos ingresados, para mantener actualizada la disponibilidad operativa en bodega sin manipular valores monetarios o financieros.
 
-**Por qué esta prioridad**: El panel es el punto de entrada de la aplicación. Nada más puede alcanzarse sin él, y las acciones rápidas son la ruta más rápida hacia cada flujo de trabajo central.
+**Por qué esta prioridad**: Esto preserva el valor operativo central del módulo de logística, siendo el punto de partida esencial para tener existencias en el sistema; sin recepciones físicas, el resto de las operaciones del almacén (como el despacho o los niveles de alerta) no pueden funcionar.
 
-**Prueba Independiente**: Un usuario abre la aplicación, ve un panel con múltiples botones de acción rápida y estadísticas de registros, inicia una nueva entidad o documento con un solo clic y ve estadísticas que reflejan los datos almacenados.
+**Prueba Independiente**: Como operador 1, se abre la aplicación, navega a la pantalla de recepción, registra el ingreso de un lote de productos asignando pasillo y estante, guarda el documento, y comprueba que el stock disponible del producto aumente de inmediato en el inventario general sin tener acceso a datos de costos.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el usuario abre la aplicación, **cuando** la aplicación carga, **entonces** se muestra el panel de inicio con al menos cuatro botones de acción rápida claramente etiquetados que cubren las tareas ERP clave: crear una nueva entidad, crear un nuevo documento, abrir la gestión de entidades y buscar registros.
-2. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de nueva entidad, **entonces** la aplicación abre el área de gestión de entidades con un formulario vacío listo para introducir datos.
-3. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de nuevo documento, **entonces** la aplicación abre el área de gestión de documentos con un formulario vacío listo para introducir datos.
-4. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de buscar registros, **entonces** la aplicación abre la pantalla de búsqueda con el campo de búsqueda enfocado.
-5. **Dadas** entidades y documentos almacenados, **cuando** el usuario ve el panel, **entonces** las tarjetas de estadísticas muestran el recuento actual de entidades y documentos.
-6. **Dado** que el usuario crea o elimina registros en otra parte de la aplicación, **cuando** vuelve al panel, **entonces** las estadísticas reflejan el cambio.
+1. **Dado** que el operador 1 está en el formulario de Entrada de Stock, **cuando** ingresa el código del producto y la cantidad recibida, **entonces** el sistema habilita las opciones para seleccionar la ubicación en la bodega.
+2. **Dado** que la sección de ubicación está visible, **cuando** el operador 1 selecciona o escribe el pasillo, estante y nivel, **entonces** estos datos quedan asociados temporalmente al registro actual.
+3. **Dado** que se tiene una entrada de mercancía con la cantidad y ubicación completadas, **cuando** el operador 1 guarda el registro, **entonces** el documento se emite con éxito en el sistema.
+4. **Dado** un documento de Entrada de Stock recién guardado, **cuando** se consulta la tabla principal de productos, **entonces** el stock disponible de ese ítem aumenta exactamente en la cantidad ingresada.
+5. **Dado** un documento de Entrada de Stock recién guardado, **cuando** se revisa el detalle del producto, **entonces** la nueva ubicación física asignada se muestra correctamente para facilitar su futura búsqueda.
+6. **Dado** que el operador 1 está en medio del llenado de una Entrada de Stock, **cuando** presiona el botón de cancelar o volver, **entonces** no se guarda ningún cambio y el stock del inventario permanece inalterado..
 
 ---
 
