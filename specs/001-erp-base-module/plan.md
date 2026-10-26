@@ -1,70 +1,40 @@
-# Plan de Implementación: Módulo Base de Software de Planificación de Recursos Empresariales (ERP)
+# Plan de Trabajo - Módulo de Logística e Inventario (SCM ERP)
 
-**Rama**: `001-erp-base-module` | **Fecha**: 2026-07-08 | **Especificación**: [spec.md](spec.md)
-**Entrada**: Especificación de la funcionalidad desde `/specs/001-erp-base-module/spec.md`
+## 1. Visión General del Proyecto
+Este plan define la estrategia de desarrollo para implementar un Producto Mínimo Viable (MVP) escalable del módulo de Logística e Inventario (Supply Chain Management - SCM) para un sistema ERP. El desarrollo se fundamenta en Spec Driven Development (SDD) con un enfoque exclusivo en frontend interactivo e integración simulada mediante un modelo entidad-relación claro.
 
-## Resumen
+## 2. Definición del Cliente y Usuarios
+- **Cliente Objetivo:** Empresas de mediano tamaño (PyMEs) operando en distribución comercial o manufactura ligera.
+- **Perfiles de Usuario:**
+  - **Administrador / Jefe de Bodega:** Supervisa niveles de stock, aprueba transferencias, gestiona inventario crítico y analiza métricas de rotación.
+  - **Operador de Logística:** Registra entradas, salidas, recepciones de proveedores y despachos a clientes.
+  - **Analista de Cadena de Suministro:** Visualiza dashboards de rendimiento de inventario y estimaciones de demanda.
 
-Construir una aplicación web ligera con Vite que sirva como módulo base de software de planificación de recursos empresariales (ERP). El módulo proporciona la base común que todo módulo ERP personalizado necesita: gestión de datos maestros (Entidades), documentos transaccionales vinculados (Documentos), flujos de crear/editar/eliminar/buscar, validación y persistencia local — construida principalmente con HTML, CSS y JavaScript vanilla. La aplicación se presenta como un espacio de trabajo ERP coherente: una barra superior con marca (logotipo derivado + nombre del módulo) y una barra lateral persistente de botones de módulo envuelven cada pantalla, y la pantalla de entrada es un panel estilo ERP que ofrece botones de acción rápida para las tareas clave (nueva entidad, nuevo documento, abrir áreas de gestión, buscar registros) además de estadísticas de registros en vivo. La adaptación a un módulo específico (p. ej., Ventas) se realiza mediante un único archivo de configuración (`src/module-config.js`) que cubre terminología, campos personalizados, ciclo de vida de documentos y color de acento, de modo que el código central permanece intacto.
+## 3. Alcance del MVP (Funcionalidad Mínima)
+1. **Página Principal (Dashboard):** Vista sintética de métricas clave (Stock total, items críticos bajo punto de reorden, valor total de inventario y movimientos recientes).
+2. **Acciones y Herramientas Operativas:**
+   - Registro de movimientos de entrada/salida de stock.
+   - Gestión de ubicaciones de almacenamiento dentro de la bodega.
+   - Consulta y filtrado de catálogo de productos e insumos.
+3. **Manejo de Sensibilidad de Datos y Sesgos:**
+   - Asignación de roles con visibilidad limitada (el operador no visualiza costos de valorización ni márgenes comerciales).
+   - Detección de sesgos de demanda en datos históricos para evitar desabastecimiento en zonas periféricas o clientes de menor volumen.
 
-## Contexto Técnico
+## 4. Cronograma y Fases de Desarrollo
 
-**Lenguaje/Versión**: JavaScript (ES2022), HTML, CSS  
-**Dependencias Principales**: Vite, sin framework de interfaz pesado  
-**Almacenamiento**: localStorage del navegador para una instancia del módulo de espacio único  
-**Pruebas**: Vitest con jsdom para pruebas unitarias y de interacción  
-**Plataforma Objetivo**: Navegadores modernos de escritorio y móviles  
-**Tipo de Proyecto**: Aplicación web  
-**Objetivos de Rendimiento**: Interacciones responsivas para listas de hasta 500 registros; la búsqueda y las actualizaciones de la interfaz deben sentirse instantáneas  
-**Restricciones**: Huella mínima de librerías, despliegue simple, sin backend requerido; la estructura debe mantenerse extensible para módulos personalizados  
-**Escala/Alcance**: Módulo base con CRUD de datos maestros (Entidad) y documentos transaccionales (Documento), búsqueda y capacidades de navegación
+### Fase 1: Arquitectura de Datos y Specs (Semanas 1 - 2)
+- [x] Definición del modelo de datos preliminar (`data-model.md`).
+- [x] Elaboración de Historias de Usuario principales en `spec.md`.
+- [x] Creación del plan de trabajo en `plan.md`.
+- [ ] Revisión de borrador del repositorio y validación del MER preliminar.
 
-## Verificación de la Constitución
+### Fase 2: Desarrollo Frontend e Interfaz del MVP (Semanas 3 - 5)
+- [ ] Implementación de plantilla/layout general con la barra de navegación del módulo.
+- [ ] Creación de componentes del Dashboard (tarjetas KPI, alertas de stock bajo).
+- [ ] Implementación de formularios interactivos (ingreso de movimiento, recepción de insumos).
+- [ ] Integración de datos mock basados en el data model definido.
 
-*COMPROBACIÓN: Debe pasar antes de la investigación de la Fase 0. Reverificar tras el diseño de la Fase 1.*
-
-- Calidad: La implementación usará una estructura JavaScript pequeña y modular con límites de función claros y nomenclatura consistente, manteniendo las preocupaciones base (almacenamiento, identidad, integridad referencial) separadas de la lógica específica del dominio para que los módulos personalizados puedan extenderlas.
-- Pruebas: Los flujos centrales de crear, editar, eliminar y buscar estarán cubiertos por pruebas automatizadas antes de completar.
-- Experiencia de Usuario: La interfaz proporcionará mensajes de validación claros, estados vacíos y comportamiento de formulario consistente, presentados dentro de un marco de espacio de trabajo ERP con marca (barra superior + barra lateral) que se ve y se comporta idénticamente en todas las pantallas.
-- Rendimiento: La búsqueda y el renderizado de listas se optimizarán para colecciones de hasta 500 registros usando actualizaciones ligeras del DOM.
-
-## Estructura del Proyecto
-
-### Documentación (esta funcionalidad)
-
-```text
-specs/001-erp-base-module/
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-├── contracts/
-└── tasks.md
-```
-
-### Código Fuente (raíz del repositorio)
-
-```text
-src/
-├── main.js
-├── styles.css
-├── storage.js
-├── app.js
-├── module-config.js
-└── components/
-    ├── shell.js        (marco del espacio de trabajo: barra superior, logotipo SVG, barra lateral, estado de módulo activo)
-    ├── dashboard.js    (vista de inicio: cuadrícula de acciones rápidas + tarjetas de estadísticas en vivo)
-    ├── entity-form.js  (formulario de creación/edición de entidades con campos personalizados)
-    └── document-form.js (formulario de creación/edición de documentos con campos personalizados y ciclo de vida de estados)
-
-tests/
-├── unit/
-├── integration/
-└── setup/
-```
-
-**Decisión de Estructura**: Una aplicación Vite simple con un único punto de entrada HTML, un pequeño conjunto de módulos JavaScript y CSS en un archivo separado. Se usará localStorage para la persistencia de modo que la aplicación permanezca ligera y autónoma. Los componentes se dividen en pares de entidad (datos maestros) y documento (transaccional) que reflejan los dos conceptos centrales del módulo base, de modo que un módulo personalizado pueda renombrar o extender cada par de forma independiente. `shell.js` posee el marco del espacio de trabajo ERP — un logotipo monograma SVG en línea derivado del nombre del módulo, la barra superior y la barra lateral de módulos — envolviendo todas las vistas para que la marca y la navegación permanezcan consistentes sin duplicar marcado. `dashboard.js` renderiza los botones de acción rápida y las tarjetas de estadísticas de la pantalla de entrada, leyendo los recuentos del almacenamiento cada vez que se vuelve visible. `module-config.js` centraliza todos los puntos de adaptación — nombre del módulo, etiquetas de términos, definiciones de campos personalizados, ciclo de vida de estados y color de acento — manteniendo la personalización del dominio fuera del código central; el estilo se controla mediante propiedades personalizadas de CSS (tokens de diseño) en `styles.css` para que el color de acento configurado se aplique globalmente.
-
-## Seguimiento de Complejidad
-
-Este plan no introdujo violaciones de la constitución.
+### Fase 3: Documentación, Escalabilidad y Demo (Semanas 6 - 7)
+- [ ] Redacción de instrucciones de ejecución en `README.md`.
+- [ ] Generación del diagrama Entidad-Relación visual (exportable desde `data-model.md`).
+- [ ] Preparación de la presentación final de 5 minutos y demo funcional.

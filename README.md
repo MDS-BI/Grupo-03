@@ -1,66 +1,99 @@
-# ERP Software Base Module (Vite + Vanilla JS)
+# ERP - Módulo de Logística e Inventario (SCM)
 
-Minimal single-page app serving as an Enterprise Resource Planning (ERP) software base module. It provides the common foundation for building custom ERP modules: master data management (Entities) and linked transactional documents (Documents) with create/edit/delete/search, validation, and browser localStorage persistence — using Vite and vanilla HTML, CSS, and JavaScript.
+Este repositorio contiene la implementación del **Módulo de Logística e Inventario (Supply Chain Management - SCM)** para el curso **Modelación de Sistemas (2026-2)** del Departamento de Ingeniería Industrial de la Universidad de Concepción.
 
-The user interface is fully in **Spanish** (default terms: Entidad / Documento; module name: Módulo Base ERP), including labels, validation messages, empty states, and dialogs.
+El desarrollo se realiza utilizando la metodología **Spec Driven Development (SDD)** sobre una plantilla base desarrollada con **Vite**, **HTML**, **CSS** y **JavaScript (Vanilla JS)**.
 
-Entities carry standard ERP master-data fields (name, code, tax ID, email, phone, address, category, target date, credit limit, payment terms). Documents use series + folio numbering and carry a monetary breakdown (subtotal, discount, tax, total), currency, payment terms, notes, quantity, dates, and status.
+---
 
-The app presents itself as a coherent ERP workspace:
+## 1. Descripción del Proyecto y MVP
 
-- **Workspace shell** — every screen lives inside a branded chrome: a top bar with a logo (an SVG monogram derived from the module name) and module name, plus a persistent sidebar of module buttons (Panel, Entidades, Documentos, Búsqueda). The active module is highlighted (`aria-current="page"`), and the sidebar collapses to an icon rail on narrow viewports.
-- **Home dashboard** — the entry screen offers quick-action buttons for key ERP tasks (new entity, new document, open management areas, find records) and live statistic cards showing record counts.
-- **Design tokens** — styling is driven by CSS custom properties in `src/styles.css`, so branding changes apply globally.
+El módulo permite gestionar el ciclo operativo de bodegas, control de existencias y movimiento de mercancías. Ofrece una interfaz de usuario completamente en español para la gestión de catálogo de productos, registro de proveedores y trazabilidad de entradas/salidas de stock.
 
-## Setup
+### Características Principales
+- **Dashboard Principal:** Métricas en tiempo real de stock total, ítems bajo punto de reorden y accesos rápidos.
+- **Gestión de Entidades (Productos y Proveedores):** Administración del maestro de productos, SKU, ubicaciones y datos de proveedores.
+- **Gestión de Documentos (Movimientos de Inventario):** Registro de guías de recepción, despachos y transferencias de stock.
+- **Persistencia Local:** Los datos se guardan en el almacenamiento local del navegador (`localStorage`).
+- **Integridad Referencial:** Eliminación en cascada y trazabilidad completa entre productos y movimientos.
 
-Install dependencies and run the dev server:
+---
 
-```bash
-npm install
-npm run dev
-```
+## 2. Configuración y Personalización (`src/module-config.js`)
 
-Open http://localhost:5173 (or the URL Vite prints).
+La adaptación del módulo base a **Logística e Inventario** se define a través del objeto `userConfig` en el archivo `src/module-config.js`:
 
-## Tests
+- **Nombre del Módulo (`moduleName`):** "Logística e Inventario"
+- **Etiquetas Custom (`labels`):**
+  - Entidades: **Producto / Proveedor**
+  - Documentos: **Movimiento de Inventario**
+- **Campos Personalizados (`customFields`):**
+  - `sku` (Texto, Requerido)
+  - `punto_reorden` (Número, Requerido)
+  - `ubicacion_bodega` (Texto)
+  - `tipo_movimiento` (Selección: Entrada, Salida, Transferencia)
+- **Ciclo de Vida de Estado (`statusLifecycle`):**
+  - Estados: `Borrador` → `Pendiente` → `Completado` / `Cancelado`
 
-Run the full test suite (unit + integration) with:
+---
 
-```bash
-npm test
-```
+## 3. Instalación y Ejecución
 
-Or a one-off run without watch mode:
+### Requisitos Previos
+- Node.js (versión 18 o superior)
+- npm o yarn
 
-```bash
-npx vitest run
-```
+### Pasos para Ejecutar Localmente
 
-## Building Custom Modules
+1. **Clonar el repositorio:**
+   ```bash
+   git clone <URL_DEL_REPOSITORIO>
+   cd <NOMBRE_DEL_REPOSITORIO>
+   ```
 
-Custom ERP modules built on this base define:
+2. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
 
-- What an **Entity** represents (e.g., customer, product, asset) plus domain-specific fields.
-- What a **Document** represents (e.g., order, invoice, contract).
-- Module-specific labels and validation rules.
+3. **Iniciar el servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
 
-The base module handles identity generation, timestamps, referential integrity between entities and documents, cascade deletion, navigation, and search. See `specs/001-erp-base-module/` for the full specification.
+4. Abrir la URL indicada en la consola (por defecto: `http://localhost:5173`).
 
-## Tailoring via Configuration
+---
 
-All tailoring lives in one place: the `userConfig` object at the top of `src/module-config.js`. Developers edit this single export; no core code changes are required. Available knobs:
+## 4. Pruebas Automatizadas
 
-- `moduleName` — display name shown in the top bar, dashboard, and document title; also derives the logo monogram.
-- `labels` — rename Entity/Document terms across every screen, including sidebar buttons, quick actions, forms, and messages. Spanish articles and agreements (el/la, seleccionado/a) are derived from the first word of each configured term.
-- `customFields` — declare extra fields per record type with `target` (`entity` or `document`), `key`, `label`, `type` (`text`, `number`, `date`, or `select`), optional `required`, and `options` for selects. Keys must not collide with base field names (see `specs/001-erp-base-module/data-model.md`). Values persist alongside records and appear in search results.
-- `statusLifecycle` — restrict document statuses to a configured list of `statuses` with permitted `transitions` between them. Without it, status stays a free-form field.
-- `theme.accentColor` — a hex color (e.g., `"#0f62fe"`) applied across the shell as highlights and primary controls. Invalid values fall back to the default.
+El proyecto cuenta con una suite de pruebas unitarias e integración con Vitest.
 
-If the configuration is invalid (unknown types, bad keys, transitions referencing unknown statuses, non-hex accent colors), the app shows the problems in a banner and falls back to defaults instead of breaking.
+- **Ejecutar pruebas en modo watch:**
+  ```bash
+  npm test
+  ```
 
-## Notes
+- **Ejecutar pruebas una sola vez:**
+  ```bash
+  npx vitest run
+  ```
 
-- Data is persisted to `localStorage` under the keys `erp_base_module:entities` and `erp_base_module:documents`.
-- Deleting an entity also deletes its documents (cascade).
-- This project intentionally uses vanilla HTML, CSS, and JavaScript for simplicity.
+---
+
+## 5. Estructura de Documentación SpecKit
+
+La especificación detallada del módulo, requerida para las entregas del curso, se encuentra distribuida en la carpeta de especificaciones:
+
+- [`plan.md`](./specs/plan.md): Plan de trabajo, historias de usuario, perfiles de clientes y mitigación de sesgos.
+- [`data-model.md`](./specs/data-model.md): Modelo Entidad-Relación (MER) en Mermaid, diccionario de variables críticas y análisis de escalabilidad.
+
+---
+
+## 6. Equipo de Trabajo e Información Académica
+
+- **Universidad:** Universidad de Concepción
+- **Facultad:** Facultad de Ingeniería
+- **Departamento:** Departamento de Ingeniería Industrial (DII)
+- **Asignatura:** Modelación de Sistemas (2026-2)
+- 
