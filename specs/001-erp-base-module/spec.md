@@ -98,19 +98,18 @@ Como desarrollador de módulos, quiero declarar un único archivo de configuraci
 
 ---
 
-### Historia de Usuario 6 - Reetiquetar pantallas desde la configuración (Prioridad: P1)
+**Estudiante Asignado:** Estudiante 6
 
-Como desarrollador de módulos, quiero que todas las etiquetas visibles para el usuario deriven de la configuración, para que un módulo adaptado hable su idioma de dominio de forma consistente en todo momento.
+Como usuario de logística y desarrollador del módulo, quiero que todas las etiquetas visibles deriven de la configuración en `module-config.js` mapeando "Entidad" a "Producto / Insumo" y "Documento" a "Movimiento de Inventario", para que la interfaz hable el lenguaje operacional de bodega y distribución en todo momento.
 
-**Por qué esta prioridad**: Los usuarios confían en un módulo que dice consistentemente "Cliente" y "Pedido de Venta" en lugar de dejar filtrarse una "Entidad" genérica por media interfaz; la terminología inconsistente hace que los módulos adaptados parezcan rotos. Esta historia depende del perfil de configuración (Historia de Usuario 5).
+Por qué esta prioridad: Los operadores y analistas de bodega confían en un sistema que hable de "Productos", "Stock" y "Movimientos de Entrada/Salida" en lugar de términos genéricos como "Entidad" o "Documento". Una terminología inconsistente genera confusión operacional durante la recepción y despacho.
 
-**Prueba Independiente**: Un desarrollador mapea Entidad→Cliente y Documento→Pedido de Venta en la configuración, y cada pestaña, botón, etiqueta de formulario, encabezado y mensaje en las tres pantallas usa los términos mapeados.
+Prueba Independiente: Un usuario configura el mapeo Entidad -> "Producto" y Documento -> "Movimiento de Inventario", verificando que cada botón, tabla, pestaña, formulario y mensaje del sistema refleje dichos términos operativos.
 
-**Escenarios de Aceptación**:
-
-1. **Dados** mapeos de términos definidos en la configuración, **cuando** cualquier pantalla carga, **entonces** pestañas, botones, etiquetas de formulario, encabezados y mensajes de estado vacío muestran los términos configurados.
-2. **Dado** que las etiquetas han sido remapeadas, **cuando** el usuario navega entre pantallas, **entonces** el comportamiento de navegación no cambia.
-3. **Dado** que no se proporcionan mapeos, **cuando** cualquier pantalla carga, **entonces** se muestran los términos predeterminados Entidad/Documento.
+Escenarios de Aceptación:
+1. Dados los mapeos definidos en `userConfig` (Entidad = "Producto", Documento = "Movimiento de Inventario"), cuando cualquier pantalla carga, entonces los botones de navegación, formularios de stock y mensajes de estado vacío muestran los términos adaptados a logística.
+2. Dado que las etiquetas han sido remapeadas a terminología de bodega, cuando el usuario navega entre pantallas de catálogo y movimientos, entonces la lógica de persistencia y navegación se mantiene intacta.
+3. Dado que no se proporcionan mapeos específicos, cuando el sistema carga, entonces se utilizan los términos base predeterminados del módulo ERP.
 
 ---
 
