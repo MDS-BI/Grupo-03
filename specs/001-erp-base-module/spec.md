@@ -59,25 +59,21 @@ Como Operador 1 de Recepción, quiero registrar documentos de Entrada de Stock y
 
 ---
 
-### Historia de Usuario 4 - Gestionar entidades y documentos en una pantalla dedicada (Prioridad: P1)
+### Historia de Usuario 4 - Gestión de Salidas y Despachos (Prioridad: P1)
 
-Como usuario de negocio, quiero una pantalla dedicada donde pueda añadir, editar y eliminar entidades y sus documentos, para poder gestionar los datos del módulo en un lugar enfocado.
+Como Operador 2 de Despacho, quiero procesar documentos de Salida de Inventario con validación automática de existencias, para garantizar que no se registren despachos ni transferencias cuando el stock disponible sea insuficiente.
 
-**Por qué esta prioridad**: Esto preserva el valor central de las capacidades de gestión del módulo, presentado como una única pantalla de gestión accesible desde la barra lateral y las acciones rápidas del panel.
+**Por qué esta prioridad**: Este proceso es vital para el ciclo final de la cadena de suministro. Sin un control riguroso de las salidas y la validación en tiempo real del stock, el sistema permitiría la existencia de inventario negativo, lo que compromete la fiabilidad de los datos, la planificación y el cumplimiento de entregas.
 
-**Prueba Independiente**: Un usuario puede navegar a la pantalla de gestión mediante la barra lateral o una acción rápida, alternar entre la gestión de entidades y documentos, y volver al panel, añadiendo, editando y eliminando con éxito una entidad y un documento.
+**Prueba Independiente**: Como operador 2, se abre la aplicación, navega a la pantalla de despachos, registra una salida intentando ingresar una cantidad superior a la existencia de un producto, verifica que el sistema bloquea la acción con una alerta. Luego, ajusta a una cantidad válida, guarda el documento y comprueba que el stock disponible del producto disminuye de inmediato en el inventario general.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la navegación, **entonces** la barra lateral del espacio de trabajo ofrece botones de módulo para Entidades, Documentos y Panel con el módulo activo resaltado.
-2. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Entidades, **entonces** se muestra el contenido de gestión de entidades.
-3. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Documentos, **entonces** se muestra el contenido de gestión de documentos.
-4. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la pantalla, **entonces** la lista de entidades no se muestra.
-5. **Dado** que el usuario está en la pantalla de gestión, **cuando** crea una nueva entidad, **entonces** la entidad se guarda.
-6. **Dada** una entidad existente, **cuando** el usuario edita sus detalles, **entonces** la información actualizada se guarda.
-7. **Dada** una entidad que ya no es relevante, **cuando** el usuario la elimina, **entonces** se elimina junto con sus documentos.
-8. **Dada** una entidad existente, **cuando** el usuario añade, edita o elimina un documento, **entonces** los cambios del documento se guardan y quedan asociados a esa entidad.
-9. **Dado** que el usuario está en la pantalla de gestión, **cuando** activa el botón Panel en la barra lateral, **entonces** vuelve al panel de inicio.
+1. **Dado** que el operador 2 está en el formulario de Salida de Inventario, **cuando** selecciona un producto a despachar, **entonces** el sistema muestra de manera visible la cantidad de stock disponible actual para ese ítem.
+2. **Dado** que el operador 2 está ingresando los detalles de la salida, **cuando** ingresa una cantidad que supera el stock disponible del producto, **entonces** el sistema muestra una alerta de error por inventario insuficiente y deshabilita el botón para guardar el documento.
+3. **Dado** que se ha seleccionado un producto y una cantidad válida (menor o igual al stock), **cuando** el operador 2 guarda el registro, **entonces** el documento de Salida de Inventario se emite con éxito en el sistema.
+4. **Dado** un documento de Salida de Inventario recién guardado, **cuando** se consulta la tabla principal de productos, **entonces** el stock disponible de ese ítem disminuye exactamente en la cantidad despachada.
+5. **Dado** que el operador 2 está en medio del llenado de una Salida de Inventario, **cuando** presiona el botón de cancelar o volver, **entonces** no se genera el documento y el stock del inventario permanece inalterado.
 
 ---
 
