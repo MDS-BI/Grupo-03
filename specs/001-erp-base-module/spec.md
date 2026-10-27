@@ -46,18 +46,31 @@ punto_reorden (tipo number, requerido)
 unidad_medida (tipo select con opciones: Unidades, Cajas, Kg, Litros)
 ---
 
-### Historia de Usuario 2 - Editar y eliminar entidades (Prioridad: P1)
-Como usuario de negocio, quiero actualizar o eliminar entidades cuando cambien los datos maestros para que los registros se mantengan precisos.
+### Historia de Usuario 2 - Operador de Bodega (Recepción y Entradas) — Operador de Almacén (Inbound) (Prioridad: P1)
+Como Operador de Recepción, quiero dar de alta entidades de productos y registrar documentos de Entrada de Inventario asignando la ubicación física (pasillo, estante, nivel), para actualizar el stock disponible sin manejar datos financieros ni valores de costo
 
-**Por qué esta prioridad**: Mantener los registros actualizados es esencial para la confianza en la herramienta y para soportar las operaciones comerciales diarias.
+**Por qué esta prioridad**:Es la puerta de entrada del inventario: sin recepción de stock registrada, no existe stock disponible y las demás funciones del sistema (despachos, consultas, reportes, valorización) no tienen datos sobre los cuales operar.
+Es una dependencia directa de otras historias de usuario, como la salida de inventario o la consulta de existencias.
+Impacta la precisión del inventario desde el origen: un error en la entrada se propaga a todo el flujo posterior.
+La asignación de ubicación física permite localizar el producto desde el momento en que llega, reduciendo tiempos de búsqueda y pérdidas.
 
-**Prueba Independiente**: Un usuario puede seleccionar una entidad existente, cambiar su información o eliminarla, y la lista refleja el cambio.
+**Prueba Independiente**: Iniciar sesión con un usuario de rol Operador de Recepción.
+Dar de alta un producto nuevo (por ejemplo, “Caja de tornillos 5 mm”).
+Registrar un documento de Entrada de Inventario con 100 unidades y asignar la ubicación Pasillo A, Estante 3, Nivel 2.
+Verificar que el stock disponible del producto sea 100 y que su ubicación quede registrada.
+Confirmar que en ningún formulario ni pantalla aparecen campos de costo, precio o valores financieros.
 
 **Escenarios de Aceptación**:
 
-1. **Dada** una entidad que ya existe en la lista, **cuando** el usuario edita sus detalles, **entonces** la información actualizada se guarda y se muestra en la lista.
-2. **Dada** una entidad que ya no es relevante, **cuando** el usuario la elimina, **entonces** desaparece de la lista y deja de aparecer en los resultados de búsqueda.
-3. **Dadas** cientos de entidades almacenadas, **cuando** el usuario edita o elimina una, **entonces** la lista se actualiza correctamente y sigue siendo ágil.
+1. Dado que el operador está autenticado y el producto no existe en el sistema
+Cuando completa el formulario de alta con los datos operativos obligatorios (código, nombre, unidad de medida) y lo guarda
+Entonces el producto queda registrado y disponible para ser usado en entradas de inventario.
+2. Dado que existe un producto registrado
+Cuando el operador crea un documento de Entrada de Inventario indicando producto, cantidad, pasillo, estante y nivel
+Entonces el sistema genera el documento de entrada, incrementa el stock disponible en la cantidad recibida y guarda la ubicación física asignada
+3. Dado que el operador está registrando una entrada
+Cuando intenta guardar sin indicar cantidad o ubicación
+Entonces el sistema impide el guardado y muestra un mensaje indicando los campos faltantes
 
 ---
 
