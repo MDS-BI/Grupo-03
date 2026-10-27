@@ -11,18 +11,39 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
-### Historia de Usuario 1 - Crear y organizar entidades (Prioridad: P1)
-Como usuario de negocio, quiero crear entradas de entidad con detalles claros para poder construir y mantener los datos maestros del módulo.
+Historia de Usuario 1 — Parametrización del ERP y Datos Maestros de Entidades (Prioridad: P1)
+Como Administrador del ERP,
 
-**Por qué esta prioridad**: Este es el valor central del producto porque, sin crear entidades, el resto de la experiencia no puede aportar valor.
+quiero configurar las reglas globales del sistema en module-config.js y crear entradas maestras de entidades (Productos/Proveedores) con atributos personalizados y reglas de validación,
 
-**Prueba Independiente**: Un usuario puede abrir el módulo, añadir una nueva entidad y verla aparecer en la lista.
+para asegurar la integridad de los datos maestros y permitir que el resto del equipo opere sobre un catálogo estandarizado y libre de errores.
 
-**Escenarios de Aceptación**:
+Por qué esta prioridad: Es la base del sistema. Sin la parametrización de etiquetas, campos personalizados y validaciones maestras del Administrador, los Operadores y Analistas no pueden ingresar ni procesar la información de inventario correctamente.
 
-1. **Dado** que un usuario está viendo la lista de entidades, **cuando** crea una nueva entidad con un nombre y un código, **entonces** la nueva entidad se guarda y aparece en la lista.
-2. **Dado** que un usuario está creando una entidad, **cuando** deja la información obligatoria en blanco, **entonces** el sistema impide guardar y explica qué se necesita.
+Prueba Independiente: El Administrador puede abrir el módulo de parametrización/entidades, configurar un campo personalizado o registrar una nueva entidad maestra con sus atributos requeridos, y verificar que el sistema aplique las reglas de validación y la muestre correctamente en la lista global.
 
+Escenarios de Aceptación:
+
+Dado que el Administrador está en el formulario de creación de entidades maestras, cuando ingresa todos los campos obligatorios (Nombre, Código/SKU, Categoría y parámetros del userConfig), entonces la nueva entidad se guarda exitosamente, aparece en la lista principal y queda disponible para las operaciones de bodega.
+
+Dado que el Administrador está registrando o parametrizando una entidad, cuando deja información obligatoria en blanco (como el Nombre o Código/SKU) o ingresa un tipo de dato inválido en un campo personalizado, entonces el sistema bloquea el guardado y despliega un mensaje descriptivo explicando qué datos se requieren.
+
+Dado que el Administrador actualiza la configuración en module-config.js (nombres de módulo, etiquetas o campos personalizados para productos/proveedores), cuando se carga la aplicación, entonces la interfaz adapta dinámicamente las etiquetas, vistas y formularios de entidades según la nueva configuración sin romper los registros existentes.
+
+Mapeo Técnico para tu Implementación (Fichas de Apoyo para tu entrega)
+Como te corresponde module-config.js y el alta de Entidades Maestras, en tu parte del código de SpecKit asegúrate de definir lo siguiente en la configuración del modulo base:
+
+Módulo Name: Módulo de Logística e Inventario
+
+Labels (Entidad): Producto / Proveedor (artículo: el)
+
+Custom Fields (en userConfig.customFields):
+
+sku (tipo text, requerido)
+
+punto_reorden (tipo number, requerido)
+
+unidad_medida (tipo select con opciones: Unidades, Cajas, Kg, Litros)
 ---
 
 ### Historia de Usuario 2 - Editar y eliminar entidades (Prioridad: P1)
