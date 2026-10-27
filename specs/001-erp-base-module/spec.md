@@ -61,44 +61,40 @@ Como usuario de negocio, quiero actualizar o eliminar entidades cuando cambien l
 
 ---
 
-### Historia de Usuario 3 - Panel de inicio con acciones rápidas y estadísticas de registros (Prioridad: P1)
+### Historia de Usuario 3 - Gestión de Entradas y Ubicación en Bodega (Prioridad: P1)
 
-Como usuario de negocio, quiero aterrizar en un panel estilo ERP con botones de acción rápida claramente etiquetados para las tareas clave y totales de registros de un vistazo al abrir la aplicación, para poder empezar a trabajar de inmediato.
+Como Operador 1 de Recepción, quiero registrar documentos de Entrada de Stock y asignar la ubicación física (pasillo, estante, nivel) a los productos ingresados, para mantener actualizada la disponibilidad operativa en bodega sin manipular valores monetarios o financieros.
 
-**Por qué esta prioridad**: El panel es el punto de entrada de la aplicación. Nada más puede alcanzarse sin él, y las acciones rápidas son la ruta más rápida hacia cada flujo de trabajo central.
+**Por qué esta prioridad**: Esto preserva el valor operativo central del módulo de logística, siendo el punto de partida esencial para tener existencias en el sistema; sin recepciones físicas, el resto de las operaciones del almacén (como el despacho o los niveles de alerta) no pueden funcionar.
 
-**Prueba Independiente**: Un usuario abre la aplicación, ve un panel con múltiples botones de acción rápida y estadísticas de registros, inicia una nueva entidad o documento con un solo clic y ve estadísticas que reflejan los datos almacenados.
+**Prueba Independiente**: Como operador 1, se abre la aplicación, navega a la pantalla de recepción, registra el ingreso de un lote de productos asignando pasillo y estante, guarda el documento, y comprueba que el stock disponible del producto aumente de inmediato en el inventario general sin tener acceso a datos de costos.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el usuario abre la aplicación, **cuando** la aplicación carga, **entonces** se muestra el panel de inicio con al menos cuatro botones de acción rápida claramente etiquetados que cubren las tareas ERP clave: crear una nueva entidad, crear un nuevo documento, abrir la gestión de entidades y buscar registros.
-2. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de nueva entidad, **entonces** la aplicación abre el área de gestión de entidades con un formulario vacío listo para introducir datos.
-3. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de nuevo documento, **entonces** la aplicación abre el área de gestión de documentos con un formulario vacío listo para introducir datos.
-4. **Dado** que se muestra el panel, **cuando** el usuario activa la acción de buscar registros, **entonces** la aplicación abre la pantalla de búsqueda con el campo de búsqueda enfocado.
-5. **Dadas** entidades y documentos almacenados, **cuando** el usuario ve el panel, **entonces** las tarjetas de estadísticas muestran el recuento actual de entidades y documentos.
-6. **Dado** que el usuario crea o elimina registros en otra parte de la aplicación, **cuando** vuelve al panel, **entonces** las estadísticas reflejan el cambio.
+1. **Dado** que el operador 1 está en el formulario de Entrada de Stock, **cuando** ingresa el código del producto y la cantidad recibida, **entonces** el sistema habilita las opciones para seleccionar la ubicación en la bodega.
+2. **Dado** que la sección de ubicación está visible, **cuando** el operador 1 selecciona o escribe el pasillo, estante y nivel, **entonces** estos datos quedan asociados temporalmente al registro actual.
+3. **Dado** que se tiene una entrada de mercancía con la cantidad y ubicación completadas, **cuando** el operador 1 guarda el registro, **entonces** el documento se emite con éxito en el sistema.
+4. **Dado** un documento de Entrada de Stock recién guardado, **cuando** se consulta la tabla principal de productos, **entonces** el stock disponible de ese ítem aumenta exactamente en la cantidad ingresada.
+5. **Dado** un documento de Entrada de Stock recién guardado, **cuando** se revisa el detalle del producto, **entonces** la nueva ubicación física asignada se muestra correctamente para facilitar su futura búsqueda.
+6. **Dado** que el operador 1 está en medio del llenado de una Entrada de Stock, **cuando** presiona el botón de cancelar o volver, **entonces** no se guarda ningún cambio y el stock del inventario permanece inalterado..
 
 ---
 
-### Historia de Usuario 4 - Gestionar entidades y documentos en una pantalla dedicada (Prioridad: P1)
+### Historia de Usuario 4 - Gestión de Salidas y Despachos (Prioridad: P1)
 
-Como usuario de negocio, quiero una pantalla dedicada donde pueda añadir, editar y eliminar entidades y sus documentos, para poder gestionar los datos del módulo en un lugar enfocado.
+Como Operador 2 de Despacho, quiero procesar documentos de Salida de Inventario con validación automática de existencias, para garantizar que no se registren despachos ni transferencias cuando el stock disponible sea insuficiente.
 
-**Por qué esta prioridad**: Esto preserva el valor central de las capacidades de gestión del módulo, presentado como una única pantalla de gestión accesible desde la barra lateral y las acciones rápidas del panel.
+**Por qué esta prioridad**: Este proceso es vital para el ciclo final de la cadena de suministro. Sin un control riguroso de las salidas y la validación en tiempo real del stock, el sistema permitiría la existencia de inventario negativo, lo que compromete la fiabilidad de los datos, la planificación y el cumplimiento de entregas.
 
-**Prueba Independiente**: Un usuario puede navegar a la pantalla de gestión mediante la barra lateral o una acción rápida, alternar entre la gestión de entidades y documentos, y volver al panel, añadiendo, editando y eliminando con éxito una entidad y un documento.
+**Prueba Independiente**: Como operador 2, se abre la aplicación, navega a la pantalla de despachos, registra una salida intentando ingresar una cantidad superior a la existencia de un producto, verifica que el sistema bloquea la acción con una alerta. Luego, ajusta a una cantidad válida, guarda el documento y comprueba que el stock disponible del producto disminuye de inmediato en el inventario general.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la navegación, **entonces** la barra lateral del espacio de trabajo ofrece botones de módulo para Entidades, Documentos y Panel con el módulo activo resaltado.
-2. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Entidades, **entonces** se muestra el contenido de gestión de entidades.
-3. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Documentos, **entonces** se muestra el contenido de gestión de documentos.
-4. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la pantalla, **entonces** la lista de entidades no se muestra.
-5. **Dado** que el usuario está en la pantalla de gestión, **cuando** crea una nueva entidad, **entonces** la entidad se guarda.
-6. **Dada** una entidad existente, **cuando** el usuario edita sus detalles, **entonces** la información actualizada se guarda.
-7. **Dada** una entidad que ya no es relevante, **cuando** el usuario la elimina, **entonces** se elimina junto con sus documentos.
-8. **Dada** una entidad existente, **cuando** el usuario añade, edita o elimina un documento, **entonces** los cambios del documento se guardan y quedan asociados a esa entidad.
-9. **Dado** que el usuario está en la pantalla de gestión, **cuando** activa el botón Panel en la barra lateral, **entonces** vuelve al panel de inicio.
+1. **Dado** que el operador 2 está en el formulario de Salida de Inventario, **cuando** selecciona un producto a despachar, **entonces** el sistema muestra de manera visible la cantidad de stock disponible actual para ese ítem.
+2. **Dado** que el operador 2 está ingresando los detalles de la salida, **cuando** ingresa una cantidad que supera el stock disponible del producto, **entonces** el sistema muestra una alerta de error por inventario insuficiente y deshabilita el botón para guardar el documento.
+3. **Dado** que se ha seleccionado un producto y una cantidad válida (menor o igual al stock), **cuando** el operador 2 guarda el registro, **entonces** el documento de Salida de Inventario se emite con éxito en el sistema.
+4. **Dado** un documento de Salida de Inventario recién guardado, **cuando** se consulta la tabla principal de productos, **entonces** el stock disponible de ese ítem disminuye exactamente en la cantidad despachada.
+5. **Dado** que el operador 2 está en medio del llenado de una Salida de Inventario, **cuando** presiona el botón de cancelar o volver, **entonces** no se genera el documento y el stock del inventario permanece inalterado.
 
 ---
 
@@ -119,20 +115,20 @@ Como desarrollador de módulos, quiero declarar un único archivo de configuraci
 
 ---
 
-### Historia de Usuario 6 - Reetiquetar pantallas desde la configuración (Prioridad: P1)
+## Historia de Usuario 6 - Reetiquetar pantallas desde la configuración de Logística e Inventario (Prioridad: P1)
 
-Como desarrollador de módulos, quiero que todas las etiquetas visibles para el usuario deriven de la configuración, para que un módulo adaptado hable su idioma de dominio de forma consistente en todo momento.
+**Estudiante Asignado:** Estudiante 6
 
-**Por qué esta prioridad**: Los usuarios confían en un módulo que dice consistentemente "Cliente" y "Pedido de Venta" en lugar de dejar filtrarse una "Entidad" genérica por media interfaz; la terminología inconsistente hace que los módulos adaptados parezcan rotos. Esta historia depende del perfil de configuración (Historia de Usuario 5).
+Como usuario de logística y desarrollador del módulo, quiero que todas las etiquetas visibles deriven de la configuración en `module-config.js` mapeando "Entidad" a "Producto / Insumo" y "Documento" a "Movimiento de Inventario", para que la interfaz hable el lenguaje operacional de bodega y distribución en todo momento.
 
-**Prueba Independiente**: Un desarrollador mapea Entidad→Cliente y Documento→Pedido de Venta en la configuración, y cada pestaña, botón, etiqueta de formulario, encabezado y mensaje en las tres pantallas usa los términos mapeados.
+Por qué esta prioridad: Los operadores y analistas de bodega confían en un sistema que hable de "Productos", "Stock" y "Movimientos de Entrada/Salida" en lugar de términos genéricos como "Entidad" o "Documento". Una terminología inconsistente genera confusión operacional durante la recepción y despacho.
 
-**Escenarios de Aceptación**:
+Prueba Independiente: Un usuario configura el mapeo Entidad -> "Producto" y Documento -> "Movimiento de Inventario", verificando que cada botón, tabla, pestaña, formulario y mensaje del sistema refleje dichos términos operativos.
 
-1. **Dados** mapeos de términos definidos en la configuración, **cuando** cualquier pantalla carga, **entonces** pestañas, botones, etiquetas de formulario, encabezados y mensajes de estado vacío muestran los términos configurados.
-2. **Dado** que las etiquetas han sido remapeadas, **cuando** el usuario navega entre pantallas, **entonces** el comportamiento de navegación no cambia.
-3. **Dado** que no se proporcionan mapeos, **cuando** cualquier pantalla carga, **entonces** se muestran los términos predeterminados Entidad/Documento.
-
+Escenarios de Aceptación:
+1. Dados los mapeos definidos en `userConfig` (Entidad = "Producto", Documento = "Movimiento de Inventario"), cuando cualquier pantalla carga, entonces los botones de navegación, formularios de stock y mensajes de estado vacío muestran los términos adaptados a logística.
+2. Dado que las etiquetas han sido remapeadas a terminología de bodega, cuando el usuario navega entre pantallas de catálogo y movimientos, entonces la lógica de persistencia y navegación se mantiene intacta.
+3. Dado que no se proporcionan mapeos específicos, cuando el sistema carga, entonces se utilizan los términos base predeterminados del módulo ERP.
 ---
 
 ### Historia de Usuario 7 - Declarar campos personalizados para los registros (Prioridad: P1)
