@@ -112,7 +112,6 @@ Como desarrollador de módulos, quiero que todas las etiquetas visibles para el 
 2. **Dado** que las etiquetas han sido remapeadas, **cuando** el usuario navega entre pantallas, **entonces** el comportamiento de navegación no cambia.
 3. **Dado** que no se proporcionan mapeos, **cuando** cualquier pantalla carga, **entonces** se muestran los términos predeterminados Entidad/Documento.
 
-
 ---
 
 ### Casos Límite
