@@ -11,32 +11,66 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
-### Historia de Usuario 1 - Crear y organizar entidades (Prioridad: P1)
-Como usuario de negocio, quiero crear entradas de entidad con detalles claros para poder construir y mantener los datos maestros del módulo.
+Historia de Usuario 1 — Parametrización del ERP y Datos Maestros de Entidades (Prioridad: P1)
+Como Administrador del ERP,
 
-**Por qué esta prioridad**: Este es el valor central del producto porque, sin crear entidades, el resto de la experiencia no puede aportar valor.
+quiero configurar las reglas globales del sistema en module-config.js y crear entradas maestras de entidades (Productos/Proveedores) con atributos personalizados y reglas de validación,
 
-**Prueba Independiente**: Un usuario puede abrir el módulo, añadir una nueva entidad y verla aparecer en la lista.
+para asegurar la integridad de los datos maestros y permitir que el resto del equipo opere sobre un catálogo estandarizado y libre de errores.
 
-**Escenarios de Aceptación**:
+Por qué esta prioridad: Es la base del sistema. Sin la parametrización de etiquetas, campos personalizados y validaciones maestras del Administrador, los Operadores y Analistas no pueden ingresar ni procesar la información de inventario correctamente.
 
-1. **Dado** que un usuario está viendo la lista de entidades, **cuando** crea una nueva entidad con un nombre y un código, **entonces** la nueva entidad se guarda y aparece en la lista.
-2. **Dado** que un usuario está creando una entidad, **cuando** deja la información obligatoria en blanco, **entonces** el sistema impide guardar y explica qué se necesita.
+Prueba Independiente: El Administrador puede abrir el módulo de parametrización/entidades, configurar un campo personalizado o registrar una nueva entidad maestra con sus atributos requeridos, y verificar que el sistema aplique las reglas de validación y la muestre correctamente en la lista global.
 
+Escenarios de Aceptación:
+
+Dado que el Administrador está en el formulario de creación de entidades maestras, cuando ingresa todos los campos obligatorios (Nombre, Código/SKU, Categoría y parámetros del userConfig), entonces la nueva entidad se guarda exitosamente, aparece en la lista principal y queda disponible para las operaciones de bodega.
+
+Dado que el Administrador está registrando o parametrizando una entidad, cuando deja información obligatoria en blanco (como el Nombre o Código/SKU) o ingresa un tipo de dato inválido en un campo personalizado, entonces el sistema bloquea el guardado y despliega un mensaje descriptivo explicando qué datos se requieren.
+
+Dado que el Administrador actualiza la configuración en module-config.js (nombres de módulo, etiquetas o campos personalizados para productos/proveedores), cuando se carga la aplicación, entonces la interfaz adapta dinámicamente las etiquetas, vistas y formularios de entidades según la nueva configuración sin romper los registros existentes.
+
+Mapeo Técnico para tu Implementación (Fichas de Apoyo para tu entrega)
+Como te corresponde module-config.js y el alta de Entidades Maestras, en tu parte del código de SpecKit asegúrate de definir lo siguiente en la configuración del modulo base:
+
+Módulo Name: Módulo de Logística e Inventario
+
+Labels (Entidad): Producto / Proveedor (artículo: el)
+
+Custom Fields (en userConfig.customFields):
+
+sku (tipo text, requerido)
+
+punto_reorden (tipo number, requerido)
+
+unidad_medida (tipo select con opciones: Unidades, Cajas, Kg, Litros)
 ---
 
-### Historia de Usuario 2 - Editar y eliminar entidades (Prioridad: P1)
-Como usuario de negocio, quiero actualizar o eliminar entidades cuando cambien los datos maestros para que los registros se mantengan precisos.
+### Historia de Usuario 2 - Operador de Bodega (Recepción y Entradas) — Operador de Almacén (Inbound) (Prioridad: P1)
+Como Operador de Recepción, quiero dar de alta entidades de productos y registrar documentos de Entrada de Inventario asignando la ubicación física (pasillo, estante, nivel), para actualizar el stock disponible sin manejar datos financieros ni valores de costo
 
-**Por qué esta prioridad**: Mantener los registros actualizados es esencial para la confianza en la herramienta y para soportar las operaciones comerciales diarias.
+**Por qué esta prioridad**:Es la puerta de entrada del inventario: sin recepción de stock registrada, no existe stock disponible y las demás funciones del sistema (despachos, consultas, reportes, valorización) no tienen datos sobre los cuales operar.
+Es una dependencia directa de otras historias de usuario, como la salida de inventario o la consulta de existencias.
+Impacta la precisión del inventario desde el origen: un error en la entrada se propaga a todo el flujo posterior.
+La asignación de ubicación física permite localizar el producto desde el momento en que llega, reduciendo tiempos de búsqueda y pérdidas.
 
-**Prueba Independiente**: Un usuario puede seleccionar una entidad existente, cambiar su información o eliminarla, y la lista refleja el cambio.
+**Prueba Independiente**: Iniciar sesión con un usuario de rol Operador de Recepción.
+Dar de alta un producto nuevo (por ejemplo, “Caja de tornillos 5 mm”).
+Registrar un documento de Entrada de Inventario con 100 unidades y asignar la ubicación Pasillo A, Estante 3, Nivel 2.
+Verificar que el stock disponible del producto sea 100 y que su ubicación quede registrada.
+Confirmar que en ningún formulario ni pantalla aparecen campos de costo, precio o valores financieros.
 
 **Escenarios de Aceptación**:
 
-1. **Dada** una entidad que ya existe en la lista, **cuando** el usuario edita sus detalles, **entonces** la información actualizada se guarda y se muestra en la lista.
-2. **Dada** una entidad que ya no es relevante, **cuando** el usuario la elimina, **entonces** desaparece de la lista y deja de aparecer en los resultados de búsqueda.
-3. **Dadas** cientos de entidades almacenadas, **cuando** el usuario edita o elimina una, **entonces** la lista se actualiza correctamente y sigue siendo ágil.
+1. Dado que el operador está autenticado y el producto no existe en el sistema
+Cuando completa el formulario de alta con los datos operativos obligatorios (código, nombre, unidad de medida) y lo guarda
+Entonces el producto queda registrado y disponible para ser usado en entradas de inventario.
+2. Dado que existe un producto registrado
+Cuando el operador crea un documento de Entrada de Inventario indicando producto, cantidad, pasillo, estante y nivel
+Entonces el sistema genera el documento de entrada, incrementa el stock disponible en la cantidad recibida y guarda la ubicación física asignada
+3. Dado que el operador está registrando una entrada
+Cuando intenta guardar sin indicar cantidad o ubicación
+Entonces el sistema impide el guardado y muestra un mensaje indicando los campos faltantes
 
 ---
 
@@ -59,25 +93,21 @@ Como Operador 1 de Recepción, quiero registrar documentos de Entrada de Stock y
 
 ---
 
-### Historia de Usuario 4 - Gestionar entidades y documentos en una pantalla dedicada (Prioridad: P1)
+### Historia de Usuario 4 - Gestión de Salidas y Despachos (Prioridad: P1)
 
-Como usuario de negocio, quiero una pantalla dedicada donde pueda añadir, editar y eliminar entidades y sus documentos, para poder gestionar los datos del módulo en un lugar enfocado.
+Como Operador 2 de Despacho, quiero procesar documentos de Salida de Inventario con validación automática de existencias, para garantizar que no se registren despachos ni transferencias cuando el stock disponible sea insuficiente.
 
-**Por qué esta prioridad**: Esto preserva el valor central de las capacidades de gestión del módulo, presentado como una única pantalla de gestión accesible desde la barra lateral y las acciones rápidas del panel.
+**Por qué esta prioridad**: Este proceso es vital para el ciclo final de la cadena de suministro. Sin un control riguroso de las salidas y la validación en tiempo real del stock, el sistema permitiría la existencia de inventario negativo, lo que compromete la fiabilidad de los datos, la planificación y el cumplimiento de entregas.
 
-**Prueba Independiente**: Un usuario puede navegar a la pantalla de gestión mediante la barra lateral o una acción rápida, alternar entre la gestión de entidades y documentos, y volver al panel, añadiendo, editando y eliminando con éxito una entidad y un documento.
+**Prueba Independiente**: Como operador 2, se abre la aplicación, navega a la pantalla de despachos, registra una salida intentando ingresar una cantidad superior a la existencia de un producto, verifica que el sistema bloquea la acción con una alerta. Luego, ajusta a una cantidad válida, guarda el documento y comprueba que el stock disponible del producto disminuye de inmediato en el inventario general.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la navegación, **entonces** la barra lateral del espacio de trabajo ofrece botones de módulo para Entidades, Documentos y Panel con el módulo activo resaltado.
-2. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Entidades, **entonces** se muestra el contenido de gestión de entidades.
-3. **Dada** la barra lateral visible, **cuando** el usuario activa el botón Documentos, **entonces** se muestra el contenido de gestión de documentos.
-4. **Dado** que el usuario está en la pantalla de gestión, **cuando** mira la pantalla, **entonces** la lista de entidades no se muestra.
-5. **Dado** que el usuario está en la pantalla de gestión, **cuando** crea una nueva entidad, **entonces** la entidad se guarda.
-6. **Dada** una entidad existente, **cuando** el usuario edita sus detalles, **entonces** la información actualizada se guarda.
-7. **Dada** una entidad que ya no es relevante, **cuando** el usuario la elimina, **entonces** se elimina junto con sus documentos.
-8. **Dada** una entidad existente, **cuando** el usuario añade, edita o elimina un documento, **entonces** los cambios del documento se guardan y quedan asociados a esa entidad.
-9. **Dado** que el usuario está en la pantalla de gestión, **cuando** activa el botón Panel en la barra lateral, **entonces** vuelve al panel de inicio.
+1. **Dado** que el operador 2 está en el formulario de Salida de Inventario, **cuando** selecciona un producto a despachar, **entonces** el sistema muestra de manera visible la cantidad de stock disponible actual para ese ítem.
+2. **Dado** que el operador 2 está ingresando los detalles de la salida, **cuando** ingresa una cantidad que supera el stock disponible del producto, **entonces** el sistema muestra una alerta de error por inventario insuficiente y deshabilita el botón para guardar el documento.
+3. **Dado** que se ha seleccionado un producto y una cantidad válida (menor o igual al stock), **cuando** el operador 2 guarda el registro, **entonces** el documento de Salida de Inventario se emite con éxito en el sistema.
+4. **Dado** un documento de Salida de Inventario recién guardado, **cuando** se consulta la tabla principal de productos, **entonces** el stock disponible de ese ítem disminuye exactamente en la cantidad despachada.
+5. **Dado** que el operador 2 está en medio del llenado de una Salida de Inventario, **cuando** presiona el botón de cancelar o volver, **entonces** no se genera el documento y el stock del inventario permanece inalterado.
 
 ---
 
@@ -98,20 +128,20 @@ Como desarrollador de módulos, quiero declarar un único archivo de configuraci
 
 ---
 
-### Historia de Usuario 6 - Reetiquetar pantallas desde la configuración (Prioridad: P1)
+## Historia de Usuario 6 - Reetiquetar pantallas desde la configuración de Logística e Inventario (Prioridad: P1)
 
-Como desarrollador de módulos, quiero que todas las etiquetas visibles para el usuario deriven de la configuración, para que un módulo adaptado hable su idioma de dominio de forma consistente en todo momento.
+**Estudiante Asignado:** Estudiante 6
 
-**Por qué esta prioridad**: Los usuarios confían en un módulo que dice consistentemente "Cliente" y "Pedido de Venta" en lugar de dejar filtrarse una "Entidad" genérica por media interfaz; la terminología inconsistente hace que los módulos adaptados parezcan rotos. Esta historia depende del perfil de configuración (Historia de Usuario 5).
+Como usuario de logística y desarrollador del módulo, quiero que todas las etiquetas visibles deriven de la configuración en `module-config.js` mapeando "Entidad" a "Producto / Insumo" y "Documento" a "Movimiento de Inventario", para que la interfaz hable el lenguaje operacional de bodega y distribución en todo momento.
 
-**Prueba Independiente**: Un desarrollador mapea Entidad→Cliente y Documento→Pedido de Venta en la configuración, y cada pestaña, botón, etiqueta de formulario, encabezado y mensaje en las tres pantallas usa los términos mapeados.
+Por qué esta prioridad: Los operadores y analistas de bodega confían en un sistema que hable de "Productos", "Stock" y "Movimientos de Entrada/Salida" en lugar de términos genéricos como "Entidad" o "Documento". Una terminología inconsistente genera confusión operacional durante la recepción y despacho.
 
-**Escenarios de Aceptación**:
+Prueba Independiente: Un usuario configura el mapeo Entidad -> "Producto" y Documento -> "Movimiento de Inventario", verificando que cada botón, tabla, pestaña, formulario y mensaje del sistema refleje dichos términos operativos.
 
-1. **Dados** mapeos de términos definidos en la configuración, **cuando** cualquier pantalla carga, **entonces** pestañas, botones, etiquetas de formulario, encabezados y mensajes de estado vacío muestran los términos configurados.
-2. **Dado** que las etiquetas han sido remapeadas, **cuando** el usuario navega entre pantallas, **entonces** el comportamiento de navegación no cambia.
-3. **Dado** que no se proporcionan mapeos, **cuando** cualquier pantalla carga, **entonces** se muestran los términos predeterminados Entidad/Documento.
-
+Escenarios de Aceptación:
+1. Dados los mapeos definidos en `userConfig` (Entidad = "Producto", Documento = "Movimiento de Inventario"), cuando cualquier pantalla carga, entonces los botones de navegación, formularios de stock y mensajes de estado vacío muestran los términos adaptados a logística.
+2. Dado que las etiquetas han sido remapeadas a terminología de bodega, cuando el usuario navega entre pantallas de catálogo y movimientos, entonces la lógica de persistencia y navegación se mantiene intacta.
+3. Dado que no se proporcionan mapeos específicos, cuando el sistema carga, entonces se utilizan los términos base predeterminados del módulo ERP.
 ---
 
 ### Casos Límite
