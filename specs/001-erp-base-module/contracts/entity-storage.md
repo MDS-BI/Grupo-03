@@ -1,79 +1,119 @@
-# Contrato de Almacenamiento de Entidades
+# Contrato de Almacenamiento de Entidades y Documentos
+
+**Feature**: `001-erp-base-module` | **Modelo**: [data-model.md](../data-model.md) | **Fecha**: 2026-11-10
 
 ## Propósito
 
-La aplicación almacena los registros de entidad localmente en el navegador usando `localStorage`.
+Definir la forma de los datos y las operaciones de persistencia que `src/storage.js` expone a la UI. El almacenamiento usa `localStorage` del navegador en un único espacio de trabajo.
 
-## Forma de los Datos
+## Claves de almacenamiento
 
-Cada registro de entidad debe incluir:
+| Clave | Contenido |
+|-------|-----------|
+| `erp.entities` | Arreglo JSON de entidades |
+| `erp.documents` | Arreglo JSON de documentos |
 
-- `id`: cadena única
-- `entity_id`: cadena única, generada automáticamente, usada para vincular documentos
-- `name`: cadena no vacía
-- `code`: cadena no vacía
-- `taxId`: cadena opcional (identificación fiscal)
-- `email`: cadena opcional con formato de correo válido cuando está presente
-- `phone`: cadena opcional
-- `address`: cadena opcional
-- `category`: cadena opcional
-- `description`: cadena opcional
-- `targetDate`: cadena de fecha opcional (YYYY-MM-DD) válida cuando está presente
-- `creditLimit`: número opcional no negativo
-- `paymentTerms`: cadena opcional
-- `createdAt`: cadena de marca de tiempo ISO
-- `updatedAt`: cadena de marca de tiempo ISO
+## Forma de una Entidad
 
-## Operaciones
+```json
+{
+  "entity_id": "ent_01H...",
+  "name": "Caja de tornillos 5 mm",
+  "code": "TOR-005",
+  "category": "Ferretería",
+  "description": "Tornillos de acero",
+  "targetDate": "2026-12-31",
+  "unitOfMeasure": "Cajas",
+  "reorderPoint": 20,
+  "unitCost": 1500,
+  "stockBalance": 100,
+  "customFields": {
+    "sku": "TOR-005",
+    "punto_reorden": 20,
+    "unidad_medida": "Cajas"
+  },
+  "createdAt": "2026-11-10T12:00:00.000Z",
+  "updatedAt": "2026-11-10T12:00:00.000Z"
+}
+```
 
-- `loadEntities()`: devuelve todas las entidades almacenadas.
-- `saveEntities(entities)`: persiste la lista completa.
-- `addEntity(entity)`: añade una nueva entidad.
-- `updateEntity(id, updates)`: actualiza una entidad existente.
-- `deleteEntity(id)`: elimina una entidad por id.
+Reglas:
+- `entity_id`, `createdAt` y `updatedAt` los genera la capa de almacenamiento.
+- `name`, `code` y `category` son obligatorios y no vacíos.
+- `stockBalance` inicia en `0` y nunca puede ser negativo.
+- `reorderPoint` y `unitCost`, si existen, son números ≥ 0.
+- `targetDate`, si existe, es una fecha de calendario válida (`YYYY-MM-DD`).
+- Los campos personalizados se validan según [module-config.md](./module-config.md).
 
-## Almacenamiento de Documentos
+## Forma de un Documento
 
-Cada registro de documento debe incluir:
+```json
+{
+  "document_id": "doc_01H...",
+  "entity_id": "ent_01H...",
+  "type": "ENTRADA",
+  "quantity": 100,
+  "aisle": "A",
+  "shelf": "3",
+  "level": "2",
+  "notes": "Recepción de proveedor",
+  "status": "Completado",
+  "createdAt": "2026-11-10T12:05:00.000Z"
+}
+```
 
-- `id`: cadena única
-- `entity_id`: el entity_id autogenerado de la entidad vinculada
-- `series`: cadena opcional que agrupa folios consecutivos
-- `folio`: entero positivo obligatorio; junto con la serie forma el número oficial del documento
-- `startDate`: cadena de fecha de calendario válida
-- `endDate`: cadena de fecha de calendario válida, igual o posterior a startDate
-- `quantity`: entero positivo opcional
-- `subtotal`: número no negativo opcional
-- `discount`: número no negativo opcional; no puede superar el subtotal
-- `taxAmount`: número no negativo opcional
-- `totalAmount`: número no negativo opcional
-- `currency`: cadena opcional
-- `paymentTerms`: cadena opcional
-- `notes`: cadena opcional
-- `status`: cadena opcional
-- `createdAt`: cadena de marca de tiempo ISO
-- `updatedAt`: cadena de marca de tiempo ISO
+Reglas:
+- `document_id` y `createdAt` los genera la capa de almacenamiento.
+- `entity_id` debe existir; si no, se rechaza el guardado.
+- `type` es `ENTRADA` o `SALIDA`.
+- `quantity` es un entero > 0.
+- `ENTRADA` exige `aisle`, `shelf` y `level` no vacíos.
+- `SALIDA` no usa campos de ubicación.
+- No existen `startDate` ni `endDate`.
+- Una `SALIDA` con `quantity > stockBalance` se rechaza.
 
-Operaciones:
+## Operaciones de Entidades
 
-- `loadDocuments()`: devuelve todos los documentos almacenados.
-- `saveDocuments(documents)`: persiste la lista completa.
-- `addDocument(document)`: añade un nuevo documento.
-- `updateDocument(id, updates)`: actualiza un documento existente.
-- `deleteDocument(id)`: elimina un documento por id.
-- `deleteDocumentsForEntity(entityId)`: elimina todos los documentos vinculados a una entidad eliminada.
+| Operación | Firma | Contrato |
+|-----------|-------|----------|
+| `loadEntities()` | `() => Entity[]` | Devuelve todas las entidades; arreglo vacío si no hay datos o el JSON es inválido |
+| `saveEntities(entities)` | `(Entity[]) => void` | Persiste la lista completa preservando el orden |
+| `addEntity(input)` | `(EntityInput) => Entity` | Genera identidad y marcas de tiempo; valida; persiste |
+| `updateEntity(entityId, updates)` | `(string, Partial<Entity>) => Entity` | Actualiza y refresca `updatedAt`; valida |
+| `deleteEntity(entityId)` | `(string) => void` | Elimina la entidad y sus documentos en cascada |
 
-## Expectativas de Validación
+## Operaciones de Documentos
 
-- Un `name` o `code` faltante debe rechazarse antes de la persistencia.
-- Un `email` presente debe tener formato de correo válido y un `creditLimit` presente debe ser un número no negativo.
-- Un documento sin `folio` entero positivo debe rechazarse; un `discount` mayor que el `subtotal` debe rechazarse.
-- Un entity_id debe generarse automáticamente y debe ser único.
-- Un documento sin un `entity_id` que coincida con una entidad existente debe rechazarse.
-- Eliminar una entidad también debe eliminar todos los documentos vinculados a su entity_id.
-- Las operaciones de almacenamiento deben preservar el orden actual de la lista y actualizar las marcas de tiempo.
+| Operación | Firma | Contrato |
+|-----------|-------|----------|
+| `loadDocuments()` | `() => Document[]` | Devuelve todos los documentos |
+| `saveDocuments(documents)` | `(Document[]) => void` | Persiste la lista completa |
+| `addDocument(input)` | `(DocumentInput) => Document` | Valida, genera identidad/tiempo y aplica el efecto de stock |
+| `updateDocument(documentId, updates)` | `(string, Partial<Document>) => Document` | Valida y ajusta el stock por la diferencia |
+| `deleteDocument(documentId)` | `(string) => void` | Elimina y revierte el efecto de stock |
+| `deleteDocumentsForEntity(entityId)` | `(string) => void` | Elimina todos los documentos de una entidad |
 
-## Expectativas de Extensibilidad
+## Operaciones de Consulta
 
-- Los campos adicionales añadidos por módulos personalizados deben persistirse junto a los campos base sin manejo especial en la capa de almacenamiento.
-- Las operaciones base anteriores permanecen estables para que los módulos personalizados puedan construir sobre ellas sin modificación.
+| Operación | Firma | Contrato |
+|-----------|-------|----------|
+| `searchEntities(term, category?)` | `(string, string?) => Entity[]` | Busca por nombre, código, categoría, descripción y campos personalizados; vacío devuelve todo |
+| `getLatestLocation(entityId)` | `(string) => Location \| null` | Deriva la ubicación del documento `ENTRADA` más reciente |
+| `getDashboardStats(category?)` | `(string?) => Stats` | Devuelve conteo, valoración y críticos, opcionalmente filtrados por categoría |
+
+## Validación
+
+- Una entidad sin `name`, `code` o `category` se rechaza antes de persistir.
+- Un campo personalizado obligatorio vacío o con tipo inválido se rechaza.
+- Un documento sin `entity_id` válido se rechaza.
+- Un documento `ENTRADA` sin ubicación completa se rechaza.
+- Una `SALIDA` con cantidad superior al stock se rechaza.
+- Un `status` fuera del ciclo configurado se rechaza.
+- Eliminar una entidad elimina todos sus documentos.
+- Las operaciones preservan el orden de la lista salvo que el llamador lo cambie explícitamente.
+
+## Extensibilidad
+
+- Los campos adicionales de módulos personalizados se persisten junto a los campos base sin manejo especial.
+- Las firmas anteriores son estables para que los módulos personalizados construyan sobre ellas sin modificar el núcleo.
+- La UI nunca accede directamente a `localStorage`; siempre usa estas operaciones.

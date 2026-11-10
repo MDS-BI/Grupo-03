@@ -2,14 +2,21 @@
   "name": "erp-base-module",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "test": "vitest"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
     "jsdom": "^30.0.1",
+    "prettier": "^3.9.10",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
   }

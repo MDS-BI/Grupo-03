@@ -11,6 +11,7 @@ El desarrollo se realiza utilizando la metodología **Spec Driven Development (S
 El módulo permite gestionar el ciclo operativo de bodegas, control de existencias y movimiento de mercancías. Ofrece una interfaz de usuario completamente en español para la gestión de catálogo de productos, registro de proveedores y trazabilidad de entradas/salidas de stock.
 
 ### Características Principales
+
 - **Dashboard Principal:** Métricas en tiempo real de stock total, ítems bajo punto de reorden y accesos rápidos.
 - **Gestión de Entidades (Productos y Proveedores):** Administración del maestro de productos, SKU, ubicaciones y datos de proveedores.
 - **Gestión de Documentos (Movimientos de Inventario):** Registro de guías de recepción, despachos y transferencias de stock.
@@ -29,34 +30,39 @@ La adaptación del módulo base a **Logística e Inventario** se define a travé
   - Documentos: **Movimiento de Inventario**
 - **Campos Personalizados (`customFields`):**
   - `sku` (Texto, Requerido)
-  - `punto_reorden` (Número, Requerido)
-  - `ubicacion_bodega` (Texto)
-  - `tipo_movimiento` (Selección: Entrada, Salida, Transferencia)
+  - `punto_reorden` (Número, Requerido, mínimo 0)
+  - `unidad_medida` (Selección: Unidades, Cajas, Kg, Litros)
+  - `tipo_movimiento` (Selección: Entrada, Salida) en documentos
 - **Ciclo de Vida de Estado (`statusLifecycle`):**
   - Estados: `Borrador` → `Pendiente` → `Completado` / `Cancelado`
+- **Color de Acento (`theme.accentColor`):** `#1f6feb`
 
 ---
 
 ## 3. Instalación y Ejecución
 
 ### Requisitos Previos
+
 - Node.js (versión 18 o superior)
 - npm o yarn
 
 ### Pasos para Ejecutar Localmente
 
 1. **Clonar el repositorio:**
+
    ```bash
    git clone <URL_DEL_REPOSITORIO>
    cd <NOMBRE_DEL_REPOSITORIO>
    ```
 
 2. **Instalar dependencias:**
+
    ```bash
    npm install
    ```
 
 3. **Iniciar el servidor de desarrollo:**
+
    ```bash
    npm run dev
    ```
@@ -70,13 +76,21 @@ La adaptación del módulo base a **Logística e Inventario** se define a travé
 El proyecto cuenta con una suite de pruebas unitarias e integración con Vitest.
 
 - **Ejecutar pruebas en modo watch:**
+
   ```bash
   npm test
   ```
 
 - **Ejecutar pruebas una sola vez:**
+
   ```bash
-  npx vitest run
+  npm run test:run
+  ```
+
+- **Verificar estilo y compilar:**
+  ```bash
+  npm run lint
+  npm run build
   ```
 
 ---
@@ -85,8 +99,9 @@ El proyecto cuenta con una suite de pruebas unitarias e integración con Vitest.
 
 La especificación detallada del módulo, requerida para las entregas del curso, se encuentra distribuida en la carpeta de especificaciones:
 
-- [`plan.md`](./specs/plan.md): Plan de trabajo, historias de usuario, perfiles de clientes y mitigación de sesgos.
-- [`data-model.md`](./specs/data-model.md): Modelo Entidad-Relación (MER) en Mermaid, diccionario de variables críticas y análisis de escalabilidad.
+- [`plan.md`](./specs/001-erp-base-module/plan.md): Plan de trabajo, historias de usuario, perfiles de clientes y mitigación de sesgos.
+- [`data-model.md`](./specs/001-erp-base-module/data-model.md): Modelo Entidad-Relación (MER) en Mermaid, diccionario de variables críticas y análisis de escalabilidad.
+- [`quickstart.md`](./specs/001-erp-base-module/quickstart.md): Escenarios de validación de extremo a extremo.
 
 ---
 
@@ -96,4 +111,4 @@ La especificación detallada del módulo, requerida para las entregas del curso,
 - **Facultad:** Facultad de Ingeniería
 - **Departamento:** Departamento de Ingeniería Industrial (DII)
 - **Asignatura:** Modelación de Sistemas (2026-2)
-- 
+-

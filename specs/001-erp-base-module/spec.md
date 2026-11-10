@@ -15,6 +15,14 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 - Q: ¿Las operaciones de inventario (saldo de stock, ubicaciones pasillo/estante/nivel y validación de existencias) deben formar parte del alcance funcional de este módulo base, o solo del módulo personalizado construido sobre él? → A: Forman parte del módulo base como comportamiento nativo; stock, ubicaciones y validación de existencias se implementan en el núcleo (Entidad=Producto, Documento=Movimiento de Inventario vía configuración).
 
+### Session 2026-11-10
+
+- Q: ¿El inicio de sesión y el acceso por roles forman parte del alcance del módulo base o los roles son solo etiquetas descriptivas en una demo de un único usuario? → A: Los roles son etiquetas descriptivas; no se implementa autenticación, inicio de sesión ni permisos, y se opera en un único espacio de trabajo local.
+- Q: ¿Cómo debe calcularse el KPI de valoración total del stock si las historias de recepción y despacho prohíben campos de costo, precio o financieros en cualquier pantalla? → A: Se añade un `costo_unitario` opcional al maestro de producto; la valoración es la suma de (stock × costo_unitario) y solo se muestra en el panel y el catálogo, nunca como campo de entrada en los formularios de Entrada o Salida de Inventario.
+- Q: ¿La ubicación física (pasillo, estante, nivel) se registra por movimiento de inventario o como una única ubicación actual en el producto? → A: Se registra en cada documento de Entrada de Inventario; el detalle del producto muestra la ubicación del documento de entrada más reciente (derivada, sin duplicar).
+- Q: ¿La categoría es un campo obligatorio al crear una entidad o es opcional? → A: Es obligatoria, junto con nombre y código.
+- Q: ¿Qué campos debe tener un Documento (movimiento de inventario) y debe soportar un rango de fechas inicial/final? → A: El Documento tiene vínculo a la entidad, tipo (Entrada/Salida), cantidad, marca de tiempo automática y notas opcionales; no admite rango de fechas.
+
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
 Historia de Usuario 1 — Parametrización del ERP y Datos Maestros de Entidades (Prioridad: P1)
@@ -60,7 +68,7 @@ Es una dependencia directa de otras historias de usuario, como la salida de inve
 Impacta la precisión del inventario desde el origen: un error en la entrada se propaga a todo el flujo posterior.
 La asignación de ubicación física permite localizar el producto desde el momento en que llega, reduciendo tiempos de búsqueda y pérdidas.
 
-**Prueba Independiente**: Iniciar sesión con un usuario de rol Operador de Recepción.
+**Prueba Independiente**: Acceder al módulo con el rol descriptivo Operador de Recepción.
 Dar de alta un producto nuevo (por ejemplo, “Caja de tornillos 5 mm”).
 Registrar un documento de Entrada de Inventario con 100 unidades y asignar la ubicación Pasillo A, Estante 3, Nivel 2.
 Verificar que el stock disponible del producto sea 100 y que su ubicación quede registrada.
@@ -68,7 +76,7 @@ Confirmar que en ningún formulario ni pantalla aparecen campos de costo, precio
 
 **Escenarios de Aceptación**:
 
-1. Dado que el operador está autenticado y el producto no existe en el sistema
+1. Dado que el operador está en el módulo y el producto no existe en el sistema
 Cuando completa el formulario de alta con los datos operativos obligatorios (código, nombre, unidad de medida) y lo guarda
 Entonces el producto queda registrado y disponible para ser usado en entradas de inventario.
 2. Dado que existe un producto registrado
@@ -127,7 +135,7 @@ Como Analista 1 de Inventarios, quiero categorizar el catálogo de productos y v
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el Analista 1 inicia sesión con el rol de Analista de Inventarios, **cuando** aterriza en la página principal, **entonces** el sistema le muestra un Dashboard con tarjetas de estadísticas que resumen el inventario total.
+1. **Dado** que el Analista 1 accede al panel con el rol descriptivo de Analista de Inventarios, **cuando** aterriza en la página principal, **entonces** el sistema le muestra un Dashboard con tarjetas de estadísticas que resumen el inventario total.
 2. **Dado** que el Analista 1 está en el panel principal, **cuando** observa los KPIs, **entonces** debe visualizar claramente al menos tres métricas: total de registros (productos), valoración total del stock y cantidad de productos con stock en nivel crítico.
 3. **Dado** que el Analista 1 está gestionando el catálogo, **cuando** crea o edita un producto, **entonces** el sistema le permite asignarle una categoría específica a través de una lista desplegable.
 4. **Dado** que el panel principal cuenta con una herramienta de búsqueda o filtro, **cuando** el Analista 1 selecciona una categoría específica, **entonces** el listado de productos de la tabla se actualiza para mostrar únicamente los ítems correspondientes a esa categoría.
@@ -160,7 +168,6 @@ Escenarios de Aceptación:
 - ¿Qué ocurre si un usuario intenta editar o eliminar una entidad que ya no existe?
 - ¿Qué ocurre cuando un usuario introduce una fecha objetivo que no es una fecha de calendario válida?
 - ¿Qué ocurre con los documentos de una entidad cuando esta se elimina?
-- ¿Qué ocurre cuando un usuario introduce una fecha final anterior a la fecha inicial en un documento?
 - ¿Qué ocurre cuando la configuración declara un campo personalizado cuya clave choca con un nombre de campo base?
 - ¿Qué ocurre cuando la configuración referencia un tipo de campo desconocido o una definición de transición de ciclo de vida inválida?
 - ¿Qué ocurre cuando los registros almacenados contienen valores de campos personalizados que ya no están declarados en la configuración?
@@ -176,7 +183,7 @@ Escenarios de Aceptación:
 
 ### Requisitos Funcionales
 
-- **FR-001**: El sistema DEBE permitir a los usuarios crear un registro de entidad con al menos un nombre y un código.
+- **FR-001**: El sistema DEBE permitir a los usuarios crear un registro de entidad con al menos un nombre, un código y una categoría.
 - **FR-002**: El sistema DEBE permitir a los usuarios editar los detalles de un registro de entidad existente.
 - **FR-003**: El sistema DEBE permitir a los usuarios eliminar un registro de entidad existente.
 - **FR-004**: El sistema DEBE permitir a los usuarios buscar registros de entidad por nombre, código, categoría u otras palabras clave descriptivas.
@@ -216,9 +223,10 @@ Escenarios de Aceptación:
 - **FR-038**: La configuración PUEDE definir un color de acento; el sistema DEBE aplicarlo consistentemente en todo el marco y retroceder de forma segura a los valores integrados cuando esté ausente o sea inválido.
 - **FR-039**: En ventanas gráficas estrechas, la barra lateral DEBE contraerse a una columna de iconos manteniéndose operable.
 - **FR-040**: El sistema DEBE mantener un saldo de stock disponible por entidad que se incrementa al registrar una Entrada de Inventario y disminuye al registrar una Salida de Inventario, exactamente en la cantidad indicada en el documento.
-- **FR-041**: El sistema DEBE registrar la ubicación física de los productos recibidos mediante pasillo, estante y nivel, y mostrarla en el detalle del producto.
+- **FR-041**: El sistema DEBE registrar la ubicación física (pasillo, estante, nivel) en cada documento de Entrada de Inventario y mostrar en el detalle del producto la ubicación del documento de entrada más reciente.
 - **FR-042**: El sistema DEBE impedir registrar una Salida de Inventario cuya cantidad supere el stock disponible de la entidad, mostrando un mensaje de error descriptivo.
 - **FR-043**: El sistema DEBE clasificar cada documento de inventario por tipo (Entrada o Salida) y aplicar el efecto correspondiente sobre el saldo de stock.
+- **FR-044**: El sistema DEBE calcular la valoración total del stock como la suma de (saldo de stock × costo_unitario) por entidad, mostrarla únicamente en el panel y el catálogo, y no ofrecerla como campo de entrada en los formularios de Entrada o Salida de Inventario.
 
 ### Requisitos de Extensibilidad *(obligaciones del módulo base)*
 
@@ -232,8 +240,8 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 
 ### Entidades Clave *(incluir si la funcionalidad implica datos)*
 
-- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, código de negocio, detalles descriptivos, categoría de clasificación, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y ubicación física (pasillo, estante, nivel). Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
-- **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (p. ej., Entrada o Salida de Inventario) y con la cantidad que afecta el saldo de stock. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
+- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, código de negocio, categoría de clasificación obligatoria, detalles descriptivos, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
+- **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (Entrada o Salida de Inventario), con la cantidad que afecta el saldo de stock, una marca de tiempo automática y notas opcionales. Los documentos de Entrada registran además la ubicación física (pasillo, estante, nivel). Los documentos no admiten rango de fechas inicial/final. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
 - **ModuleConfig**: El objeto de adaptación cargado al arrancar que define el nombre del módulo, las etiquetas de terminología, las definiciones de campos personalizados y el ciclo de vida de estados de documentos. Consulte data-model.md para su forma completa.
 
 ## Criterios de Éxito *(obligatorio)*
@@ -254,6 +262,8 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 ## Suposiciones
 
 - El módulo base gestiona datos para un único espacio de trabajo en lugar de una base de datos multiinquilino compartida.
+- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) son etiquetas descriptivas; el módulo base no implementa autenticación, inicio de sesión ni permisos.
+- La valoración del stock usa un `costo_unitario` opcional por producto y se muestra solo en el panel y el catálogo; los formularios de Entrada y Salida de Inventario no incluyen campos de costo.
 - La adaptación a un módulo específico se realiza mediante un archivo de configuración del módulo en lugar de editando archivos fuente centrales.
 - Cada entidad incluye información básica suficiente para identificación y seguimiento; los módulos personalizados aportan los campos específicos del dominio.
 - La versión inicial se centra en la gestión central de datos maestros y documentos en lugar de capacidades ERP avanzadas como flujos de aprobación, períodos de contabilización o informes.

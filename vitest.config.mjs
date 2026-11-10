@@ -2,6 +2,10 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    fileParallelism: false
+    environment: 'jsdom',
+    setupFiles: ['./tests/setup.js'],
+    fileParallelism: false,
+    clearMocks: true,
+    restoreMocks: true
   }
 });
