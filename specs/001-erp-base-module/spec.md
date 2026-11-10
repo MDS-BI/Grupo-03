@@ -9,6 +9,12 @@
 
 Este proyecto sirve como módulo base reutilizable para construir módulos ERP personalizados. Establece los patrones comunes que todo módulo ERP necesita: gestionar registros de datos maestros (**Entidades**) y sus **Documentos** transaccionales asociados, con navegación, validación, persistencia y búsqueda ya implementadas, de modo que los módulos personalizados solo necesiten definir sus campos y reglas específicos del dominio.
 
+## Clarifications
+
+### Session 2026-11-03
+
+- Q: ¿Las operaciones de inventario (saldo de stock, ubicaciones pasillo/estante/nivel y validación de existencias) deben formar parte del alcance funcional de este módulo base, o solo del módulo personalizado construido sobre él? → A: Forman parte del módulo base como comportamiento nativo; stock, ubicaciones y validación de existencias se implementan en el núcleo (Entidad=Producto, Documento=Movimiento de Inventario vía configuración).
+
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
 Historia de Usuario 1 — Parametrización del ERP y Datos Maestros de Entidades (Prioridad: P1)
@@ -206,6 +212,10 @@ Escenarios de Aceptación:
 - **FR-037**: La barra lateral DEBE resaltar visualmente el módulo activo en cada pantalla.
 - **FR-038**: La configuración PUEDE definir un color de acento; el sistema DEBE aplicarlo consistentemente en todo el marco y retroceder de forma segura a los valores integrados cuando esté ausente o sea inválido.
 - **FR-039**: En ventanas gráficas estrechas, la barra lateral DEBE contraerse a una columna de iconos manteniéndose operable.
+- **FR-040**: El sistema DEBE mantener un saldo de stock disponible por entidad que se incrementa al registrar una Entrada de Inventario y disminuye al registrar una Salida de Inventario, exactamente en la cantidad indicada en el documento.
+- **FR-041**: El sistema DEBE registrar la ubicación física de los productos recibidos mediante pasillo, estante y nivel, y mostrarla en el detalle del producto.
+- **FR-042**: El sistema DEBE impedir registrar una Salida de Inventario cuya cantidad supere el stock disponible de la entidad, mostrando un mensaje de error descriptivo.
+- **FR-043**: El sistema DEBE clasificar cada documento de inventario por tipo (Entrada o Salida) y aplicar el efecto correspondiente sobre el saldo de stock.
 
 ### Requisitos de Extensibilidad *(obligaciones del módulo base)*
 
@@ -219,8 +229,8 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 
 ### Entidades Clave *(incluir si la funcionalidad implica datos)*
 
-- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, código de negocio, detalles descriptivos, categoría de clasificación, una fecha objetivo opcional y un entity_id autogenerado. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
-- **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
+- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, código de negocio, detalles descriptivos, categoría de clasificación, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y ubicación física (pasillo, estante, nivel). Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
+- **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (p. ej., Entrada o Salida de Inventario) y con la cantidad que afecta el saldo de stock. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
 - **ModuleConfig**: El objeto de adaptación cargado al arrancar que define el nombre del módulo, las etiquetas de terminología, las definiciones de campos personalizados y el ciclo de vida de estados de documentos. Consulte data-model.md para su forma completa.
 
 ## Criterios de Éxito *(obligatorio)*
