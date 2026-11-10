@@ -111,20 +111,23 @@ Como Operador 2 de Despacho, quiero procesar documentos de Salida de Inventario 
 
 ---
 
-### Historia de Usuario 5 - Definir un perfil de configuración del módulo (Prioridad: P1)
+### Historia de Usuario 5 - Agrupación analítica y paneles estadísticos de stock (Prioridad: P1)
 
-Como desarrollador de módulos, quiero declarar un único archivo de configuración que defina la identidad, terminología, campos personalizados y reglas de mi módulo, para adaptar el módulo base en un módulo específico sin modificar su código central.
+Como Analista 1 de Inventarios, quiero categorizar el catálogo de productos y visualizar indicadores clave (KPIs) de conteo de registros, valoración de stock y productos con nivel crítico, para monitorear la salud operacional del almacén en el panel principal.
 
-**Por qué esta prioridad**: La adaptación mediante configuración es lo que convierte este proyecto de una aplicación fija en una base reutilizable. Sin ella, cada módulo personalizado requeriría editar archivos fuente centrales, lo que frustra el propósito de la plantilla; todas las historias de personalización posteriores dependen de que este mecanismo exista primero.
+**Por qué esta prioridad**: El análisis de datos y la visualización del estado del inventario son fundamentales para la toma de decisiones ágiles. Sin un panel estadístico claro y categorizado, el equipo no puede detectar rápidamente quiebres de stock, inmovilización de capital ni evaluar la salud global del almacén.
 
-**Prueba Independiente**: Un desarrollador proporciona un archivo de configuración que define un perfil de Ventas (nombre del módulo, mapeos Entidad→Cliente, campos personalizados, ciclo de vida), y la aplicación se presenta plenamente como un módulo de Ventas; al quitar el archivo se restauran los valores predeterminados de la base sin errores.
+**Prueba Independiente**: El Analista 1 abre la aplicación, visualiza el panel principal con las tarjetas de estadísticas globales, filtra la vista seleccionando una categoría de productos específica, y comprueba que las tarjetas de KPIs (conteo, valoración y niveles críticos) se recalculan dinámicamente al instante para reflejar solo los datos de esa categoría elegida.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que un archivo de configuración define el nombre del módulo, **cuando** la aplicación carga, **entonces** el panel de inicio y el marco del espacio de trabajo muestran el nombre configurado.
-2. **Dada** una configuración completa (nombre, mapeos de términos, campos personalizados, ciclo de vida), **cuando** la aplicación carga, **entonces** el módulo se presenta plenamente bajo la identidad configurada sin que se vean términos del módulo base en ningún sitio.
-3. **Dado** que no se proporciona configuración, **cuando** la aplicación carga, **entonces** la aplicación retrocede a los valores predeterminados integrados Entidad/Documento sin errores.
-4. **Dada** una configuración con valores inválidos o conflictivos, **cuando** la aplicación carga, **entonces** el sistema informa del problema con claridad en lugar de fallar silenciosamente.
+1. **Dado** que el Analista 1 inicia sesión con el rol de Analista de Inventarios, **cuando** aterriza en la página principal, **entonces** el sistema le muestra un Dashboard con tarjetas de estadísticas que resumen el inventario total.
+2. **Dado** que el Analista 1 está en el panel principal, **cuando** observa los KPIs, **entonces** debe visualizar claramente al menos tres métricas: total de registros (productos), valoración total del stock y cantidad de productos con stock en nivel crítico.
+3. **Dado** que el Analista 1 está gestionando el catálogo, **cuando** crea o edita un producto, **entonces** el sistema le permite asignarle una categoría específica a través de una lista desplegable.
+4. **Dado** que el panel principal cuenta con una herramienta de búsqueda o filtro, **cuando** el Analista 1 selecciona una categoría específica, **entonces** el listado de productos de la tabla se actualiza para mostrar únicamente los ítems correspondientes a esa categoría.
+5. **Dado** que el Analista 1 ha filtrado la vista por una categoría, **cuando** revisa las tarjetas de estadísticas superiores, **entonces** los valores de conteo, valoración y nivel crítico se recalculan dinámicamente excluyendo los datos de las demás categorías.
+6. **Dado** que el stock de un producto cae por debajo de su umbral de seguridad, **cuando** el sistema actualiza la base de datos, **entonces** el indicador de "productos con nivel crítico" en el panel del Analista aumenta automáticamente y muestra una alerta visual.
+7. **Dado** que el Analista 1 tiene un filtro de categoría activo, **cuando** presiona un botón para "limpiar filtros", **entonces** el panel y los KPIs vuelven a mostrar los valores globales de todo el inventario de la bodega.
 
 ---
 
