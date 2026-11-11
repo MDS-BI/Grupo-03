@@ -23,6 +23,10 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 - Q: ¿La categoría es un campo obligatorio al crear una entidad o es opcional? → A: Es obligatoria, junto con nombre y código.
 - Q: ¿Qué campos debe tener un Documento (movimiento de inventario) y debe soportar un rango de fechas inicial/final? → A: El Documento tiene vínculo a la entidad, tipo (Entrada/Salida), cantidad, marca de tiempo automática y notas opcionales; no admite rango de fechas.
 
+### Session 2026-11-11
+
+- Q: ¿Debe el código (SKU) de una entidad ser único en todo el sistema, bloqueando el guardado cuando ya existe otro registro con el mismo código? → A: Sí, el código es único globalmente: crear o editar una entidad con un código ya existente se bloquea con un mensaje de error descriptivo.
+
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
 Historia de Usuario 1 — Parametrización del ERP y Datos Maestros de Entidades (Prioridad: P1)
@@ -227,6 +231,7 @@ Escenarios de Aceptación:
 - **FR-042**: El sistema DEBE impedir registrar una Salida de Inventario cuya cantidad supere el stock disponible de la entidad, mostrando un mensaje de error descriptivo.
 - **FR-043**: El sistema DEBE clasificar cada documento de inventario por tipo (Entrada o Salida) y aplicar el efecto correspondiente sobre el saldo de stock.
 - **FR-044**: El sistema DEBE calcular la valoración total del stock como la suma de (saldo de stock × costo_unitario) por entidad, mostrarla únicamente en el panel y el catálogo, y no ofrecerla como campo de entrada en los formularios de Entrada o Salida de Inventario.
+- **FR-045**: El sistema DEBE impedir crear o editar una entidad cuyo código coincida con el de otra entidad existente (excluyendo la propia entidad en edición), mostrando un mensaje de error descriptivo.
 
 ### Requisitos de Extensibilidad *(obligaciones del módulo base)*
 
@@ -240,7 +245,7 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 
 ### Entidades Clave *(incluir si la funcionalidad implica datos)*
 
-- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, código de negocio, categoría de clasificación obligatoria, detalles descriptivos, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
+- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, un código de negocio único en todo el sistema, una categoría de clasificación obligatoria, detalles descriptivos, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
 - **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (Entrada o Salida de Inventario), con la cantidad que afecta el saldo de stock, una marca de tiempo automática y notas opcionales. Los documentos de Entrada registran además la ubicación física (pasillo, estante, nivel). Los documentos no admiten rango de fechas inicial/final. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
 - **ModuleConfig**: El objeto de adaptación cargado al arrancar que define el nombre del módulo, las etiquetas de terminología, las definiciones de campos personalizados y el ciclo de vida de estados de documentos. Consulte data-model.md para su forma completa.
 
