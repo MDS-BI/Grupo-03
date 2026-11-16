@@ -28,11 +28,13 @@ describe('integración: shell, navegación y búsqueda', () => {
     await tick();
     expect(window.location.hash).toBe('#/entities');
     expect(document.querySelector('[data-testid="entities-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="documents-panel"]')).toBeNull();
 
     document.querySelector('[data-testid="nav-documents"]').click();
     await tick();
     expect(window.location.hash).toBe('#/documents');
     expect(document.querySelector('[data-testid="documents-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="entities-panel"]')).toBeNull();
 
     document.querySelector('[data-testid="nav-dashboard"]').click();
     await tick();

@@ -1,6 +1,16 @@
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'build/**', 'coverage/**', 'package-lock.json']
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'build/**',
+      'coverage/**',
+      'package-lock.json',
+      'streamlit_app/**',
+      '.venv/**',
+      '.specify/**',
+      '.opencode/**'
+    ]
   },
   {
     files: ['**/*.js', '**/*.mjs'],

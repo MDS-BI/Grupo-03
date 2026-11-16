@@ -93,7 +93,9 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function navigate(view, options = {}) {
     const nextSection = options.section ?? state.section;
-    if (state.view === 'manage' && view !== 'manage' && !confirmDiscard()) return;
+    const leavingManage =
+      state.view === 'manage' && (view !== 'manage' || nextSection !== state.section);
+    if (leavingManage && !confirmDiscard()) return;
 
     if (options.pendingFocus) state.pendingFocus = options.pendingFocus;
 
@@ -229,28 +231,13 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     handleEntityDelete(entity);
   }
 
-  function renderManage(container) {
-    clear(container);
-    const notice = state.notice;
-    state.notice = null;
-
-    const entities = loadEntities();
-    const categories = getCategories(entities);
-    const documents = loadDocuments();
+  function renderEntityPanel(entities, categories) {
     const labels = config.labels;
-
     const editingEntity = state.editingEntityId ? getEntity(state.editingEntityId) : null;
     let missingEntity = false;
     if (state.editingEntityId && !editingEntity) {
       missingEntity = true;
       state.editingEntityId = null;
-    }
-
-    const editingDocument = state.editingDocumentId ? getDocument(state.editingDocumentId) : null;
-    let missingDocument = false;
-    if (state.editingDocumentId && !editingDocument) {
-      missingDocument = true;
-      state.editingDocumentId = null;
     }
 
     const entitySelector = h(
@@ -260,7 +247,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         'data-testid': 'entity-selector',
         onchange: (event) => {
           state.editingEntityId = event.target.value || null;
-          renderManage(container);
+          render();
         }
       },
       option(
@@ -321,6 +308,18 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     });
     state.formApis.entity = entityFormApi;
 
+    return entityPanel;
+  }
+
+  function renderDocumentPanel(entities, documents) {
+    const labels = config.labels;
+    const editingDocument = state.editingDocumentId ? getDocument(state.editingDocumentId) : null;
+    let missingDocument = false;
+    if (state.editingDocumentId && !editingDocument) {
+      missingDocument = true;
+      state.editingDocumentId = null;
+    }
+
     const entityMap = new Map(entities.map((entity) => [entity.entity_id, entity]));
     const documentSelector = h(
       'select',
@@ -329,7 +328,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         'data-testid': 'document-selector',
         onchange: (event) => {
           state.editingDocumentId = event.target.value || null;
-          renderManage(container);
+          render();
         }
       },
       option(
@@ -392,6 +391,30 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     });
     state.formApis.document = documentFormApi;
 
+    return documentPanel;
+  }
+
+  function renderManage(container) {
+    clear(container);
+    const notice = state.notice;
+    state.notice = null;
+
+    const entities = loadEntities();
+    const documents = loadDocuments();
+    const labels = config.labels;
+    const isDocuments = state.section === 'documents';
+
+    const activeSectionTitle = isDocuments
+      ? labels.document.plural
+      : labels.entity.plural;
+    const activeSectionSubtitle = isDocuments
+      ? 'Registre entradas y salidas y consulte el historial de movimientos.'
+      : 'Cree, edite o elimine los registros del catálogo maestro.';
+
+    const panel = isDocuments
+      ? renderDocumentPanel(entities, documents)
+      : renderEntityPanel(entities, getCategories(entities));
+
     const manageContent = h(
       'div',
       { class: 'stack' },
@@ -401,23 +424,15 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         h(
           'div',
           {},
-          h('h2', {}, labels.manage),
-          h(
-            'p',
-            { class: 'page-subtitle' },
-            'Área de creación, edición y eliminación de registros.'
-          )
+          h('h2', {}, `${labels.manage} · ${activeSectionTitle}`),
+          h('p', { class: 'page-subtitle' }, activeSectionSubtitle)
         )
       ),
       notice ? h('p', { class: 'alert alert-warning', role: 'alert' }, notice) : null,
-      h('div', { class: 'manage-grid' }, entityPanel, documentPanel)
+      h('div', { class: 'manage-grid' }, panel)
     );
 
     container.append(manageContent);
-
-    if (state.section === 'documents' && typeof documentPanel.scrollIntoView === 'function') {
-      documentPanel.scrollIntoView({ block: 'start' });
-    }
   }
 
   function render() {

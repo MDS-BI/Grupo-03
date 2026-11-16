@@ -1,24 +1,25 @@
 :root {
-  --accent: #1f6feb;
+  --accent: #4c8dff;
   --accent-contrast: #ffffff;
-  --bg: #f4f6fb;
-  --surface: #ffffff;
-  --surface-muted: #eef2f9;
-  --border: #d8deea;
-  --text: #162033;
-  --text-muted: #5b677d;
-  --danger: #b42318;
-  --danger-bg: #fef3f2;
-  --success: #067647;
-  --success-bg: #ecfdf3;
-  --warning: #b54708;
-  --warning-bg: #fffaeb;
+  --bg: #0b1017;
+  --surface: #151c26;
+  --surface-muted: #1e2733;
+  --border: #2b3644;
+  --text: #e6edf5;
+  --text-muted: #9aa8ba;
+  --danger: #ff7b72;
+  --danger-bg: #2e1517;
+  --success: #3fb950;
+  --success-bg: #10281a;
+  --warning: #e3a008;
+  --warning-bg: #2b2110;
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.35);
   --sidebar-width: 232px;
   --sidebar-collapsed: 68px;
   --topbar-height: 64px;
+  color-scheme: dark;
   font-family:
     Inter,
     system-ui,
@@ -165,7 +166,7 @@ a {
 }
 
 .nav-button[aria-current='page'] {
-  background: color-mix(in srgb, var(--accent) 12%, white);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
   color: var(--accent);
 }
 
@@ -225,7 +226,7 @@ a {
 
 .config-warning {
   background: var(--warning-bg);
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, white);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
   color: var(--warning);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
@@ -445,7 +446,7 @@ a {
 }
 
 .button:hover:not(:disabled) {
-  filter: brightness(0.97);
+  filter: brightness(1.12);
 }
 
 .button:disabled {
@@ -461,7 +462,7 @@ a {
 .button-danger {
   background: var(--danger-bg);
   color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 25%, white);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .button-ghost {
@@ -483,19 +484,19 @@ a {
 .alert-danger {
   background: var(--danger-bg);
   color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 25%, white);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .alert-warning {
   background: var(--warning-bg);
   color: var(--warning);
-  border: 1px solid color-mix(in srgb, var(--warning) 25%, white);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
 }
 
 .alert-success {
   background: var(--success-bg);
   color: var(--success);
-  border: 1px solid color-mix(in srgb, var(--success) 25%, white);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
 }
 
 .alert:empty {
