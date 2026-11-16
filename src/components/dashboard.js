@@ -1,5 +1,11 @@
 import { formatCurrency, h, option } from './dom.js';
-import { getDashboardStats, loadDocuments, loadEntities, searchEntities } from '../storage.js';
+import {
+  getDashboardStats,
+  getReorderAlerts,
+  loadDocuments,
+  loadEntities,
+  searchEntities
+} from '../storage.js';
 import { renderEntityList } from './entity-list.js';
 import { renderDocumentList } from './document-list.js';
 import { icon } from './shell.js';
@@ -35,6 +41,7 @@ export function renderDashboard(
     const allEntities = loadEntities();
     const allDocuments = loadDocuments();
     const stats = getDashboardStats(selectedCategory);
+    const alerts = getReorderAlerts(selectedCategory);
     const filteredEntities = searchEntities('', selectedCategory);
     const filteredEntityIds = new Set(filteredEntities.map((entity) => entity.entity_id));
     const filteredDocuments = selectedCategory
@@ -156,6 +163,70 @@ export function renderDashboard(
           )
         : null;
 
+    const alertsPanel = h(
+      'section',
+      { class: 'panel', 'data-testid': 'reorder-alerts' },
+      h(
+        'div',
+        { class: 'panel-header' },
+        h(
+          'div',
+          {},
+          h('h3', {}, 'Alertas de reposición'),
+          h(
+            'p',
+            { class: 'panel-subtitle' },
+            'Productos con stock por debajo del punto de reorden.'
+          )
+        )
+      ),
+      alerts.length === 0
+        ? h(
+            'div',
+            { class: 'empty-state', 'data-testid': 'reorder-alerts-empty' },
+            h('h3', {}, 'No hay alertas de reposición'),
+            h('p', {}, 'Todos los productos están en nivel adecuado o sin punto de reorden.')
+          )
+        : h(
+            'div',
+            { class: 'table-wrap' },
+            h(
+              'table',
+              { class: 'data-table', 'data-testid': 'reorder-alerts-table' },
+              h(
+                'thead',
+                {},
+                h(
+                  'tr',
+                  {},
+                  h('th', { scope: 'col' }, 'Código'),
+                  h('th', { scope: 'col' }, 'Nombre'),
+                  h('th', { scope: 'col' }, 'Categoría'),
+                  h('th', { scope: 'col' }, 'Stock'),
+                  h('th', { scope: 'col' }, 'Punto de reorden'),
+                  h('th', { scope: 'col' }, 'Faltante')
+                )
+              ),
+              h(
+                'tbody',
+                {},
+                ...alerts.map((alert) =>
+                  h(
+                    'tr',
+                    { 'data-testid': `alert-row-${alert.entity_id}` },
+                    h('td', {}, alert.code || '—'),
+                    h('td', {}, alert.name || '—'),
+                    h('td', {}, alert.category || '—'),
+                    h('td', {}, String(alert.stock)),
+                    h('td', {}, String(alert.reorderPoint)),
+                    h('td', {}, String(alert.shortage))
+                  )
+                )
+              )
+            )
+          )
+    );
+
     const emptyState =
       allEntities.length === 0 && allDocuments.length === 0
         ? h(
@@ -223,6 +294,7 @@ export function renderDashboard(
         filterBar,
         kpiCards,
         criticalAlert,
+        alertsPanel,
         h(
           'section',
           { class: 'panel', 'data-testid': 'dashboard-products' },

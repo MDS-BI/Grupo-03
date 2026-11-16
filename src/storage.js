@@ -563,6 +563,34 @@ export function searchEntities(term = '', category = '') {
   });
 }
 
+export function getReorderAlerts(category = '') {
+  const entities = searchEntities('', category);
+  return entities
+    .filter((entity) => {
+      const reorderPoint = entity.reorderPoint;
+      if (reorderPoint === null || reorderPoint === undefined) return false;
+      if (typeof reorderPoint !== 'number' || !Number.isFinite(reorderPoint)) return false;
+      return (Number(entity.stockBalance) || 0) < reorderPoint;
+    })
+    .map((entity) => {
+      const stock = Number(entity.stockBalance) || 0;
+      const reorderPoint = Number(entity.reorderPoint) || 0;
+      return {
+        entity_id: entity.entity_id,
+        code: entity.code ?? '',
+        name: entity.name ?? '',
+        category: entity.category ?? '',
+        stock,
+        reorderPoint,
+        shortage: reorderPoint - stock
+      };
+    })
+    .sort((a, b) => {
+      if (b.shortage !== a.shortage) return b.shortage - a.shortage;
+      return String(a.name).localeCompare(String(b.name), 'es');
+    });
+}
+
 export function getDashboardStats(category = '') {
   const allEntities = loadEntities();
   const categoryFilter = typeof category === 'string' ? category.trim().toLowerCase() : '';
@@ -579,12 +607,7 @@ export function getDashboardStats(category = '') {
     (sum, entity) => sum + (Number(entity.stockBalance) || 0) * (Number(entity.unitCost) || 0),
     0
   );
-  const critical = entities.filter(
-    (entity) =>
-      typeof entity.reorderPoint === 'number' &&
-      Number.isFinite(entity.reorderPoint) &&
-      (Number(entity.stockBalance) || 0) < entity.reorderPoint
-  ).length;
+  const critical = getReorderAlerts(category).length;
 
   return {
     totalEntities: entities.length,
