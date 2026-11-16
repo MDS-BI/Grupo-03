@@ -1,4 +1,4 @@
-# Tasks: Módulo Base ERP — Logística e Inventario
+# Tasks: MÃ³dulo Base ERP â€” LogÃ­stica e Inventario
 
 **Input**: Design documents from `/specs/001-erp-base-module/`
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
@@ -30,7 +30,7 @@
 
 **Purpose**: Core infrastructure required before any user story implementation.
 
-**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
+**âš ï¸ CRITICAL**: No user story work can begin until this phase is complete.
 
 - [X] T007 Implement storage keys, load/save helpers, ID/timestamp utilities, and safe localStorage access in `src/storage.js`
 - [X] T008 Implement module configuration loading, defaults, validation, and fallback behavior in `src/module-config.js`
@@ -40,116 +40,116 @@
 - [X] T012 [P] Create test setup/reset utilities for isolated localStorage state in `tests/setup.js` (and wire in `vitest.config.mjs` if needed)
 - [X] T013 [P] Add foundational unit tests for config defaults/validation and storage primitives in `tests/unit/module-config.test.js` and `tests/unit/storage.test.js`
 
-**Checkpoint**: Foundation ready — user story implementation can begin.
+**Checkpoint**: Foundation ready â€” user story implementation can begin.
 
 ---
 
-## Phase 3: User Story 1 - Catálogo maestro y simulación de rol (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - CatÃ¡logo maestro y simulaciÃ³n de rol (Priority: P1) ðŸŽ¯ MVP
 
-**Goal**: Gestionar entidades maestras con campos obligatorios, unicidad de SKU, reglas de eliminación/desactivación por historial, y simulación visual de rol sin autenticación.
+**Goal**: Gestionar entidades maestras con campos obligatorios, unicidad de SKU, reglas de eliminaciÃ³n/desactivaciÃ³n por historial, y simulaciÃ³n visual de rol sin autenticaciÃ³n.
 
-**Independent Test**: Crear una entidad válida (nombre, SKU, categoría, unidad, punto de reorden) con stock 0; rechazar SKU duplicado/costos o puntos negativos; bloquear eliminación si hay historial y permitir solo desactivación; cambiar rol simulado a Operador y ocultar costos/valoración/contactos en la vista.
+**Independent Test**: Crear una entidad vÃ¡lida (nombre, SKU, categorÃ­a, unidad, punto de reorden) con stock 0; rechazar SKU duplicado/costos o puntos negativos; bloquear eliminaciÃ³n si hay historial y permitir solo desactivaciÃ³n; cambiar rol simulado a Operador y ocultar costos/valoraciÃ³n/contactos en la vista.
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Add unit tests for entity validation, SKU normalization/uniqueness, and delete-vs-deactivate rules in `tests/unit/storage.test.js`
-- [ ] T015 [P] [US1] Add integration test for entity create/edit flows and validation feedback in `tests/integration/create-entity.test.js`
-- [ ] T016 [P] [US1] Add integration test for delete/deactivate behavior with and without history in `tests/integration/edit-delete-entity.test.js`
+- [X] T014 [P] [US1] Add unit tests for entity validation, SKU normalization/uniqueness, and delete-vs-deactivate rules in `tests/unit/storage.test.js`
+- [X] T015 [P] [US1] Add integration test for entity create/edit flows and validation feedback in `tests/integration/create-entity.test.js`
+- [X] T016 [P] [US1] Add integration test for delete/deactivate behavior with and without history in `tests/integration/edit-delete-entity.test.js`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Implement entity data model helpers, required-field validation, SKU uniqueness checks, and audit label capture hooks in `src/storage.js`
-- [ ] T018 [P] [US1] Implement entity list/detail rendering with safe output, empty states, and history-aware actions in `src/components/entity-list.js`
-- [ ] T019 [US1] Implement entity create/edit/deactivate form with custom fields support and inline validation in `src/components/entity-form.js`
-- [ ] T020 [US1] Wire entity CRUD/deactivate flows, role-simulated visibility rules, and audit label recording into app state/views in `src/app.js` and `src/components/shell.js`
-- [ ] T021 [US1] Ensure `costo_unitario` is editable only in entity/catalog contexts and hidden for simulated Operador view in `src/components/entity-form.js`, `src/components/entity-list.js`, and `src/app.js`
+- [X] T017 [P] [US1] Implement entity data model helpers, required-field validation, SKU uniqueness checks, and audit label capture hooks in `src/storage.js`
+- [X] T018 [P] [US1] Implement entity list/detail rendering with safe output, empty states, and history-aware actions in `src/components/entity-list.js`
+- [X] T019 [US1] Implement entity create/edit/deactivate form with custom fields support and inline validation in `src/components/entity-form.js`
+- [X] T020 [US1] Wire entity CRUD/deactivate flows, role-simulated visibility rules, and audit label recording into app state/views in `src/app.js` and `src/components/shell.js`
+- [X] T021 [US1] Ensure `costo_unitario` is editable only in entity/catalog contexts and hidden for simulated Operador view in `src/components/entity-form.js`, `src/components/entity-list.js`, and `src/app.js`
 
 **Checkpoint**: US1 independently functional and testable.
 
 ---
 
-## Phase 4: User Story 2 - Recepción con ubicación y transferencias (Priority: P1)
+## Phase 4: User Story 2 - RecepciÃ³n con ubicaciÃ³n y transferencias (Priority: P1)
 
-**Goal**: Registrar entradas con ubicación y transferencias entre ubicaciones, actualizando stock de forma atómica y preservando trazabilidad.
+**Goal**: Registrar entradas con ubicaciÃ³n y transferencias entre ubicaciones, actualizando stock de forma atÃ³mica y preservando trazabilidad.
 
-**Independent Test**: Confirmar entrada de 50 unidades en ubicación A-03-2 y verificar stock total/ubicación; transferir 10 a B-01-1 y verificar total constante; bloquear transferencias que excedan stock de origen y cancelar sin efectos.
+**Independent Test**: Confirmar entrada de 50 unidades en ubicaciÃ³n A-03-2 y verificar stock total/ubicaciÃ³n; transferir 10 a B-01-1 y verificar total constante; bloquear transferencias que excedan stock de origen y cancelar sin efectos.
 
 ### Tests for User Story 2
 
-- [ ] T022 [P] [US2] Add unit tests for movement validation and stock/location effects for `ENTRADA` and `TRANSFERENCIA` in `tests/unit/stock.test.js`
-- [ ] T023 [P] [US2] Add integration test for entry registration, location capture, transfer flow, and cancel-without-persist in `tests/integration/inventory-movements.test.js`
+- [X] T022 [P] [US2] Add unit tests for movement validation and stock/location effects for `ENTRADA` and `TRANSFERENCIA` in `tests/unit/stock.test.js`
+- [X] T023 [P] [US2] Add integration test for entry registration, location capture, transfer flow, and cancel-without-persist in `tests/integration/inventory-movements.test.js`
 
 ### Implementation for User Story 2
 
-- [ ] T024 [P] [US2] Implement movement persistence/model for draft/confirmed states and location/transfer fields in `src/storage.js`
-- [ ] T025 [P] [US2] Implement movement form UI for `ENTRADA` and `TRANSFERENCIA` (including draft/cancel behavior) in `src/components/document-form.js`
-- [ ] T026 [US2] Implement movement/kardex list rendering for entity movements in `src/components/document-list.js`
-- [ ] T027 [US2] Integrate entry/transfer confirmation, atomic stock updates, latest-entry location derivation, and cancel handling in `src/app.js` and `src/storage.js`
+- [X] T024 [P] [US2] Implement movement persistence/model for draft/confirmed states and location/transfer fields in `src/storage.js`
+- [X] T025 [P] [US2] Implement movement form UI for `ENTRADA` and `TRANSFERENCIA` (including draft/cancel behavior) in `src/components/document-form.js`
+- [X] T026 [US2] Implement movement/kardex list rendering for entity movements in `src/components/document-list.js`
+- [X] T027 [US2] Integrate entry/transfer confirmation, atomic stock updates, latest-entry location derivation, and cancel handling in `src/app.js` and `src/storage.js`
 
 **Checkpoint**: US2 independently functional (with foundational + US1 entity data available).
 
 ---
 
-## Phase 5: User Story 3 - Despacho con validación de stock (Priority: P1)
+## Phase 5: User Story 3 - Despacho con validaciÃ³n de stock (Priority: P1)
 
-**Goal**: Registrar salidas con validación de existencias (incluida al confirmar), motivo y reglas de negocio sin permitir stock negativo.
+**Goal**: Registrar salidas con validaciÃ³n de existencias (incluida al confirmar), motivo y reglas de negocio sin permitir stock negativo.
 
-**Independent Test**: Bloquear salida mayor al disponible con mensaje y confirmación deshabilitada; confirmar salida válida descontando stock exacto; exigir observación cuando motivo es Merma; reflejar condición de alerta por punto de reorden.
+**Independent Test**: Bloquear salida mayor al disponible con mensaje y confirmaciÃ³n deshabilitada; confirmar salida vÃ¡lida descontando stock exacto; exigir observaciÃ³n cuando motivo es Merma; reflejar condiciÃ³n de alerta por punto de reorden.
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] Add unit tests for `SALIDA` stock validation, insufficient-stock rejection, and reorder-threshold signals in `tests/unit/stock.test.js`
-- [ ] T029 [P] [US3] Add integration test for outbound flow, insufficient stock blocking, merma-note rule, and valid confirmation in `tests/integration/inventory-movements.test.js`
+- [X] T028 [P] [US3] Add unit tests for `SALIDA` stock validation, insufficient-stock rejection, and reorder-threshold signals in `tests/unit/stock.test.js`
+- [X] T029 [P] [US3] Add integration test for outbound flow, insufficient stock blocking, merma-note rule, and valid confirmation in `tests/integration/inventory-movements.test.js`
 
 ### Implementation for User Story 3
 
-- [ ] T030 [P] [US3] Extend movement model/validation for `SALIDA` reasons, merma note requirement, and confirm-time stock checks in `src/storage.js`
-- [ ] T031 [US3] Extend movement form UI for `SALIDA` (available stock/location info, reason/notes, disabled confirm on invalid) in `src/components/document-form.js`
-- [ ] T032 [US3] Integrate outbound confirmation flow and low-stock alert signaling for downstream dashboard use in `src/app.js` and `src/storage.js`
+- [X] T030 [P] [US3] Extend movement model/validation for `SALIDA` reasons, merma note requirement, and confirm-time stock checks in `src/storage.js`
+- [X] T031 [US3] Extend movement form UI for `SALIDA` (available stock/location info, reason/notes, disabled confirm on invalid) in `src/components/document-form.js`
+- [X] T032 [US3] Integrate outbound confirmation flow and low-stock alert signaling for downstream dashboard use in `src/app.js` and `src/storage.js`
 
 **Checkpoint**: US3 independently functional for outbound scenarios.
 
 ---
 
-## Phase 6: User Story 4 - Kardex, conteo físico y ajustes (Priority: P1)
+## Phase 6: User Story 4 - Kardex, conteo fÃ­sico y ajustes (Priority: P1)
 
-**Goal**: Proveer trazabilidad completa (kardex), inmutabilidad de confirmados con anulación/contramovimiento, conteos físicos ciegos y ajustes aprobados.
+**Goal**: Proveer trazabilidad completa (kardex), inmutabilidad de confirmados con anulaciÃ³n/contramovimiento, conteos fÃ­sicos ciegos y ajustes aprobados.
 
-**Independent Test**: Ver kardex cronológico filtrable; impedir edición/eliminación directa de confirmados y corregir por anulación con contramovimiento; cerrar conteo ciego con diferencias y aprobar ajuste con motivo y actor distinto al conteo.
+**Independent Test**: Ver kardex cronolÃ³gico filtrable; impedir ediciÃ³n/eliminaciÃ³n directa de confirmados y corregir por anulaciÃ³n con contramovimiento; cerrar conteo ciego con diferencias y aprobar ajuste con motivo y actor distinto al conteo.
 
 ### Tests for User Story 4
 
-- [ ] T033 [P] [US4] Add unit tests for confirmed-movement immutability, void/contramovement linkage, and adjustment application in `tests/unit/stock.test.js` and `tests/unit/storage.test.js`
-- [ ] T034 [P] [US4] Add integration test for kardex view/filters, void flow, blind count closure, and approved adjustment recording in `tests/integration/inventory-movements.test.js`
+- [X] T033 [P] [US4] Add unit tests for confirmed-movement immutability, void/contramovement linkage, and adjustment application in `tests/unit/stock.test.js` and `tests/unit/storage.test.js`
+- [X] T034 [P] [US4] Add integration test for kardex view/filters, void flow, blind count closure, and approved adjustment recording in `tests/integration/inventory-movements.test.js`
 
 ### Implementation for User Story 4
 
-- [ ] T035 [P] [US4] Implement void/contramovement operations and immutable confirmed-movement guards in `src/storage.js`
-- [ ] T036 [P] [US4] Implement physical count and adjustment data structures/operations (blind capture, differences, approval actor labels) in `src/storage.js`
-- [ ] T037 [US4] Implement kardex UI (chronological list, filters by date/type, actor/location/saldo display) in `src/components/document-list.js`
-- [ ] T038 [US4] Implement count/adjustment UI flows and void-action controls with clear immutability feedback in `src/components/document-form.js` and `src/app.js`
+- [X] T035 [P] [US4] Implement void/contramovement operations and immutable confirmed-movement guards in `src/storage.js`
+- [X] T036 [P] [US4] Implement physical count and adjustment data structures/operations (blind capture, differences, approval actor labels) in `src/storage.js`
+- [X] T037 [US4] Implement kardex UI (chronological list, filters by date/type, actor/location/saldo display) in `src/components/document-list.js`
+- [X] T038 [US4] Implement count/adjustment UI flows and void-action controls with clear immutability feedback in `src/components/document-form.js` and `src/app.js`
 
 **Checkpoint**: US4 independently functional for traceability and controlled corrections.
 
 ---
 
-## Phase 7: User Story 5 - Panel de inventario y alertas de reposición (Priority: P2)
+## Phase 7: User Story 5 - Panel de inventario y alertas de reposiciÃ³n (Priority: P2)
 
-**Goal**: Mostrar KPIs y alertas de reposición accionables, con filtros y generación de solicitudes de reposición.
+**Goal**: Mostrar KPIs y alertas de reposiciÃ³n accionables, con filtros y generaciÃ³n de solicitudes de reposiciÃ³n.
 
-**Independent Test**: Ver KPIs (activos, valoración, alertas, sin movimiento 90 días) recalculados por filtros; listar productos en alerta con cantidad sugerida editable; generar solicitud de reposición agrupada por proveedor; mostrar "Datos insuficientes" cuando aplique.
+**Independent Test**: Ver KPIs (activos, valoraciÃ³n, alertas, sin movimiento 90 dÃ­as) recalculados por filtros; listar productos en alerta con cantidad sugerida editable; generar solicitud de reposiciÃ³n agrupada por proveedor; mostrar "Datos insuficientes" cuando aplique.
 
 ### Tests for User Story 5
 
-- [ ] T039 [P] [US5] Add unit tests for dashboard KPI calculations, alert classification, and replenishment suggestion logic in `tests/unit/storage.test.js`
-- [ ] T040 [P] [US5] Add integration test for dashboard rendering, filters/clear behavior, and replenishment request generation in `tests/integration/dashboard.test.js`
+- [X] T039 [P] [US5] Add unit tests for dashboard KPI calculations, alert classification, and replenishment suggestion logic in `tests/unit/storage.test.js`
+- [X] T040 [P] [US5] Add integration test for dashboard rendering, filters/clear behavior, and replenishment request generation in `tests/integration/dashboard.test.js`
 
 ### Implementation for User Story 5
 
-- [ ] T041 [P] [US5] Implement dashboard stats, alert/replenishment query helpers, and replenishment request persistence in `src/storage.js`
-- [ ] T042 [US5] Implement dashboard UI (quick actions, KPI cards, alert table, filters, clear filters, insufficient-data labels) in `src/components/dashboard.js`
-- [ ] T043 [US5] Integrate replenishment request creation/grouping flow and dashboard refresh on navigation in `src/app.js`
-- [ ] T044 [US5] Implement/extend search screen behavior and access paths (sidebar and dashboard quick action) with safe rendering and empty states in `src/components/search-bar.js` and `src/app.js`
+- [X] T041 [P] [US5] Implement dashboard stats, alert/replenishment query helpers, and replenishment request persistence in `src/storage.js`
+- [X] T042 [US5] Implement dashboard UI (quick actions, KPI cards, alert table, filters, clear filters, insufficient-data labels) in `src/components/dashboard.js`
+- [X] T043 [US5] Integrate replenishment request creation/grouping flow and dashboard refresh on navigation in `src/app.js`
+- [X] T044 [US5] Implement/extend search screen behavior and access paths (sidebar and dashboard quick action) with safe rendering and empty states in `src/components/search-bar.js` and `src/app.js`
 
 **Checkpoint**: US5 independently functional using persisted inventory data.
 
@@ -159,12 +159,12 @@
 
 **Purpose**: Hardening, consistency, accessibility, performance, and validation across stories.
 
-- [ ] T045 [P] Apply consistent config-driven relabeling and safe fallbacks across all screens/components in `src/module-config.js`, `src/components/shell.js`, `src/components/dashboard.js`, `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js`, and `src/components/search-bar.js`
-- [ ] T046 [P] Audit and enforce XSS-safe rendering and input/output escaping for all user-provided data in `src/components/` and shared DOM utilities
-- [ ] T047 [P] Verify accessibility and responsive behavior (labels, focus, keyboard nav, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
-- [ ] T048 [P] Validate performance for list/search operations with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
-- [ ] T049 Run and update quickstart validation scenarios and document results in `specs/001-erp-base-module/quickstart.md`
-- [ ] T050 [P] Add or update developer documentation for setup, configuration, and module extension points in `README.md` (if present) or `specs/001-erp-base-module/quickstart.md`
+- [X] T045 [P] Apply consistent config-driven relabeling and safe fallbacks across all screens/components in `src/module-config.js`, `src/components/shell.js`, `src/components/dashboard.js`, `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js`, and `src/components/search-bar.js`
+- [X] T046 [P] Audit and enforce XSS-safe rendering and input/output escaping for all user-provided data in `src/components/` and shared DOM utilities
+- [X] T047 [P] Verify accessibility and responsive behavior (labels, focus, keyboard nav, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
+- [X] T048 [P] Validate performance for list/search operations with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
+- [X] T049 Run and update quickstart validation scenarios and document results in `specs/001-erp-base-module/quickstart.md`
+- [X] T050 [P] Add or update developer documentation for setup, configuration, and module extension points in `README.md` (if present) or `specs/001-erp-base-module/quickstart.md`
 
 ---
 
@@ -172,11 +172,11 @@
 
 ### Phase Dependencies
 
-- **Phase 1 (Setup)**: No dependencies — start immediately
-- **Phase 2 (Foundational)**: Depends on Phase 1 — **blocks all user stories**
-- **Phases 3–7 (User Stories)**: Depend on Phase 2 completion
-  - Recommended priority order: **US1 → US2 → US3 → US4 → US5**
-  - US5 depends functionally on reliable inventory data from US1–US4 but should remain independently testable with seeded/fixture data
+- **Phase 1 (Setup)**: No dependencies â€” start immediately
+- **Phase 2 (Foundational)**: Depends on Phase 1 â€” **blocks all user stories**
+- **Phases 3â€“7 (User Stories)**: Depend on Phase 2 completion
+  - Recommended priority order: **US1 â†’ US2 â†’ US3 â†’ US4 â†’ US5**
+  - US5 depends functionally on reliable inventory data from US1â€“US4 but should remain independently testable with seeded/fixture data
 - **Phase 8 (Polish)**: Depends on completion of desired user stories
 
 ### User Story Dependencies
@@ -208,10 +208,10 @@
 ## Parallel Example: User Story 1
 
 ```text
-- [ ] T014 [P] [US1] Add unit tests for entity validation, SKU normalization/uniqueness, and delete-vs-deactivate rules in tests/unit/storage.test.js
-- [ ] T015 [P] [US1] Add integration test for entity create/edit flows and validation feedback in tests/integration/create-entity.test.js
-- [ ] T016 [P] [US1] Add integration test for delete/deactivate behavior with and without history in tests/integration/edit-delete-entity.test.js
-- [ ] T018 [P] [US1] Implement entity list/detail rendering with safe output, empty states, and history-aware actions in src/components/entity-list.js
+- [X] T014 [P] [US1] Add unit tests for entity validation, SKU normalization/uniqueness, and delete-vs-deactivate rules in tests/unit/storage.test.js
+- [X] T015 [P] [US1] Add integration test for entity create/edit flows and validation feedback in tests/integration/create-entity.test.js
+- [X] T016 [P] [US1] Add integration test for delete/deactivate behavior with and without history in tests/integration/edit-delete-entity.test.js
+- [X] T018 [P] [US1] Implement entity list/detail rendering with safe output, empty states, and history-aware actions in src/components/entity-list.js
 ```
 
 ## Implementation Strategy
@@ -226,12 +226,12 @@
 
 ### Incremental Delivery
 
-1. Setup + Foundational → base ready
-2. Add US1 → validate independently (MVP)
-3. Add US2 → validate entries/transfers
-4. Add US3 → validate outbound controls
-5. Add US4 → validate traceability/counts/adjustments
-6. Add US5 → validate KPIs/alerts/replenishment
+1. Setup + Foundational â†’ base ready
+2. Add US1 â†’ validate independently (MVP)
+3. Add US2 â†’ validate entries/transfers
+4. Add US3 â†’ validate outbound controls
+5. Add US4 â†’ validate traceability/counts/adjustments
+6. Add US5 â†’ validate KPIs/alerts/replenishment
 7. Finish with Phase 8 polish and full quickstart validation
 
 ### Parallel Team Strategy

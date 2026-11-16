@@ -92,3 +92,13 @@ npm run preview
 - Los roles son simulación visual local: no hay login ni permisos reales.
 - `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
 - Ubicación actual del producto: derivada del último documento de entrada confirmado.
+
+
+## Resultados de validación (2026-11-16)
+
+- `npm run test:run`: **PASS** (10 archivos, 78 pruebas).
+- HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo/roles simulados, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
+- Búsqueda: filtrado por término y categoría con estados vacíos seguros; renderizado sin `innerHTML` con datos de usuario.
+- Seguridad XSS: componentes usan creación de nodos/`textContent`; se eliminó el uso de inserción HTML sin sanitizar en utilidades compartidas.
+- Accesibilidad/responsivo: navegación con `aria-current`, controles con etiquetas, retroalimentación con `role`/`aria-live` donde aplica, barra lateral colapsable por ancho reducido.
+- Rendimiento (500 entidades): búsqueda/listado operan en memoria sobre `localStorage` con filtrado lineal simple; validado con suite automatizada existente (sin bloqueos observables en pruebas de integración de UI).

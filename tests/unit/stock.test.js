@@ -180,4 +180,141 @@ describe('storage: movimientos de inventario', () => {
     );
     expect(getLatestLocation(entity.entity_id)).toEqual({ aisle: 'B', shelf: '2', level: '3' });
   });
+
+  it('registra una TRANSFERENCIA entre ubicaciones sin cambiar el stock total', () => {
+    const entity = seedEntity();
+    addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 50,
+        aisle: 'A',
+        shelf: '3',
+        level: '2'
+      },
+      baseConfig
+    );
+    addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'TRANSFERENCIA',
+        quantity: 10,
+        fromAisle: 'A',
+        fromShelf: '3',
+        fromLevel: '2',
+        toAisle: 'B',
+        toShelf: '1',
+        toLevel: '1'
+      },
+      baseConfig
+    );
+
+    expect(getEntity(entity.entity_id).stockBalance).toBe(50);
+    expect(getLatestLocation(entity.entity_id)).toEqual({ aisle: 'B', shelf: '1', level: '1' });
+  });
+
+  it('bloquea una TRANSFERENCIA que excede el stock disponible', () => {
+    const entity = seedEntity();
+    addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 5,
+        aisle: 'A',
+        shelf: '1',
+        level: '1'
+      },
+      baseConfig
+    );
+    expect(() =>
+      addDocument(
+        {
+          entity_id: entity.entity_id,
+          type: 'TRANSFERENCIA',
+          quantity: 10,
+          fromAisle: 'A',
+          fromShelf: '1',
+          fromLevel: '1',
+          toAisle: 'B',
+          toShelf: '1',
+          toLevel: '1'
+        },
+        baseConfig
+      )
+    ).toThrow(ValidationError);
+    expect(getEntity(entity.entity_id).stockBalance).toBe(5);
+  });
+
+  it('requiere observación cuando el motivo de SALIDA es Merma y detecta umbral de reorden', async () => {
+    const { getDashboardStats, isBelowReorderPoint } = await import('../../src/storage.js');
+    const entity = seedEntity({ reorderPoint: 10 });
+    addDocument(
+      { entity_id: entity.entity_id, type: 'ENTRADA', quantity: 10, aisle: 'A', shelf: '1', level: '1' },
+      baseConfig
+    );
+    expect(() =>
+      addDocument(
+        { entity_id: entity.entity_id, type: 'SALIDA', quantity: 2, reason: 'Merma', notes: '' },
+        baseConfig
+      )
+    ).toThrow(ValidationError);
+
+    addDocument(
+      { entity_id: entity.entity_id, type: 'SALIDA', quantity: 2, reason: 'Merma', notes: 'Producto dañado' },
+      baseConfig
+    );
+    expect(getEntity(entity.entity_id).stockBalance).toBe(8);
+    expect(isBelowReorderPoint(getEntity(entity.entity_id))).toBe(true);
+    expect(getDashboardStats().critical).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('storage: US4 inmutabilidad, anulaci�n y ajustes', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('impide editar o eliminar un movimiento confirmado y permite anular con contramovimiento vinculado', async () => {
+    const { voidDocument, updateDocument, deleteDocument, loadDocuments } = await import('../../src/storage.js');
+    const entity = seedEntity();
+    const doc = addDocument(
+      { entity_id: entity.entity_id, type: 'ENTRADA', quantity: 20, aisle: 'A', shelf: '1', level: '1', state: 'confirmed' },
+      baseConfig
+    );
+
+    expect(() => updateDocument(doc.document_id, { quantity: 10 }, baseConfig)).toThrow(ValidationError);
+    expect(() => deleteDocument(doc.document_id)).toThrow(ValidationError);
+
+    const result = voidDocument(doc.document_id, { reason: 'Error de captura', actorLabel: 'admin' });
+    expect(result.voided.state).toBe('voided');
+    expect(result.contramovement.voidsMovementId).toBe(doc.document_id);
+    expect(result.contramovement.state).toBe('confirmed');
+
+    const docs = loadDocuments();
+    expect(docs.find((d) => d.document_id === doc.document_id).state).toBe('voided');
+    expect(docs.some((d) => d.voidsMovementId === doc.document_id)).toBe(true);
+    expect(getEntity(entity.entity_id).stockBalance).toBe(0);
+  });
+
+  it('aplica ajustes aprobados desde conteo y los registra como AJUSTE confirmado', async () => {
+    const { createPhysicalCount, recordBlindCountDetail, closePhysicalCount, approveCountAdjustment, loadDocuments } = await import('../../src/storage.js');
+    const entity = seedEntity();
+    addDocument(
+      { entity_id: entity.entity_id, type: 'ENTRADA', quantity: 20, aisle: 'A', shelf: '1', level: '1', state: 'confirmed' },
+      baseConfig
+    );
+
+    const count = createPhysicalCount({ actorLabel: 'operador' });
+    recordBlindCountDetail(count.count_id, { entity_id: entity.entity_id, countedQuantity: 18 });
+    const closed = closePhysicalCount(count.count_id);
+    expect(closed.details[0].systemQuantity).toBe(20);
+    expect(closed.details[0].difference).toBe(-2);
+
+    const { adjustments } = approveCountAdjustment(count.count_id, { approverLabel: 'supervisor', reason: 'Da�o' });
+    expect(adjustments).toHaveLength(1);
+    expect(adjustments[0].type).toBe('AJUSTE');
+    expect(adjustments[0].state).toBe('confirmed');
+    expect(getEntity(entity.entity_id).stockBalance).toBe(18);
+    expect(loadDocuments().some((d) => d.type === 'AJUSTE' && d.countId === count.count_id)).toBe(true);
+  });
 });

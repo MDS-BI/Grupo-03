@@ -22,6 +22,18 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 
 ## 2. Configuración y Personalización (`src/module-config.js`)
 
+## 2.1 Funcionalidades implementadas (feature 001-erp-base-module)
+
+- **US1 Catálogo maestro**: campos obligatorios (nombre, código/SKU, categoría, unidad, punto de reorden), unicidad global de SKU normalizado, eliminación solo sin historial o desactivación con historial, simulación visual de rol (Administrador/Operador) sin autenticación real.
+- **US2 Recepción y transferencias**: entradas con ubicación, transferencias entre ubicaciones con validación de stock, borradores/cancelación sin persistir efectos.
+- **US3 Salidas**: validación de stock al confirmar, motivos (incluye Merma con observación), bloqueo ante insuficiencia y señales de punto de reorden.
+- **US4 Trazabilidad y control**: kardex filtrable, inmutabilidad de movimientos confirmados/anulados con corrección por contramovimiento, conteos físicos ciegos y ajustes aprobados.
+- **US5 Panel y reposición**: KPIs (activos, valoración, alertas, sin movimiento 90 días), alertas con cantidad sugerida editable y generación de solicitudes de reposición agrupadas por proveedor.
+- **Búsqueda y UX**: búsqueda por nombre/código/categoría/descripción/fecha/campos personalizados, estados vacíos, renderizado seguro (sin innerHTML con datos de usuario), etiquetas y mensajes de validación accesibles.
+
+> Nota: la configuración declarativa en src/module-config.js permite adaptar etiquetas, campos personalizados, ciclo de vida y tema. Las capacidades nativas de inventario descritas arriba forman parte del módulo base implementado.
+
+
 La adaptación del módulo base a **Logística e Inventario** se define a través del objeto `userConfig` en el archivo `src/module-config.js`:
 
 - **Nombre del Módulo (`moduleName`):** "Logística e Inventario"

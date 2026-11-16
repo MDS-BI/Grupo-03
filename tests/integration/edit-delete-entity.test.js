@@ -21,6 +21,19 @@ describe('integración: edición y eliminación', () => {
     expect(loadEntities()[0].name).toBe('Tornillos actualizados');
   });
 
+  it('elimina físicamente una entidad sin historial', async () => {
+    const entity = seedEntity();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const app = mountApp();
+    await go(app, 'manage', 'entities');
+    setValue(document.querySelector('[data-testid="entity-selector"]'), entity.entity_id);
+    document.querySelector('[data-testid="entity-delete"]').click();
+
+    expect(confirm).toHaveBeenCalled();
+    expect(loadEntities()).toHaveLength(0);
+  });
+
   it('desactiva una entidad con historial en lugar de eliminarla físicamente', async () => {
     const entity = seedEntity();
     seedEntry(entity.entity_id);

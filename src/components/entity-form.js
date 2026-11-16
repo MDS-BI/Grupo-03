@@ -38,7 +38,7 @@ function customControl(definition, value) {
 
 export function renderEntityForm(
   container,
-  { config, entity = null, categories = [], onSubmit, onCancel, onDelete }
+  { config, entity = null, categories = [], onSubmit, onCancel, onDelete, canViewCost = true }
 ) {
   const labels = config.labels.entity;
   const isEditing = Boolean(entity);
@@ -81,8 +81,9 @@ export function renderEntityForm(
   const unitOfMeasureInput = h(
     'select',
     { name: 'unitOfMeasure', 'data-testid': 'entity-unit' },
-    option('', 'Sin especificar', !entity?.unitOfMeasure),
-    ...UNIT_OPTIONS.map((unit) => option(unit, unit, unit === entity?.unitOfMeasure))
+    ...UNIT_OPTIONS.map((unit) =>
+      option(unit, unit, (entity?.unitOfMeasure ?? entity?.unit ?? 'Unidades') === unit)
+    )
   );
   const reorderPointInput = h('input', {
     type: 'number',
@@ -232,14 +233,17 @@ export function renderEntityForm(
         label: 'Punto de reorden',
         name: 'reorderPoint',
         control: reorderPointInput,
+        required: true,
         hint: 'Umbral para marcar stock crítico.'
       }),
-      formField({
-        label: 'Costo unitario',
-        name: 'unitCost',
-        control: unitCostInput,
-        hint: 'Solo se usa para la valoración del catálogo y del panel.'
-      }),
+      canViewCost
+        ? formField({
+            label: 'Costo unitario',
+            name: 'unitCost',
+            control: unitCostInput,
+            hint: 'Solo se usa para la valoración del catálogo y del panel.'
+          })
+        : null,
       ...customFields
     ),
     datalist,

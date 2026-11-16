@@ -1,6 +1,8 @@
 export const STORAGE_KEYS = {
   entities: 'erp.entities',
-  documents: 'erp.documents'
+  documents: 'erp.documents',
+  counts: 'erp.counts',
+  replenishmentRequests: 'erp.replenishmentRequests'
 };
 
 function normalizeCode(value) {
@@ -376,6 +378,7 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     type,
     quantity: parseQuantity(input.quantity),
     notes: trimString(input.notes),
+    reason: trimString(input.reason ?? input.motivo),
     status: typeof input.status === 'string' ? input.status.trim() : '',
     customFields: normalizeCustomValues(input.customFields, config?.customFields?.document ?? [])
   };
@@ -384,6 +387,17 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     normalized.aisle = trimString(input.aisle);
     normalized.shelf = trimString(input.shelf);
     normalized.level = trimString(input.level);
+  } else if (type === 'TRANSFERENCIA') {
+    normalized.fromAisle = trimString(input.fromAisle ?? input.aisle);
+    normalized.fromShelf = trimString(input.fromShelf ?? input.shelf);
+    normalized.fromLevel = trimString(input.fromLevel ?? input.level);
+    normalized.toAisle = trimString(input.toAisle);
+    normalized.toShelf = trimString(input.toShelf);
+    normalized.toLevel = trimString(input.toLevel);
+    // keep latest location at destination for compatibility
+    normalized.aisle = normalized.toAisle;
+    normalized.shelf = normalized.toShelf;
+    normalized.level = normalized.toLevel;
   } else {
     normalized.aisle = '';
     normalized.shelf = '';
@@ -425,7 +439,7 @@ export function validateDocument(
     errors.entity_id = 'La entidad seleccionada no existe.';
   }
 
-  if (!['ENTRADA', 'SALIDA'].includes(input.type)) {
+  if (!['ENTRADA', 'SALIDA', 'TRANSFERENCIA', 'AJUSTE'].includes(input.type)) {
     errors.type = 'Seleccione un tipo de movimiento válido.';
   }
 
@@ -441,10 +455,29 @@ export function validateDocument(
     if (isBlank(input.level)) errors.level = 'El nivel es obligatorio para una entrada.';
   }
 
-  if (input.type === 'SALIDA' && entity && Number.isInteger(input.quantity) && input.quantity > 0) {
+  if (input.type === 'TRANSFERENCIA') {
+    if (isBlank(input.fromAisle)) errors.fromAisle = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.fromShelf)) errors.fromShelf = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.fromLevel)) errors.fromLevel = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.toAisle)) errors.toAisle = 'La ubicación de destino es obligatoria.';
+    if (isBlank(input.toShelf)) errors.toShelf = 'La ubicación de destino es obligatoria.';
+    if (isBlank(input.toLevel)) errors.toLevel = 'La ubicación de destino es obligatoria.';
+  }
+
+  if ((input.type === 'SALIDA' || input.type === 'TRANSFERENCIA') && entity && Number.isInteger(input.quantity) && input.quantity > 0) {
     const available = computeAvailableStock(entity, existingDocument);
     if (input.quantity > available) {
       errors.quantity = `Stock insuficiente: disponible ${available}, solicitado ${input.quantity}.`;
+    }
+  }
+
+  if (input.type === 'SALIDA') {
+    const reason = trimString(input.reason);
+    if (reason && !['Venta', 'Consumo interno', 'Merma', 'Devolución'].includes(reason)) {
+      errors.reason = 'Seleccione un motivo de salida válido.';
+    }
+    if (reason === 'Merma' && isBlank(input.notes)) {
+      errors.notes = 'La observación es obligatoria cuando el motivo es Merma.';
     }
   }
 
@@ -485,15 +518,43 @@ export function saveDocuments(documents) {
   writeCollection(STORAGE_KEYS.documents, Array.isArray(documents) ? documents : []);
 }
 
+export function loadCounts() {
+  return readCollection(STORAGE_KEYS.counts);
+}
+
+export function saveCounts(counts) {
+  writeCollection(STORAGE_KEYS.counts, Array.isArray(counts) ? counts : []);
+}
+
+export function loadReplenishmentRequests() {
+  return readCollection(STORAGE_KEYS.replenishmentRequests);
+}
+
+export function saveReplenishmentRequests(requests) {
+  writeCollection(STORAGE_KEYS.replenishmentRequests, Array.isArray(requests) ? requests : []);
+}
+
 export function getDocument(documentId) {
   return loadDocuments().find((document) => document.document_id === documentId) ?? null;
 }
 
+function movementStockDelta(document) {
+  const qty = Number(document.quantity) || 0;
+  if (document.type === 'ENTRADA') return qty;
+  if (document.type === 'SALIDA') return -qty;
+  if (document.type === 'AJUSTE') {
+    if (document.delta !== undefined && document.delta !== null && document.delta !== '') {
+      return Number(document.delta) || 0;
+    }
+    return qty;
+  }
+  return 0; // TRANSFERENCIA
+}
+
 function applyStockEffect(entity, document, direction) {
   if (!entity) return;
-  const quantity = (Number(document.quantity) || 0) * direction;
   const balance = Number(entity.stockBalance) || 0;
-  entity.stockBalance = document.type === 'ENTRADA' ? balance + quantity : balance - quantity;
+  entity.stockBalance = balance + movementStockDelta(document) * direction;
 }
 
 export function addDocument(input, config = {}) {
@@ -510,7 +571,9 @@ export function addDocument(input, config = {}) {
   const document = {
     document_id: generateId('doc'),
     ...normalized,
-    createdAt: nowIso()
+    state: normalized.state || input.state || 'active',
+    createdAt: nowIso(),
+    confirmedAt: normalized.confirmedAt || ''
   };
 
   applyStockEffect(entity, document, 1);
@@ -529,6 +592,13 @@ export function updateDocument(documentId, updates = {}, config = {}) {
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
 
   const existing = documents[index];
+  if (existing.state === 'confirmed' || existing.state === 'voided' || existing.voidsMovementId) {
+    throw new ValidationError(
+      { _form: 'Los movimientos confirmados son inmutables. Use anulación con contramovimiento.' },
+      'Movimiento inmutable.'
+    );
+  }
+
   const merged = {
     ...existing,
     ...updates,
@@ -560,7 +630,9 @@ export function updateDocument(documentId, updates = {}, config = {}) {
     ...existing,
     ...normalized,
     document_id: existing.document_id,
-    createdAt: existing.createdAt
+    createdAt: existing.createdAt,
+    state: existing.state ?? 'active',
+    confirmedAt: existing.confirmedAt ?? ''
   };
   documents[index] = updated;
   saveDocuments(documents);
@@ -573,6 +645,12 @@ export function deleteDocument(documentId) {
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
 
   const document = documents[index];
+  if (document.state === 'confirmed' || document.state === 'voided' || document.voidsMovementId) {
+    throw new ValidationError(
+      { _form: 'Los movimientos confirmados no se eliminan. Use anulación con contramovimiento.' },
+      'Movimiento inmutable.'
+    );
+  }
   const entities = loadEntities();
   const entity = entities.find((item) => item.entity_id === document.entity_id);
   if (entity) {
@@ -591,9 +669,109 @@ export function deleteDocumentsForEntity(entityId) {
   if (remaining.length !== documents.length) saveDocuments(remaining);
 }
 
+export function voidDocument(documentId, { reason = '', actorLabel = '' } = {}) {
+  const documents = loadDocuments();
+  const index = documents.findIndex((document) => document.document_id === documentId);
+  if (index === -1) throw new NotFoundError('El documento ya no existe.');
+  const original = documents[index];
+  if (original.state === 'voided' || original.voidedAt) {
+    throw new ValidationError({ _form: 'El movimiento ya fue anulado.' }, 'Movimiento ya anulado.');
+  }
+  if (original.state === 'draft') {
+    throw new ValidationError({ _form: 'Solo los movimientos confirmados pueden anularse.' }, 'No anulable.');
+  }
+
+  const voidedAt = nowIso();
+  const voidReason = trimString(reason);
+  documents[index] = {
+    ...original,
+    state: 'voided',
+    voidedAt,
+    voidReason,
+    voidedBy: trimString(actorLabel) || 'local'
+  };
+
+  // Contramovement reverses stock effect and is linked to original
+  const inverseType =
+    original.type === 'ENTRADA' ? 'SALIDA'
+    : original.type === 'SALIDA' ? 'ENTRADA'
+    : original.type;
+  const contramovement = {
+    ...original,
+    document_id: generateId('doc'),
+    type: inverseType,
+    state: 'confirmed',
+    delta: original.type === 'AJUSTE' ? -movementStockDelta(original) : undefined,
+    fromAisle: original.type === 'TRANSFERENCIA' ? original.toAisle : original.fromAisle,
+    fromShelf: original.type === 'TRANSFERENCIA' ? original.toShelf : original.fromShelf,
+    fromLevel: original.type === 'TRANSFERENCIA' ? original.toLevel : original.fromLevel,
+    toAisle: original.type === 'TRANSFERENCIA' ? original.fromAisle : original.toAisle,
+    toShelf: original.type === 'TRANSFERENCIA' ? original.fromShelf : original.toShelf,
+    toLevel: original.type === 'TRANSFERENCIA' ? original.fromLevel : original.toLevel,
+    aisle: original.type === 'TRANSFERENCIA' ? original.fromAisle : original.aisle,
+    shelf: original.type === 'TRANSFERENCIA' ? original.fromShelf : original.shelf,
+    level: original.type === 'TRANSFERENCIA' ? original.fromLevel : original.level,
+    voidsMovementId: original.document_id,
+    reason: voidReason || original.reason || '',
+    notes: voidReason ? `Contramovimiento: ${voidReason}` : `Anulación de ${original.document_id}`,
+    actorLabel: trimString(actorLabel) || 'local',
+    createdAt: voidedAt,
+    confirmedAt: voidedAt,
+    voidedAt: '',
+    voidReason: ''
+  };
+
+  const entities = loadEntities();
+  const entity = entities.find((item) => item.entity_id === original.entity_id);
+  if (entity) {
+    applyStockEffect(entity, contramovement, 1);
+    entity.updatedAt = voidedAt;
+    saveEntities(entities);
+  }
+
+  documents.push(contramovement);
+  saveDocuments(documents);
+  return { voided: clone(documents[index]), contramovement: clone(contramovement) };
+}
+
+export function getKardex(entityId, filters = {}) {
+  const { fromDate = '', toDate = '', type = '' } = filters;
+  const movements = loadDocuments()
+    .filter((d) => d.entity_id === entityId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  let running = 0;
+  const rows = [];
+  for (const movement of movements) {
+    // Only confirmed/voided/active legacy records affect/history shown; drafts excluded from kardex totals except maybe not created
+    if (movement.state === 'draft') continue;
+    const delta = movementStockDelta(movement);
+    running += delta;
+    const created = movement.createdAt ? new Date(movement.createdAt) : null;
+    if (fromDate && created && created < new Date(fromDate)) {
+      rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+      continue;
+    }
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      if (created && created > end) {
+        rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+        continue;
+      }
+    }
+    if (type && movement.type !== type) {
+      rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+      continue;
+    }
+    rows.push({ ...clone(movement), saldo: running, _filteredOut: false });
+  }
+  return rows.filter((r) => !r._filteredOut).map(({ _filteredOut, ...rest }) => rest);
+}
+
 export function getLatestLocation(entityId) {
   const entries = loadDocuments().filter(
-    (document) => document.entity_id === entityId && document.type === 'ENTRADA'
+    (document) => document.entity_id === entityId && (document.type === 'ENTRADA' || document.type === 'TRANSFERENCIA')
   );
   if (entries.length === 0) return null;
 
@@ -648,6 +826,24 @@ export function searchEntities(term = '', category = '') {
   });
 }
 
+function daysSince(dateValue) {
+  const d = dateValue ? new Date(dateValue) : null;
+  if (!d || Number.isNaN(d.getTime())) return Infinity;
+  return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+}
+
+function getLastMovementDate(entityId, documents) {
+  let last = null;
+  for (const doc of documents) {
+    if (doc.entity_id !== entityId) continue;
+    if (doc.state === 'draft') continue;
+    const t = doc.createdAt || doc.confirmedAt;
+    if (!t) continue;
+    if (!last || new Date(t) > new Date(last)) last = t;
+  }
+  return last;
+}
+
 export function getDashboardStats(category = '') {
   const allEntities = loadEntities();
   const categoryFilter = typeof category === 'string' ? category.trim().toLowerCase() : '';
@@ -660,24 +856,120 @@ export function getDashboardStats(category = '') {
     ? documents.filter((document) => entityIds.has(document.entity_id))
     : documents;
 
+  const activeEntities = entities.filter((e) => e.status !== 'inactive');
   const valuation = entities.reduce(
     (sum, entity) => sum + (Number(entity.stockBalance) || 0) * (Number(entity.unitCost) || 0),
     0
   );
-  const critical = entities.filter(
-    (entity) =>
-      typeof entity.reorderPoint === 'number' &&
-      Number.isFinite(entity.reorderPoint) &&
-      (Number(entity.stockBalance) || 0) < entity.reorderPoint
-  ).length;
+
+  const alerts = entities.filter((entity) => {
+    const rp = Number(entity.reorderPoint);
+    return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) <= rp;
+  });
+  const critical = entities.filter((entity) => {
+    const rp = Number(entity.reorderPoint);
+    return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) < rp;
+  }).length;
+
+  let noMovement90Days = 0;
+  for (const entity of entities) {
+    const last = getLastMovementDate(entity.entity_id, documents);
+    if (!last) {
+      // no movement history: if entity is older than 90 days treat as no movement in 90 days, else insufficient history context
+      const age = daysSince(entity.createdAt);
+      if (age >= 90) noMovement90Days += 1;
+      continue;
+    }
+    if (daysSince(last) >= 90) noMovement90Days += 1;
+  }
 
   return {
     totalEntities: entities.length,
+    activeEntities: activeEntities.length,
     totalDocuments: scopedDocuments.length,
     valuation,
     critical,
+    alerts: alerts.length,
+    noMovement90Days,
     categories: getCategories(allEntities)
   };
+}
+
+export function getReplenishmentSuggestions(filters = {}) {
+  const category = typeof filters?.category === 'string' ? filters.category : '';
+  const allEntities = loadEntities();
+  const documents = loadDocuments();
+  const filtered = category
+    ? allEntities.filter((e) => String(e.category ?? '').toLowerCase() === category.trim().toLowerCase())
+    : allEntities;
+
+  return filtered
+    .filter((entity) => {
+      const rp = Number(entity.reorderPoint);
+      return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) <= rp;
+    })
+    .map((entity) => {
+      const stock = Number(entity.stockBalance) || 0;
+      const reorderPoint = Number(entity.reorderPoint) || 0;
+      const maxStock = Number(entity.maxStock ?? entity.stockMaximo ?? entity.customFields?.stock_maximo);
+      const suggestedQty = Number.isFinite(maxStock) ? Math.max(0, maxStock - stock) : Math.max(0, reorderPoint - stock);
+      const provider = entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+      const historyDays = daysSince(entity.createdAt);
+      return {
+        entity_id: entity.entity_id,
+        name: entity.name,
+        code: entity.code,
+        category: entity.category,
+        provider,
+        stockBalance: stock,
+        reorderPoint,
+        suggestedQty,
+        alertLevel: stock <= 0 ? 'red' : 'yellow',
+        rotationLabel: historyDays < 30 ? 'Datos insuficientes' : null
+      };
+    });
+}
+
+export function createReplenishmentRequest({ lines = [], actorLabel = 'local' } = {}) {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new ValidationError({ _form: 'Seleccione al menos un producto para generar la solicitud.' }, 'Solicitud vacía.');
+  }
+  const entities = loadEntities();
+  const normalizedLines = lines.map((line) => {
+    const entity = entities.find((e) => e.entity_id === line.entity_id);
+    if (!entity) throw new ValidationError({ _form: 'Una entidad seleccionada ya no existe.' }, 'Entidad inválida.');
+    const qty = Number(line.suggestedQty ?? line.quantity);
+    if (!Number.isFinite(qty) || qty < 0) {
+      throw new ValidationError({ suggestedQty: 'La cantidad sugerida debe ser un número mayor o igual a 0.' }, 'Cantidad inválida.');
+    }
+    const provider = line.provider || entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+    return {
+      entity_id: entity.entity_id,
+      name: entity.name,
+      code: entity.code,
+      provider,
+      suggestedQty: qty
+    };
+  });
+
+  const grouped = normalizedLines.reduce((acc, line) => {
+    acc[line.provider] = acc[line.provider] || [];
+    acc[line.provider].push(line);
+    return acc;
+  }, {});
+
+  const request = {
+    request_id: generateId('req'),
+    status: 'created',
+    actorLabel: trimString(actorLabel) || 'local',
+    createdAt: nowIso(),
+    lines: normalizedLines,
+    groupedByProvider: grouped
+  };
+  const requests = loadReplenishmentRequests();
+  requests.push(request);
+  saveReplenishmentRequests(requests);
+  return clone(request);
 }
 
 export function resetStore() {
@@ -685,4 +977,139 @@ export function resetStore() {
   if (!storage) return;
   storage.removeItem(STORAGE_KEYS.entities);
   storage.removeItem(STORAGE_KEYS.documents);
+  storage.removeItem(STORAGE_KEYS.counts);
+  storage.removeItem(STORAGE_KEYS.replenishmentRequests);
+}
+
+export function isBelowReorderPoint(entity) {
+  if (!entity) return false;
+  const reorderPoint = Number(entity.reorderPoint);
+  if (!Number.isFinite(reorderPoint)) return false;
+  return (Number(entity.stockBalance) || 0) <= reorderPoint;
+}
+
+export function createPhysicalCount({ actorLabel = 'local', notes = '' } = {}) {
+  const counts = loadCounts();
+  const count = {
+    count_id: generateId('cnt'),
+    state: 'open',
+    actorLabel: trimString(actorLabel) || 'local',
+    notes: trimString(notes),
+    details: [],
+    createdAt: nowIso(),
+    closedAt: '',
+    approvedAt: '',
+    approvedBy: ''
+  };
+  counts.push(count);
+  saveCounts(counts);
+  return clone(count);
+}
+
+export function recordBlindCountDetail(countId, { entity_id, countedQuantity }) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'open') throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  const entity = getEntity(entity_id);
+  if (!entity) throw new NotFoundError('La entidad ya no existe.');
+  const qty = Number(countedQuantity);
+  if (!Number.isInteger(qty) || qty < 0) {
+    throw new ValidationError({ countedQuantity: 'La cantidad contada debe ser un entero mayor o igual a 0.' }, 'Cantidad inv�lida.');
+  }
+  count.details = Array.isArray(count.details) ? count.details : [];
+  const existing = count.details.find((d) => d.entity_id === entity_id);
+  const detail = {
+    detail_id: existing?.detail_id || generateId('cdt'),
+    entity_id,
+    countedQuantity: qty
+    // systemQuantity intentionally not exposed during blind capture
+  };
+  if (existing) Object.assign(existing, detail);
+  else count.details.push(detail);
+  saveCounts(counts);
+  return clone(detail);
+}
+
+export function closePhysicalCount(countId) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'open') throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  const entities = loadEntities();
+  count.details = (count.details || []).map((d) => {
+    const entity = entities.find((e) => e.entity_id === d.entity_id);
+    const systemQuantity = Number(entity?.stockBalance) || 0;
+    const countedQuantity = Number(d.countedQuantity) || 0;
+    return {
+      ...d,
+      systemQuantity,
+      difference: countedQuantity - systemQuantity
+    };
+  });
+  count.state = 'closed';
+  count.closedAt = nowIso();
+  saveCounts(counts);
+  return clone(count);
+}
+
+export function approveCountAdjustment(countId, { approverLabel = '', reason = '' } = {}) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'closed') {
+    throw new ValidationError({ _form: 'El conteo debe estar cerrado antes de aprobar ajustes.' }, 'Conteo no cerrado.');
+  }
+  const approver = trimString(approverLabel) || 'supervisor';
+  if (approver === trimString(count.actorLabel)) {
+    throw new ValidationError({ approverLabel: 'La aprobaci�n debe registrarse con un actor distinto al del conteo.' }, 'Actor inv�lido.');
+  }
+  const adjustmentReason = trimString(reason);
+  if (!adjustmentReason) {
+    throw new ValidationError({ reason: 'El motivo del ajuste es obligatorio.' }, 'Motivo requerido.');
+  }
+
+  const documents = loadDocuments();
+  const entities = loadEntities();
+  const now = nowIso();
+  const adjustments = [];
+
+  for (const detail of count.details || []) {
+    const diff = Number(detail.difference) || 0;
+    if (diff === 0) continue;
+    const entity = entities.find((e) => e.entity_id === detail.entity_id);
+    if (!entity) continue;
+    const movement = {
+      document_id: generateId('doc'),
+      entity_id: detail.entity_id,
+      type: 'AJUSTE',
+      quantity: Math.abs(diff),
+      delta: diff,
+      state: 'confirmed',
+      reason: adjustmentReason,
+      notes: `Ajuste por conteo ${count.count_id}`,
+      actorLabel: approver,
+      countId: count.count_id,
+      createdAt: now,
+      confirmedAt: now
+    };
+    applyStockEffect(entity, movement, 1);
+    entity.updatedAt = now;
+    documents.push(movement);
+    adjustments.push(clone(movement));
+  }
+
+  count.state = 'approved';
+  count.approvedAt = now;
+  count.approvedBy = approver;
+  count.adjustmentReason = adjustmentReason;
+
+  saveEntities(entities);
+  saveDocuments(documents);
+  saveCounts(counts);
+  return { count: clone(count), adjustments };
+}
+
+export function getCount(countId) {
+  return loadCounts().find((c) => c.count_id === countId) || null;
 }

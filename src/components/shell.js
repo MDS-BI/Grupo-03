@@ -13,7 +13,14 @@ const ICONS = {
 };
 
 export function icon(name) {
-  return h('span', { class: 'nav-icon', html: ICONS[name] ?? ICONS.dashboard });
+  const wrapper = h('span', { class: 'nav-icon', 'aria-hidden': 'true' });
+  const svgMarkup = ICONS[name] ?? ICONS.dashboard;
+  const doc = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
+  const svg = doc.documentElement;
+  if (svg && !doc.querySelector('parsererror')) {
+    wrapper.append(document.importNode(svg, true));
+  }
+  return wrapper;
 }
 
 export function getInitials(moduleName) {
@@ -77,7 +84,7 @@ function warningContent(errors) {
   ];
 }
 
-export function mountShell(root, { config, errors = [], onNavigate = () => {} }) {
+export function mountShell(root, { config, errors = [], onNavigate = () => {}, onRoleChange = () => {}, role = 'admin' }) {
   const logo = monogram(config.moduleName);
   const brandName = h(
     'h1',
@@ -85,11 +92,24 @@ export function mountShell(root, { config, errors = [], onNavigate = () => {} })
     config.moduleName
   );
 
+  const roleSelect = h(
+    'select',
+    {
+      class: 'role-select',
+      'data-testid': 'role-selector',
+      'aria-label': 'Rol simulado',
+      onchange: (event) => onRoleChange?.(event.target.value)
+    },
+    h('option', { value: 'admin', selected: role === 'admin' }, 'Administrador (simulado)'),
+    h('option', { value: 'operador', selected: role === 'operador' }, 'Operador (simulado)')
+  );
+
   const topbar = h(
     'header',
     { class: 'topbar' },
     h('div', { class: 'brand' }, logo, brandName),
-    h('div', { class: 'topbar-spacer' })
+    h('div', { class: 'topbar-spacer' }),
+    h('div', { class: 'topbar-actions' }, roleSelect)
   );
 
   const navDefinitions = [
@@ -165,5 +185,10 @@ export function mountShell(root, { config, errors = [], onNavigate = () => {} })
     }
   }
 
-  return { view, main, setActive, setWarnings, navButtons };
+  function setRole(nextRole = 'admin') {
+    roleSelect.value = nextRole;
+  }
+
+  setRole(role);
+  return { view, main, setActive, setWarnings, navButtons, setRole };
 }
