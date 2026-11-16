@@ -1,85 +1,82 @@
 # Contrato de Interfaz de Usuario
 
-**Feature**: `001-erp-base-module` | **Spec**: [spec.md](../spec.md) | **Fecha**: 2026-11-10
+**Feature**: `001-erp-base-module` | **Spec**: [../spec.md](../spec.md) | **Fecha**: 2026-11-16
 
 ## Propósito
 
-Definir las pantallas, la navegación y el comportamiento observable que la SPA debe cumplir. Las etiquetas mostradas provienen de [module-config.md](./module-config.md); los textos de ejemplo usan los valores base.
+Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). El alcance incluye simulación visual de rol (sin autenticación/permisos reales).
 
 ## Marco persistente (workspace shell)
 
-- Barra superior con logotipo monograma SVG derivado de `moduleName` y el nombre del módulo (FR-036).
-- Barra lateral con botones de módulo: Panel, Entidades, Documentos y Buscar (FR-012).
-- El módulo activo se resalta visualmente con `aria-current` (FR-037).
-- La barra lateral se contrae a una columna de iconos en anchos reducidos, manteniéndose operable (FR-039).
-- El marco permanece visible en todas las pantallas; solo cambia la región de contenido.
+- Barra superior con logotipo monograma SVG derivado de `moduleName` y nombre del módulo.
+- Selector de **rol simulado** (etiqueta de vista local) disponible en el marco; cambia solo la presentación/ocultación visual permitida (p. ej. costos/valoración/contactos en vista Operador) y no implementa control de acceso ni seguridad.
+- Barra lateral con botones de módulo: Panel, Entidades, Documentos y Buscar; el activo se resalta (`aria-current`).
+- En anchos reducidos la barra lateral se contrae a iconos manteniéndose operable.
+- El marco permanece visible en todas las pantallas.
 
 ## Pantallas
 
 ### 1. Panel (Dashboard)
-
 | Elemento | Comportamiento |
 |----------|----------------|
-| Acciones rápidas | Al menos: nueva entidad, nuevo documento, abrir gestión de entidades y buscar registros (FR-033) |
-| Acción "nueva entidad" | Abre Gestión con el formulario de entidad vacío y enfocado (FR-034) |
-| Acción "nuevo documento" | Abre Gestión con el formulario de documento vacío y enfocado (FR-034) |
-| Tarjetas de estadísticas | Total de entidades, total de documentos, valoración del stock y productos en nivel crítico (FR-035, US5) |
-| Filtro por categoría | Recalcula las tarjetas dinámicamente; "limpiar filtros" vuelve a valores globales (US5) |
-| Actualización | Las estadísticas se refrescan cada vez que se muestra el panel |
+| Acciones rápidas | Al menos: nueva entidad, nuevo documento/movimiento, abrir gestión y buscar registros |
+| Nueva entidad / nuevo movimiento | Abre Gestión con formulario vacío enfocado |
+| KPIs | N° entidades activas, valoración total `Σ(stock×unitCost)` (solo panel/catálogo), N° en alerta, productos sin movimiento en 90 días |
+| Alertas de reposición | Productos con stock ≤ punto de reorden (rojo si 0, amarillo si bajo punto) con cantidad sugerida editable |
+| Solicitud de reposición | Genera solicitud agrupada por proveedor a partir de selección |
+| Filtros | Recalculan KPIs y tabla; filtro activo visible; limpiar filtros restaura vista global |
+| Actualización | Se refresca al mostrar el panel |
 
-### 2. Gestión (Entidades y Documentos)
-
+### 2. Gestión (Entidades y Movimientos)
 | Elemento | Comportamiento |
 |----------|----------------|
-| Formulario de entidad | Crear/editar nombre, código, categoría, descripción, fecha objetivo, unidad de medida, punto de reorden, costo unitario y campos personalizados |
-| Formulario de documento | Crear/editar tipo (Entrada/Salida), cantidad, notas y, en Entrada, pasillo/estante/nivel |
-| Lista de entidades | **No** se muestra en la pantalla de gestión (FR-016) |
-| Acciones | Crear, editar y eliminar entidades y documentos (FR-017, FR-018) |
-| Validación | Bloquea guardados inválidos y muestra mensajes descriptivos junto al campo (FR-006) |
-| Eliminación de entidad | Advierte y elimina en cascada sus documentos (FR-009) |
+| Formulario de entidad | Crear/editar nombre, código (SKU), categoría, unidad, punto de reorden, descripción, fecha objetivo, `costo_unitario` opcional y campos personalizados; desactivar entidad con historial |
+| Eliminación de entidad | Si no tiene historial: permite eliminar. Si tiene historial: bloquea eliminación y ofrece solo desactivación (conserva historial) |
+| Formulario de movimiento | Registrar borrador/confirmación de Entrada, Salida, Transferencia y Ajuste según reglas; ubicación en entradas; origen/destino en transferencias; motivo cuando aplique |
+| Inmutabilidad | Movimientos confirmados no se editan ni eliminan; se corrigen por anulación con contramovimiento. Borradores pueden editarse/cancelarse |
+| Conteos físicos | Soporte para conteo ciego, cierre con diferencias y generación/aprobación de ajustes (etiqueta de actor distinta, simulada) |
+| Kardex/historial | Consulta cronológica por entidad con filtros (fecha/tipo), saldo, ubicación y actor; accesible desde gestión/detalle |
+| Lista de entidades | No se muestra como listado principal en esta pantalla (FR-016); gestión se enfoca en formularios/acciones |
+| Validación | Bloquea guardados inválidos con mensajes descriptivos (campos obligatorios, SKU duplicado, stock insuficiente, etc.) |
 
 ### 3. Búsqueda
-
 | Elemento | Comportamiento |
 |----------|----------------|
-| Entrada de búsqueda | Filtra por nombre, código, categoría, descripción y fecha objetivo (FR-020) |
-| Filtro de categoría | Restringe resultados a la categoría seleccionada |
-| Estado vacío | Mensaje claro cuando no hay coincidencias (FR-005) |
-| Resultados | Solo lectura; la edición permanece en Gestión |
-| Acceso | Desde la barra lateral y desde la acción rápida del panel (FR-021) |
+| Búsqueda | Por nombre, código, categoría, descripción, fecha objetivo y campos personalizados |
+| Filtros | P. ej. categoría; resultados claros |
+| Estado vacío | Mensaje claro cuando no hay coincidencias |
+| Resultados | Lectura/detalle; edición en Gestión |
+| Acceso | Desde barra lateral y acción rápida del panel |
 
 ## Navegación y Estado
 
-- Solo se muestra una pantalla a la vez.
-- La navegación interna no recarga la página; el botón atrás del navegador se comporta de forma predecible.
-- Los datos de entidades y documentos permanecen intactos al navegar (FR-022, SC-007).
-- Un enlace profundo o recarga en Gestión/Búsqueda debe renderizar la pantalla solicitada sin pasar por el panel.
-- Salir de un formulario con cambios sin guardar requiere confirmación.
+- Una sola pantalla visible a la vez; navegación interna sin recarga completa.
+- Botón atrás del navegador con comportamiento predecible; enlaces profundos/recarga renderizan la pantalla solicitada.
+- Datos intactos al navegar (FR-022, SC-007).
+- Salir de formularios con cambios sin guardar requiere confirmación.
 
-## Etiquetado desde configuración
+## Etiquetado y simulación de rol
 
-- Todos los textos visibles (botones, títulos, pestañas, etiquetas de formulario, mensajes y estados vacíos) se derivan de `labels` (FR-029).
-- Si no hay configuración, se muestran los términos base Entidad/Documento (FR-024).
-- El logotipo y el nombre del módulo reflejan `moduleName`.
+- Todas las etiquetas visibles derivan de `labels` (FR-029); fallback a términos base (FR-024).
+- El selector de rol simulado afecta solo visibilidad/presentación en UI local (sin enforcement de seguridad).
 
 ## Estados de retroalimentación
 
 | Estado | Requisito |
 |--------|-----------|
-| Validación | Mensaje descriptivo por campo; el foco se mueve al primer error |
-| Vacío | Mensaje claro con acción sugerida (crear/buscar) |
-| Carga | Indicador no bloqueante al leer `localStorage` |
-| Error de configuración | Aviso visible que explica el problema sin romper la app (FR-025) |
-| Stock insuficiente | Alerta visible y botón de guardado deshabilitado en Salida (FR-042) |
+| Validación | Mensaje descriptivo por campo; foco en primer error |
+| Vacío | Mensaje claro con acción sugerida |
+| Carga | Indicador no bloqueante |
+| Error de configuración | Aviso visible sin romper la app (FR-025) |
+| Stock insuficiente | Alerta y guardado/confirmación bloqueados según corresponda (FR-042) |
+| Inmutabilidad | Indicación clara de que un movimiento confirmado solo puede anularse |
 
 ## Accesibilidad y seguridad
 
-- Controles nativos con `<label>` asociado; navegación completa por teclado; foco visible.
-- Contraste suficiente y texto alternativo en el logotipo.
-- Todo dato introducido por el usuario se escapa antes de insertarse en el DOM para prevenir XSS.
-- No se usan `innerHTML` con datos de usuario sin sanitizar.
+- Controles nativos con `<label>`, teclado completo, foco visible.
+- Contraste suficiente y texto alternativo en logotipo.
+- Todo dato de usuario escapado antes de insertarse en el DOM (prevención XSS); sin `innerHTML` con datos sin sanitizar.
 
 ## Rendimiento observable
 
-- Listados y búsqueda responden con ≥ 500 entidades sin pérdida de funcionalidad (FR-032).
-- La interacción con el panel y la navegación no debe bloquear el hilo principal de forma perceptible.
+- Listados y búsqueda usables con ≥ 500 entidades (FR-032); sin bloqueos perceptibles en interacción/navegación.

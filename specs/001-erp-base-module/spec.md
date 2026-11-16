@@ -27,27 +27,35 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 - Q: ¿Debe el código (SKU) de una entidad ser único en todo el sistema, bloqueando el guardado cuando ya existe otro registro con el mismo código? → A: Sí, el código es único globalmente: crear o editar una entidad con un código ya existente se bloquea con un mensaje de error descriptivo.
 
+### Session 2026-11-16
+
+- Q: ¿Cómo debe resolverse la contradicción entre las historias que describen usuarios/roles con control de acceso y la aclaración que indica que no habrá autenticación ni permisos reales en este módulo base? (FR-clarificación roles) → A: Opción B: los roles son solo etiqueta/simulación de vista en un único espacio de trabajo local, sin autenticación, sin gestión de usuarios ni permisos reales; las historias deben ajustarse a este alcance.
+- Q: ¿Qué comportamiento debe tener el sistema cuando se intenta eliminar una entidad que ya tiene documentos o movimientos asociados? (FR-003, FR-009) → A: Opción B: permitir eliminación solo si la entidad no tiene documentos/movimientos asociados; si tiene historial, bloquear la eliminación y permitir solo desactivación conservando historial.
+- Q: ¿Las operaciones avanzadas de inventario descritas en las historias (transferencias entre ubicaciones, ajustes por conteo físico, anulaciones con contramovimiento y solicitudes de reposición) deben implementarse como capacidades nativas del módulo base o quedar fuera como extensiones personalizadas? (HU2–HU5) → A: Opción A: incluirlas como capacidades nativas del módulo base (transferencias, ajustes/conteos, anulaciones con contramovimiento y solicitudes de reposición).
+- Q: ¿Qué campos deben ser obligatorios al crear una entidad en este módulo base para que sea coherente con las reglas de inventario definidas? (FR-001, HU1) → A: Opción A: exigir nombre, código (SKU), categoría, unidad y punto de reorden como campos obligatorios.
+- Q: Una vez confirmado un documento/movimiento de inventario, ¿debe poder editarse o eliminarse directamente, o las correcciones deben hacerse mediante anulación con contramovimiento? (FR-008, HU4) → A: Opción A: los movimientos confirmados son inmutables (no se editan ni eliminan) y se corrigen mediante anulación con contramovimiento vinculado; solo los borradores/no confirmados pueden editarse o cancelarse.
+
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
-### Historia de Usuario 1 – Catálogo maestro y control de acceso (Prioridad: P1)
+### Historia de Usuario 1 – Catálogo maestro y simulación de rol (Prioridad: P1)
 
-Como Administrador, quiero registrar productos y proveedores con datos validados, y asignar un rol a cada usuario, para que todo el equipo trabaje sobre un catálogo único, sin duplicados, y cada persona vea solo la información que le corresponde.
+Como usuario del espacio de trabajo local, quiero registrar productos y proveedores con datos validados y seleccionar un rol simulado de vista, para que el equipo trabaje sobre un catálogo único, sin duplicados, y pueda previsualizar qué información se muestra u oculta según el rol seleccionado.
 
-**Por qué esta prioridad**: Todas las demás historias dependen de un producto bien definido y de saber quién está operando. Si el catálogo tiene duplicados, el stock se divide en registros distintos y los reportes quedan mal.
+**Por qué esta prioridad**: Todas las demás historias dependen de un producto bien definido. Si el catálogo tiene duplicados, el stock se divide en registros distintos y los reportes quedan mal.
 
-**Prueba Independiente**: Crear "Resma papel carta 75 g" (SKU `PAP-CAR-075`, categoría Papelería, unidad Paquete, punto de reorden 20, costo $3.200, proveedor "Distribuidora Sur"). Intentar crearlo de nuevo con el mismo SKU y comprobar que el sistema lo rechaza. Cambiar al rol Operador y verificar que el costo no aparece.
+**Prueba Independiente**: Crear "Resma papel carta 75 g" (SKU `PAP-CAR-075`, categoría Papelería, unidad Paquete, punto de reorden 20, costo $3.200, proveedor "Distribuidora Sur"). Intentar crearlo de nuevo con el mismo SKU y comprobar que el sistema lo rechaza. Seleccionar el rol simulado Operador y verificar que el costo no aparece en la vista.
 
 **Escenarios de Aceptación**:
 
 1. **Dado** que se completan los campos obligatorios (SKU, nombre, categoría, unidad, punto de reorden), **cuando** se guarda, **entonces** el producto queda activo con stock 0.
 2. **Dado** que el SKU ya existe (sin importar mayúsculas o espacios), o el punto de reorden o el costo es negativo, **cuando** se intenta guardar, **entonces** el sistema bloquea el guardado e indica el error.
-3. **Dado** un producto con movimientos, **cuando** se intenta eliminarlo, **entonces** solo se permite desactivarlo (se conserva su historial).
-4. **Dado** un usuario con rol Operador, **entonces** no ve costos, valorización ni contactos de proveedores en ninguna pantalla.
-5. **Dado** cualquier creación, edición o desactivación, **entonces** queda registrada en la auditoría con el usuario y la fecha.
+3. **Dado** un producto sin documentos ni movimientos asociados, **cuando** se confirma su eliminación, **entonces** el sistema lo elimina. **Dado** un producto con documentos o movimientos asociados, **cuando** se intenta eliminarlo, **entonces** el sistema bloquea la eliminación y solo permite desactivarlo (se conserva su historial).
+4. **Dado** que se selecciona el rol simulado Operador en la interfaz, **entonces** la vista oculta costos, valorización y contactos de proveedores; esta simulación no constituye control de acceso ni seguridad.
+5. **Dado** cualquier creación, edición o desactivación, **entonces** queda registrada en la auditoría con una etiqueta de actor local (p. ej., rol simulado o identificador genérico) y la fecha.
 
-**Datos involucrados**: `Producto`, `Categoria`, `Proveedor`, `Usuario`, `Rol`, `Auditoria`.
+**Datos involucrados**: `Producto`, `Categoria`, `Proveedor`, `Auditoria` (etiqueta de rol/actor simulada para visualización/auditoría local; no hay cuentas de `Usuario` ni gestión de `Rol` como entidades autenticables).
 
-**Decisión de diseño**: El SKU se normaliza antes de validar que sea único. Los productos se desactivan, nunca se borran. En el MVP (solo frontend), el rol se elige con un selector simulado; en producción debe validarse en el backend. Las etiquetas del módulo ("Producto", "Movimiento de Inventario") se definen en la configuración del template (detalle en `plan.md`).
+**Decisión de diseño**: El SKU se normaliza antes de validar que sea único. Los productos se desactivan, nunca se borran. El rol es un selector simulado de vista en un único espacio de trabajo local; no existe autenticación, inicio de sesión ni permisos reales. Las etiquetas del módulo ("Producto", "Movimiento de Inventario") se definen en la configuración del template (detalle en `plan.md`).
 
 ---
 
@@ -63,7 +71,7 @@ Como Operador de Bodega, quiero registrar las entradas de mercadería indicando 
 
 1. **Dado** un documento de entrada con una o más líneas (producto, cantidad, ubicación), **cuando** se confirma, **entonces** se genera `ENT-xxxxx` con fecha, hora y usuario, y el stock aumenta en cada ubicación.
 2. **Dado** que falta la cantidad, la ubicación o el documento de respaldo, la cantidad es ≤ 0 o la ubicación no existe, **cuando** se intenta guardar, **entonces** el sistema lo impide e indica qué corregir.
-3. **Dado** que el producto no existe, **cuando** el operador lo busca, **entonces** puede enviar una solicitud de alta al Administrador, pero no puede crearlo él mismo.
+3. **Dado** que el producto no existe, **cuando** se busca, **entonces** el sistema indica que el producto no está registrado y orienta a completar el alta desde la gestión de entidades (sin flujo de solicitud ni aprobación entre cuentas de usuario).
 4. **Dado** una transferencia de `A-03-2` a `B-01-1`, **cuando** se confirma, **entonces** el origen baja, el destino sube y el stock total no cambia; si la cantidad supera el stock del origen, se bloquea.
 5. **Dado** que el operador cancela a mitad del registro, **entonces** no se genera el documento ni cambia el stock.
 
@@ -105,11 +113,11 @@ Como Jefe de Bodega, quiero consultar el historial completo de movimientos de ca
 
 1. **Dado** un producto, **cuando** se abre su kardex, **entonces** se listan sus movimientos en orden cronológico (tipo, documento, cantidad, saldo, ubicación y usuario), filtrables por fecha y tipo.
 2. **Dado** un documento confirmado, **entonces** no se puede editar; para corregirlo se anula, lo que genera un contramovimiento enlazado al original con su motivo.
-3. **Dado** un conteo físico, **entonces** quien cuenta no ve la cantidad del sistema (conteo ciego); al cerrar el conteo se muestra la diferencia por producto.
-4. **Dado** una diferencia, **cuando** se genera el ajuste, **entonces** el motivo es obligatorio y el ajuste no puede aprobarlo la misma persona que contó.
+3. **Dado** un conteo físico, **entonces** la captura del conteo no muestra la cantidad del sistema (conteo ciego); al cerrar el conteo se muestra la diferencia por producto.
+4. **Dado** una diferencia, **cuando** se genera el ajuste, **entonces** el motivo es obligatorio y la aprobación debe registrarse con una etiqueta de actor distinta a la del conteo (simulada en el espacio local, sin autenticación real).
 5. **Dado** un ajuste aprobado, **entonces** el stock se corrige y aparece en el kardex como `AJUSTE`.
 
-**Datos involucrados**: `MovimientoInventario` (tipo `AJUSTE`, estado, `anula_a_id`, `aprobado_por`), `ConteoFisico`, `DetalleConteo`.
+**Datos involucrados**: `MovimientoInventario` (tipo `AJUSTE`, estado, `anula_a_id`, etiqueta local de aprobación), `ConteoFisico`, `DetalleConteo`.
 
 **Decisión de diseño**: Los documentos son inmutables y se corrigen con contramovimientos, el mismo principio de la contabilidad, así que el saldo siempre se puede reconstruir.
 
@@ -137,15 +145,15 @@ Como Analista de Inventario, quiero un panel con los KPIs del inventario y la li
 
 ### Requisitos Funcionales
 
-- **FR-001**: El sistema DEBE permitir a los usuarios crear un registro de entidad con al menos un nombre, un código y una categoría.
+- **FR-001**: El sistema DEBE permitir a los usuarios crear un registro de entidad con nombre, código (SKU), categoría, unidad y punto de reorden como campos obligatorios.
 - **FR-002**: El sistema DEBE permitir a los usuarios editar los detalles de un registro de entidad existente.
-- **FR-003**: El sistema DEBE permitir a los usuarios eliminar un registro de entidad existente.
+- **FR-003**: El sistema DEBE permitir eliminar un registro de entidad existente únicamente cuando no tenga documentos/movimientos asociados; si tiene historial asociado, el sistema DEBE bloquear la eliminación y ofrecer solo desactivación.
 - **FR-004**: El sistema DEBE permitir a los usuarios buscar registros de entidad por nombre, código, categoría u otras palabras clave descriptivas.
 - **FR-005**: El sistema DEBE mostrar una lista clara de entidades e indicar cuándo ningún resultado coincide con una búsqueda.
 - **FR-006**: El sistema DEBE presentar retroalimentación clara cuando falta información obligatoria o no se puede completar una acción.
 - **FR-007**: El sistema DEBE mantener los datos de entidad consistentes tras operaciones de creación, edición y eliminación.
-- **FR-008**: El sistema DEBE permitir a los usuarios añadir, editar y eliminar detalles de documentos de una entidad.
-- **FR-009**: El sistema DEBE asociar cada documento exactamente a una entidad y eliminar los documentos asociados cuando la entidad se elimina.
+- **FR-008**: El sistema DEBE permitir añadir documentos/movimientos a una entidad. Los documentos/movimientos confirmados NO DEBEN editarse ni eliminarse directamente; las correcciones se realizan mediante anulación con contramovimiento vinculado. Solo los registros en borrador/no confirmados pueden editarse o cancelarse antes de su confirmación.
+- **FR-009**: El sistema DEBE asociar cada documento exactamente a una entidad. Los documentos asociados se conservan cuando la entidad se desactiva por tener historial; la eliminación física de la entidad solo es posible cuando no existen documentos asociados.
 - **FR-010**: El sistema DEBE mostrar un panel de inicio como vista inicial, con botones de acción rápida claramente etiquetados para las tareas ERP clave.
 - **FR-011**: El sistema DEBE envolver cada pantalla en un marco de espacio de trabajo persistente compuesto por una barra superior con marca y una barra lateral de navegación de módulos.
 - **FR-012**: La barra lateral DEBE proporcionar botones de módulo para Panel, Entidades, Documentos y Buscar, etiquetados desde la configuración del módulo.
@@ -154,7 +162,7 @@ Como Analista de Inventario, quiero un panel con los KPIs del inventario y la li
 - **FR-015**: El botón de módulo Panel DEBE devolver al usuario al panel de inicio.
 - **FR-016**: La pantalla de gestión NO DEBE mostrar la lista de entidades.
 - **FR-017**: La pantalla de gestión DEBE proporcionar la funcionalidad de crear, editar y eliminar entidades.
-- **FR-018**: La pantalla de gestión DEBE proporcionar la funcionalidad de crear, editar y eliminar documentos.
+- **FR-018**: La pantalla de gestión DEBE proporcionar la funcionalidad de crear documentos/movimientos y gestionar su corrección según estado: edición/cancelación solo en borrador y, una vez confirmados, anulación mediante contramovimiento (sin edición/eliminación directa).
 - **FR-019**: El sistema DEBE navegar a una pantalla de búsqueda dedicada cuando se selecciona el botón Buscar en la barra lateral.
 - **FR-020**: La pantalla de búsqueda DEBE permitir buscar entidades por nombre, código, categoría, descripción o fecha objetivo.
 - **FR-021**: La pantalla de búsqueda DEBE ser accesible tanto desde la barra lateral como desde la acción rápida de buscar registros del panel.
@@ -179,7 +187,7 @@ Como Analista de Inventario, quiero un panel con los KPIs del inventario y la li
 - **FR-040**: El sistema DEBE mantener un saldo de stock disponible por entidad que se incrementa al registrar una Entrada de Inventario y disminuye al registrar una Salida de Inventario, exactamente en la cantidad indicada en el documento.
 - **FR-041**: El sistema DEBE registrar la ubicación física (pasillo, estante, nivel) en cada documento de Entrada de Inventario y mostrar en el detalle del producto la ubicación del documento de entrada más reciente.
 - **FR-042**: El sistema DEBE impedir registrar una Salida de Inventario cuya cantidad supere el stock disponible de la entidad, mostrando un mensaje de error descriptivo.
-- **FR-043**: El sistema DEBE clasificar cada documento de inventario por tipo (Entrada o Salida) y aplicar el efecto correspondiente sobre el saldo de stock.
+- **FR-043**: El sistema DEBE clasificar cada documento/movimiento de inventario por tipo (Entrada, Salida, Transferencia, Ajuste) y aplicar el efecto correspondiente sobre el saldo de stock y la trazabilidad, incluyendo anulaciones mediante contramovimiento cuando aplique.
 - **FR-044**: El sistema DEBE calcular la valoración total del stock como la suma de (saldo de stock × costo_unitario) por entidad, mostrarla únicamente en el panel y el catálogo, y no ofrecerla como campo de entrada en los formularios de Entrada o Salida de Inventario.
 - **FR-045**: El sistema DEBE impedir crear o editar una entidad cuyo código coincida con el de otra entidad existente (excluyendo la propia entidad en edición), mostrando un mensaje de error descriptivo.
 
@@ -190,13 +198,14 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 - **XR-001**: Extender los registros de entidad y documento con campos adicionales específicos del dominio sin cambiar la estructura de almacenamiento base.
 - **XR-002**: Reetiquetar pantallas, pestañas, formularios y listas con terminología específica del módulo sin alterar el comportamiento de navegación.
 - **XR-003**: Añadir reglas de validación específicas del módulo junto a las reglas de validación base.
-- **XR-004**: Apoyarse en el módulo base para generación de identidad, marcas de tiempo, integridad referencial entre entidades y documentos, y eliminación en cascada.
+- **XR-004**: Apoyarse en el módulo base para generación de identidad, marcas de tiempo e integridad referencial entre entidades y documentos; la eliminación/desactivación de entidades debe respetar las reglas de preservación de historial definidas por el módulo base.
 - **XR-005**: Remarcar el espacio de trabajo —nombre del módulo, logotipo derivado y color de acento— únicamente mediante configuración.
 
 ### Entidades Clave *(incluir si la funcionalidad implica datos)*
 
-- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, un código de negocio único en todo el sistema, una categoría de clasificación obligatoria, detalles descriptivos, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
-- **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (Entrada o Salida de Inventario), con la cantidad que afecta el saldo de stock, una marca de tiempo automática y notas opcionales. Los documentos de Entrada registran además la ubicación física (pasillo, estante, nivel). Los documentos no admiten rango de fechas inicial/final. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
+- **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye nombre, un código de negocio (SKU) único en todo el sistema, categoría, unidad y punto de reorden como campos obligatorios; además detalles descriptivos, fecha objetivo opcional, entity_id autogenerado, saldo de stock disponible y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados pueden ampliar la entidad con campos específicos del dominio.
+- **Documento/Movimiento de Inventario**: Registro transaccional vinculado a una entidad que afecta o traza el stock. Incluye tipo (Entrada, Salida, Transferencia, Ajuste), cantidad, marca de tiempo automática, notas opcionales y referencias de trazabilidad cuando aplique (p. ej., contramovimiento de anulación, estado/aprobación de ajustes según corresponda). Las entradas registran ubicación física (pasillo, estante, nivel); las transferencias reflejan origen/destino. Los documentos/movimientos no admiten rango de fechas inicial/final como campo del registro.
+- **Conteo Físico y Solicitud de Reposición**: Registros nativos de soporte para control y reposición de inventario (conteos ciegos, diferencias, ajustes derivados y solicitudes de reposición con detalle y cantidad sugerida), vinculados a las entidades y movimientos correspondientes.
 - **ModuleConfig**: El objeto de adaptación cargado al arrancar que define el nombre del módulo, las etiquetas de terminología, las definiciones de campos personalizados y el ciclo de vida de estados de documentos. Consulte data-model.md para su forma completa.
 
 ## Criterios de Éxito *(obligatorio)*

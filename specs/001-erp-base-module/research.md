@@ -1,104 +1,55 @@
 # Investigación (Phase 0): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-10
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-16
 
 Este documento resuelve las decisiones técnicas y de dominio necesarias antes del diseño. No quedan marcadores `NEEDS CLARIFICATION`.
 
 ## Decisión 1: Vite + HTML/CSS/JavaScript vanilla
-
-**Decisión**: Implementar la SPA con Vite 8 como herramienta de desarrollo/build y JavaScript ES2022 sin framework de UI.
-
-**Justificación**: El proyecto es un módulo base pequeño y didáctico; Vite ofrece recarga rápida y build simple, mientras que JavaScript vanilla mantiene el código legible y fácil de probar. Evita que los módulos personalizados hereden un framework específico.
-
-**Alternativas consideradas**:
-- React/Vue: mejor ecosistema de componentes, pero añade abstracción y dependencias innecesarias para el alcance.
-- HTML estático sin bundler: más simple, pero sin servidor de desarrollo ni build de producción.
+**Decisión**: Implementar la SPA con Vite como herramienta de desarrollo/build y JavaScript ES2022 sin framework de UI.
+**Justificación**: Módulo base pequeño y didáctico; código legible, fácil de probar y sin acoplar módulos personalizados a un framework.
+**Alternativas consideradas**: React/Vue (más dependencias/abstracción) y HTML estático sin bundler (peor DX/build).
 
 ## Decisión 2: Persistencia en `localStorage`
-
-**Decisión**: Guardar entidades y documentos en `localStorage` del navegador bajo un espacio de trabajo único.
-
-**Justificación**: El alcance excluye backend y multiinquilino. `localStorage` cumple la persistencia, es síncrono y suficiente para ≥ 500 registros. La capa `storage.js` aísla el acceso para permitir un backend futuro sin cambiar la UI.
-
-**Alternativas consideradas**:
-- IndexedDB: mejor para grandes volúmenes, pero añade complejidad asíncrona innecesaria.
-- Backend con base de datos: fuera de alcance y agrega infraestructura.
+**Decisión**: Guardar entidades, movimientos, conteos y solicitudes en `localStorage` en un único espacio de trabajo.
+**Justificación**: Sin backend/multiinquilino; suficiente para ≥ 500 registros. `storage.js` aísla acceso para futura evolución.
+**Alternativas consideradas**: IndexedDB (complejidad asíncrona innecesaria) y backend (fuera de alcance).
 
 ## Decisión 3: Configuración como único punto de adaptación
+**Decisión**: Nombre, etiquetas, campos personalizados, ciclo de vida y color de acento se definen en `src/module-config.js`; el núcleo no se edita.
+**Justificación**: Cumple FR-023..FR-029 y XR-001..XR-005; fallback a valores base cuando falta configuración.
+**Alternativas consideradas**: Variables de entorno o editar código por módulo (viola SC-008).
 
-**Decisión**: Toda adaptación (nombre de módulo, etiquetas, campos personalizados, ciclo de vida y color de acento) se define en `src/module-config.js`; el código central no se edita.
+## Decisión 4: Modelo de inventario nativo y saldo derivado por movimientos
+**Decisión**: El núcleo soporta nativamente Entidades y Movimientos de inventario (Entrada, Salida, Transferencia, Ajuste), además de Conteo Físico y Solicitud de Reposición. El saldo total y por ubicación se deriva/aplica mediante movimientos confirmados (nunca edición manual directa del stock).
+**Justificación**: Alineado con aclaración 2026-11-16 (HU2–HU5 nativas) y con trazabilidad (HU4). La capa de almacenamiento aplica efectos de forma atómica al confirmar.
+**Alternativas consideradas**: Limitar base a Entrada/Salida (contradice spec) o editar stock a mano (rompe integridad).
 
-**Justificación**: Cumple FR-023 a FR-029 y los requisitos XR-001 a XR-005. Sin configuración, la aplicación usa los valores base Entidad/Documento, sin campos personalizados ni ciclo de vida.
+## Decisión 5: Ubicación por movimiento y ubicación actual derivada
+**Decisión**: La ubicación física se registra en documentos de Entrada (y origen/destino en Transferencias). La “ubicación actual” mostrada en el detalle del producto se deriva del documento de entrada más reciente.
+**Justificación**: Preserva historial y evita duplicación/inconsistencia (FR-041, aclaraciones previas).
+**Alternativas consideradas**: Ubicación única en entidad o duplicada en entidad+documento.
 
-**Alternativas consideradas**:
-- Variables de entorno: no permiten etiquetas/campos anidados de forma legible.
-- Editar código por módulo: viola SC-008 (cero modificaciones al código central).
+## Decisión 6: Campos obligatorios, unicidad y costo opcional
+**Decisión**: Crear entidad exige nombre, código (SKU), categoría, unidad y punto de reorden. El código es único globalmente (normalizado) y el guardado se bloquea ante duplicados. `costo_unitario` es opcional, se mantiene en la entidad y solo se muestra en panel/catálogo para valoración `Σ(stock × costo_unitario)`.
+**Justificación**: Alinea FR-001/FR-045/HU1 y evita contradicción de KPI financiero con formularios de movimiento (aclaración 2026-11-10).
+**Alternativas consideradas**: Código no único o costo en formularios de movimiento (rechazados por spec).
 
-## Decisión 4: Saldo de stock en la entidad y efecto por movimiento
+## Decisión 7: Eliminación, desactivación e inmutabilidad
+**Decisión**: Eliminación física solo si la entidad no tiene documentos/movimientos asociados; si tiene historial, se bloquea y solo se permite desactivación conservando historial. Movimientos confirmados son inmutables y se corrigen mediante anulación con contramovimiento vinculado; solo borradores/no confirmados pueden editarse o cancelarse.
+**Justificación**: Integridad referencial y trazabilidad/auditoría (FR-003, FR-008/FR-009/FR-018, HU4).
+**Alternativas consideradas**: Borrado en cascada siempre o edición directa de confirmados (rompen historial).
 
-**Decisión**: Cada entidad mantiene un `stockBalance` numérico. Un documento de tipo `ENTRADA` suma la cantidad y uno de tipo `SALIDA` la resta, de forma atómica al guardar. Una salida con cantidad mayor al saldo se rechaza.
+## Decisión 8: Roles simulados sin autenticación
+**Decisión**: Los roles son etiquetas/simulación de vista en UI local (p. ej. selector) en un único espacio de trabajo; no hay login, cuentas gestionables ni permisos/enforcement reales. La auditoría usa etiquetas locales de actor.
+**Justificación**: Aclaración 2026-11-16 y supuestos del MVP con `localStorage`.
+**Alternativas consideradas**: Autenticación/permisos reales o gestión local de perfiles con enforcement (fuera de alcance/complejidad innecesaria).
 
-**Justificación**: FR-040, FR-042 y FR-043 exigen un saldo por entidad y validación de existencias. Mantener el saldo en la entidad evita recalcular todo el historial en cada render y soporta 500 registros.
+## Decisión 9: Conteos, ajustes y solicitudes como registros nativos
+**Decisión**: Modelar conteos físicos (ciegos, con diferencias) y solicitudes de reposición (con detalle y cantidad sugerida) como registros nativos vinculados a entidades/movimientos, con ajustes aprobados representados como movimientos de tipo Ajuste y referencias de trazabilidad.
+**Justificación**: HU4/HU5 forman parte del alcance nativo; permite KPIs y kardex coherentes.
+**Alternativas consideradas**: Dejar a extensiones (contradice alcance aclarado).
 
-**Alternativas consideradas**:
-- Calcular el saldo sumando todos los movimientos en cada lectura: correcto pero costoso y propenso a errores de rendimiento.
-- Inventario negativo permitido: rechazado explícitamente por FR-042.
-
-## Decisión 5: Ubicación física por movimiento de entrada
-
-**Decisión**: `pasillo`, `estante` y `nivel` se almacenan en cada documento de Entrada. El detalle del producto muestra la ubicación del documento de entrada más reciente, derivada en lectura y sin duplicarla en la entidad.
-
-**Justificación**: Responde a la clarificación del 2026-11-10 y a FR-041. Conserva historial de ubicaciones y evita inconsistencias entre entidad y movimientos.
-
-**Alternativas consideradas**:
-- Ubicación única en la entidad: pierde historial y contradice "asociados al registro actual".
-- Duplicar ubicación en entidad y documento: riesgo de desincronización.
-
-## Decisión 6: Valoración con `costo_unitario` opcional
-
-**Decisión**: La entidad admite un `costo_unitario` opcional. El KPI de valoración total se calcula como `Σ(stockBalance × costo_unitario)` y se muestra solo en el panel y el catálogo. Los formularios de Entrada/Salida no incluyen campos de costo.
-
-**Justificación**: Resuelve la contradicción entre la historia del Analista (valoración) y la prohibición de datos financieros en las historias de operación. Mantiene el KPI sin exponer costos en los flujos de movimiento.
-
-**Alternativas consideradas**:
-- Eliminar el KPI: pierde un requisito de la historia del Analista.
-- Costo global en configuración: menos realista y no refleja productos distintos.
-
-## Decisión 7: Categoría obligatoria y sin autenticación
-
-**Decisión**: `category` es obligatoria al crear una entidad. Los roles (Administrador, Operador de Recepción, Operador de Despacho, Analista) son etiquetas descriptivas; no se implementa login ni permisos.
-
-**Justificación**: Alinea FR-001 con la historia del Administrador y habilita el filtro por categoría del Analista. La ausencia de autenticación respeta la suposición de espacio único y `localStorage`.
-
-**Alternativas consideradas**:
-- Categoría opcional: obliga a manejar "sin categoría" en KPIs y filtros.
-- Autenticación local completa: fuera del alcance del módulo base y añade gestión de usuarios.
-
-## Decisión 8: Documento de inventario sin rango de fechas
-
-**Decisión**: Un documento contiene `entity_id`, `type` (`ENTRADA`/`SALIDA`), `quantity`, `location` (solo Entrada), `notes` opcional, `status` y una marca de tiempo `createdAt` automática. No admite `startDate`/`endDate`.
-
-**Justificación**: Los movimientos de inventario son eventos puntuales. Elimina la ambigüedad del caso límite de fechas invertidas y simplifica la validación.
-
-**Alternativas consideradas**:
-- Rango de fechas genérico: útil para documentos tipo contrato, pero no para movimientos y añade validación innecesaria.
-
-## Decisión 9: Pruebas con Vitest + jsdom
-
-**Decisión**: Usar Vitest 4 con entorno jsdom, con pruebas unitarias para `storage.js` y `module-config.js`, y de integración para flujos de UI.
-
-**Justificación**: Cumple el principio constitucional II (Test-First). `fileParallelism: false` en `vitest.config.mjs` evita interferencias de `localStorage` compartido entre archivos.
-
-**Alternativas consideradas**:
-- Jest: viable, pero Vitest ya está configurado y se integra con Vite.
-- Solo pruebas manuales: no cumple la constitución.
-
-## Decisión 10: Renderizado seguro y accesible
-
-**Decisión**: Escapar HTML y atributos al renderizar datos de usuario; usar controles nativos, etiquetas asociadas, foco visible y `aria-current` en la navegación; la barra lateral se contrae a iconos en anchos reducidos.
-
-**Justificación**: La suposición de seguridad de la spec exige prevenir XSS; el principio III exige accesibilidad y consistencia. Los controles nativos reducen superficie de error.
-
-**Alternativas consideradas**:
-- `innerHTML` directo con datos de usuario: riesgo de XSS.
-- Widgets personalizados complejos: mayor coste de accesibilidad y mantenimiento.
+## Decisión 10: Pruebas, renderizado seguro y accesibilidad
+**Decisión**: Vitest + jsdom con pruebas unitarias e integración; escapar HTML/atributos al renderizar datos de usuario; controles nativos, labels, foco visible y `aria-current`; barra lateral contraíble.
+**Justificación**: Cumple Constitución (II, III) y supuestos de seguridad/XSS de la spec.
+**Alternativas consideradas**: Solo pruebas manuales o inserción directa de HTML no sanitizado.

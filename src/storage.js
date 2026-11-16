@@ -3,6 +3,26 @@ export const STORAGE_KEYS = {
   documents: 'erp.documents'
 };
 
+function normalizeCode(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+function ensureEntityDefaults(entity) {
+  const unit = trimString(entity?.unit ?? entity?.unitOfMeasure ?? entity?.customFields?.unidad_medida) || 'Unidades';
+  const reorderPointRaw = entity?.reorderPoint ?? entity?.customFields?.punto_reorden;
+  const reorderPoint = reorderPointRaw === undefined || reorderPointRaw === '' || reorderPointRaw === null ? 0 : Number(reorderPointRaw);
+  return {
+    ...entity,
+    unit,
+    unitOfMeasure: entity?.unitOfMeasure ?? unit,
+    reorderPoint: Number.isFinite(reorderPoint) ? reorderPoint : 0,
+    status: entity?.status === 'inactive' ? 'inactive' : 'active'
+  };
+}
+
 export class ValidationError extends Error {
   constructor(errors, message = 'Datos inválidos.') {
     super(message);
@@ -170,36 +190,59 @@ function normalizeCustomValues(values, definitions) {
 
 export function normalizeEntityInput(input = {}, config = {}) {
   const definitions = config?.customFields?.entity ?? [];
+  const customValues = normalizeCustomValues(input.customFields, definitions);
   const normalized = {
     name: trimString(input.name),
     code: trimString(input.code),
     category: trimString(input.category),
+    unit: trimString(input.unit ?? input.unitOfMeasure ?? customValues.unidad_medida) || 'Unidades',
     description: trimString(input.description),
     targetDate: trimString(input.targetDate),
-    unitOfMeasure: trimString(input.unitOfMeasure),
-    customFields: normalizeCustomValues(input.customFields, definitions)
+    customFields: customValues
   };
 
-  const reorderPoint = parseOptionalNumber(input.reorderPoint);
-  if (reorderPoint !== undefined) normalized.reorderPoint = reorderPoint;
+  const reorderPoint = parseOptionalNumber(input.reorderPoint ?? customValues.punto_reorden);
+  normalized.reorderPoint = reorderPoint === undefined ? 0 : reorderPoint;
 
   const unitCost = parseOptionalNumber(input.unitCost);
   if (unitCost !== undefined) normalized.unitCost = unitCost;
 
+  // Keep legacy field in sync for existing UI/data compatibility
+  if (normalized.unit) normalized.unitOfMeasure = normalized.unit;
+
   return normalized;
 }
 
-export function validateEntity(input, config = {}) {
+export function validateEntity(input, config = {}, { entities = loadEntities(), entityId = null } = {}) {
   const errors = {};
   if (isBlank(input.name)) errors.name = 'El nombre es obligatorio.';
   if (isBlank(input.code)) errors.code = 'El código es obligatorio.';
   if (isBlank(input.category)) errors.category = 'La categoría es obligatoria.';
+  if (isBlank(input.unit)) errors.unit = 'La unidad es obligatoria.';
+
+  if (input.reorderPoint === undefined || input.reorderPoint === '' || Number.isNaN(input.reorderPoint)) {
+    errors.reorderPoint = 'El punto de reorden es obligatorio.';
+  } else if (typeof input.reorderPoint !== 'number' || !Number.isFinite(input.reorderPoint)) {
+    errors.reorderPoint = 'El punto de reorden debe ser un número válido.';
+  } else if (input.reorderPoint < 0) {
+    errors.reorderPoint = 'El punto de reorden debe ser mayor o igual a 0.';
+  }
+
   if (!isBlank(input.targetDate) && !isValidDate(input.targetDate)) {
     errors.targetDate = 'La fecha objetivo no es una fecha de calendario válida.';
   }
 
-  validateOptionalNumber(input.reorderPoint, 'reorderPoint', 'El punto de reorden', errors);
   validateOptionalNumber(input.unitCost, 'unitCost', 'El costo unitario', errors);
+
+  if (!isBlank(input.code)) {
+    const normalized = normalizeCode(input.code);
+    const duplicate = entities.find(
+      (entity) => entity.entity_id !== entityId && normalizeCode(entity.code) === normalized
+    );
+    if (duplicate) {
+      errors.code = 'Ya existe una entidad con este código (SKU).';
+    }
+  }
 
   const customValues =
     input.customFields && typeof input.customFields === 'object' ? input.customFields : {};
@@ -213,7 +256,7 @@ export function validateEntity(input, config = {}) {
 }
 
 export function loadEntities() {
-  return readCollection(STORAGE_KEYS.entities);
+  return readCollection(STORAGE_KEYS.entities).map(ensureEntityDefaults);
 }
 
 export function saveEntities(entities) {
@@ -224,17 +267,25 @@ export function getEntity(entityId) {
   return loadEntities().find((entity) => entity.entity_id === entityId) ?? null;
 }
 
-export function addEntity(input, config = {}) {
+export function addEntity(input, config = {}, { actorLabel = '' } = {}) {
   const normalized = normalizeEntityInput(input, config);
-  const { valid, errors } = validateEntity(normalized, config);
+  const entities = loadEntities();
+  const { valid, errors } = validateEntity(normalized, config, { entities });
   if (!valid) throw new ValidationError(errors);
 
-  const entities = loadEntities();
   const timestamp = nowIso();
   const entity = {
     entity_id: generateId('ent'),
     ...normalized,
+    status: 'active',
     stockBalance: 0,
+    audit: [
+      {
+        action: 'create',
+        at: timestamp,
+        actorLabel: trimString(actorLabel) || 'local'
+      }
+    ],
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -243,7 +294,7 @@ export function addEntity(input, config = {}) {
   return clone(entity);
 }
 
-export function updateEntity(entityId, updates = {}, config = {}) {
+export function updateEntity(entityId, updates = {}, config = {}, { actorLabel = '' } = {}) {
   const entities = loadEntities();
   const index = entities.findIndex((entity) => entity.entity_id === entityId);
   if (index === -1) throw new NotFoundError('La entidad ya no existe.');
@@ -258,30 +309,64 @@ export function updateEntity(entityId, updates = {}, config = {}) {
     }
   };
   const normalized = normalizeEntityInput(merged, config);
-  normalized.stockBalance = existing.stockBalance;
-
-  const { valid, errors } = validateEntity(normalized, config);
+  const { valid, errors } = validateEntity(normalized, config, { entities, entityId });
   if (!valid) throw new ValidationError(errors);
 
+  const timestamp = nowIso();
   const updated = {
     ...existing,
     ...normalized,
+    status: existing.status === 'inactive' ? 'inactive' : 'active',
     entity_id: existing.entity_id,
     stockBalance: existing.stockBalance,
     createdAt: existing.createdAt,
-    updatedAt: nowIso()
+    audit: [
+      ...(Array.isArray(existing.audit) ? existing.audit : []),
+      { action: 'update', at: timestamp, actorLabel: trimString(actorLabel) || 'local' }
+    ],
+    updatedAt: timestamp
   };
   entities[index] = updated;
   saveEntities(entities);
   return clone(updated);
 }
 
-export function deleteEntity(entityId) {
+export function deactivateEntity(entityId, { actorLabel = '' } = {}) {
   const entities = loadEntities();
-  const remaining = entities.filter((entity) => entity.entity_id !== entityId);
-  if (remaining.length === entities.length) throw new NotFoundError('La entidad ya no existe.');
-  saveEntities(remaining);
+  const index = entities.findIndex((entity) => entity.entity_id === entityId);
+  if (index === -1) throw new NotFoundError('La entidad ya no existe.');
+  const timestamp = nowIso();
+  entities[index] = {
+    ...entities[index],
+    status: 'inactive',
+    audit: [
+      ...(Array.isArray(entities[index].audit) ? entities[index].audit : []),
+      { action: 'deactivate', at: timestamp, actorLabel: trimString(actorLabel) || 'local' }
+    ],
+    updatedAt: timestamp
+  };
+  saveEntities(entities);
+  return clone(entities[index]);
+}
+
+export function hasEntityHistory(entityId) {
+  return loadDocuments().some((document) => document.entity_id === entityId);
+}
+
+export function deleteEntity(entityId, { force = false, actorLabel = '' } = {}) {
+  const entities = loadEntities();
+  const index = entities.findIndex((entity) => entity.entity_id === entityId);
+  if (index === -1) throw new NotFoundError('La entidad ya no existe.');
+
+  const hasHistory = hasEntityHistory(entityId);
+  if (hasHistory && !force) {
+    return deactivateEntity(entityId, { actorLabel });
+  }
+
+  entities.splice(index, 1);
+  saveEntities(entities);
   deleteDocumentsForEntity(entityId);
+  return null;
 }
 
 export function normalizeDocumentInput(input = {}, config = {}) {

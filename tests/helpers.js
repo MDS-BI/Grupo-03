@@ -45,11 +45,18 @@ export async function go(app, view, section = 'entities') {
 }
 
 export function seedEntity(overrides = {}, config = baseConfig) {
+  const customFields = { ...(overrides.customFields ?? {}) };
+  const code = overrides.code ?? 'TOR-005';
+  const reorderPoint = overrides.reorderPoint ?? 0;
+  const unit = overrides.unit ?? overrides.unitOfMeasure ?? 'Unidades';
   return addEntity(
     {
       name: 'Tornillos',
-      code: 'TOR-005',
+      code,
       category: 'Ferretería',
+      unit,
+      reorderPoint,
+      customFields: { sku: customFields.sku ?? code, punto_reorden: customFields.punto_reorden ?? reorderPoint, ...customFields },
       ...overrides
     },
     config

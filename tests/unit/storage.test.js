@@ -107,12 +107,14 @@ describe('storage: entidades', () => {
     expect(updated.customFields.punto_reorden).toBe(30);
   });
 
-  it('elimina una entidad y sus documentos en cascada', () => {
+  it('no elimina físicamente una entidad con historial; la desactiva y conserva documentos', () => {
     const entity = seedEntity();
     seedEntry(entity.entity_id);
-    deleteEntity(entity.entity_id);
-    expect(loadEntities()).toHaveLength(0);
-    expect(JSON.parse(localStorage.getItem('erp.documents') ?? '[]')).toHaveLength(0);
+    const result = deleteEntity(entity.entity_id);
+    expect(loadEntities()).toHaveLength(1);
+    expect(result?.status).toBe('inactive');
+    expect(loadEntities()[0].status).toBe('inactive');
+    expect(JSON.parse(localStorage.getItem('erp.documents') ?? '[]')).toHaveLength(1);
   });
 
   it('informa cuando la entidad ya no existe al editar o eliminar', () => {
