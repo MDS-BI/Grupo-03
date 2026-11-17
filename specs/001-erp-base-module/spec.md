@@ -53,23 +53,25 @@ Como Administrador, quiero registrar productos y proveedores con datos validados
 
 ### Historia de Usuario 2 – Recepción con ubicación en bodega (Prioridad: P1)
 
-Como Operador de Bodega, quiero registrar las entradas de mercadería indicando el proveedor, el documento de respaldo, la cantidad y la ubicación (pasillo-estante-nivel), y mover stock entre ubicaciones, para que el stock quede disponible de inmediato y cualquiera pueda encontrar el producto.
+Como operador de recepción, quiero registrar una entrada indicando el proveedor, el documento de respaldo, los productos, las cantidades y la ubicación (pasillo-estante-nivel) donde los guardo, para que el stock quede disponible de inmediato y cualquiera pueda encontrar el producto en bodega.
 
 **Por qué esta prioridad**: Es la puerta de entrada del inventario. Un error aquí se propaga a los despachos, las alertas y los reportes.
 
-**Prueba Independiente**: Registrar 50 paquetes de `PAP-CAR-075` con la guía N° 4521 en `A-03-2`. Verificar que el stock total y el de `A-03-2` quedan en 50. Luego transferir 10 a `B-01-1` y verificar que el total sigue en 50.
+**Prueba Independiente**: Con el rol Operador de Recepción, registrar una entrada de 50 paquetes de  `PAP-CAR-075` con la guía de despacho N° 4521 de 'Distribuida Sur' en la ubicación `A-03-2`. Verificar que el stock total pasa de 0 a 50, que `A-03-2`muestre 50 y que no aparece ningún campo de costo en la pantalla.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** un documento de entrada con una o más líneas (producto, cantidad, ubicación), **cuando** se confirma, **entonces** se genera `ENT-xxxxx` con fecha, hora y usuario, y el stock aumenta en cada ubicación.
-2. **Dado** que falta la cantidad, la ubicación o el documento de respaldo, la cantidad es ≤ 0 o la ubicación no existe, **cuando** se intenta guardar, **entonces** el sistema lo impide e indica qué corregir.
-3. **Dado** que el producto no existe, **cuando** el operador lo busca, **entonces** puede enviar una solicitud de alta al Administrador, pero no puede crearlo él mismo.
-4. **Dado** una transferencia de `A-03-2` a `B-01-1`, **cuando** se confirma, **entonces** el origen baja, el destino sube y el stock total no cambia; si la cantidad supera el stock del origen, se bloquea.
-5. **Dado** que el operador cancela a mitad del registro, **entonces** no se genera el documento ni cambia el stock.
+1. **Dado** que el operador busca un producto por SKU o nombre, **cuando** lo selecciona, **entonces** se muestra el stock actual por ubicación como referencia.
+2. **Dado** que un documento de entrada tiene varias líneas (producto, cantidad, ubicación), **cuando** el operador confirma, **entonces** se genera un documento correlativo (ENT-000123), fecha, hora y usuario, y el stock de cada producto aumenta en su ubicación.
+3. **Dado** que la ubicación ingresada no existe en el maestro de ubicaciones, **cuando** se intenta guardar, **entonces** el sistema no lo permite y sugiere ubicaciones válidas.
+4. **Dado** que el mismo producto ya está en otra ubicación, **cuando** se recibe en una nueva, **entonces** el stock se registra por ubicación y el total es la suma.
+5. **Dado**  que falta la cantidad, la ubicación o el documento de respaldo, o la cantidad es ≤ 0, **cuando** se intenta guardar, **entonces** el sistema indica qué falta y no modifica el stock.
+6.**Dado** que el producto no existe en el catálogo, **cuando** el operador lo busca, **entonces** puede enviar una solicitud de alta al Administrador, pero no puede crearlo él mismo.
+7.**Dado** que el operador está a mitad del ingreso, **cuando** cancela, **entonces** no se genera el documento ni cambia el stock.
 
-**Datos involucrados**: `MovimientoInventario` (tipo `ENTRADA` / `TRANSFERENCIA`), `DetalleMovimiento`, `Ubicacion`, `StockUbicacion`.
+**Datos involucrados**: MovimientoInventario (tipo = ENTRADA, numero, fecha, usuario_id, proveedor_id, doc_respaldo), DetalleMovimiento (producto_id, ubicacion_id, cantidad, costo_unitario*), Ubicacion (pasillo, estante, nivel), StockUbicacion (producto_id, ubicacion_id, cantidad).
 
-**Decisión de diseño**: El stock se guarda por ubicación y nunca se edita a mano: siempre es el resultado de los movimientos.
+**Decisión de diseño**:  El stock no se edita a mano: siempre es el resultado de los movimientos. El costo de la entrada lo completa el Analista o lo toma del catálogo, y seoculta al operador.
 
 ---
 
@@ -177,6 +179,20 @@ Como Analista de Inventario, quiero un panel con los KPIs principales, filtrable
 **Datos involucrados**: Lectura de `Producto`, `StockUbicacion` y `MovimientoInventario` (sin tablas nuevas).
 
 **Decisión de diseño**: La valorización usa costo promedio ponderado, que se recalcula con cada entrada.
+
+### Historia de Usuario 8 - Transferencia entre ubicaciones (Prioridad: P2)
+
+Como Operador de Recepción o de Despacho, quiero mover stock de una ubicación a otra dentro de la bodega, para reordenar la bodega sin hacer una salida y una entrada falsas.
+
+**Escenarios de Aceptación**:
+
+1. **Dado** que se transfieren 10 unidades de A-03-2 a B-01-1, **cuando** se confirma, **entonces**  el origen baja 10, el destino sube 10 y el stock total no cambia.
+2. **Dado** que la cantidad supera el stock del origen, o el origen es igual al destino,**entonces** el sistema bloquea la operación.
+3. **Dado** una transferencia, **entonces** aparece en el kardex como tipo TRANSFERENCIA con su origen y su destino.
+
+**Datos involucrados**: MovimientoInventario (tipo = TRANSFERENCIA), DetalleMovimiento (ubicacion_origen_id, ubicacion_destino_id). 
+
+
 
 ## Requisitos *(obligatorio)*
 
