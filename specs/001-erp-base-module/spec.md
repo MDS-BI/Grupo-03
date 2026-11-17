@@ -180,7 +180,7 @@ Como Analista de Inventario, quiero que las solicitudes de reposición lleguen a
 
 **Datos involucrados**: `SolicitudReposicion` (con estado "Enviada"), `OrdenCompra` y `PedidoVenta` (desde los otros módulos), y claves foráneas `orden_compra_id` y `pedido_venta_id` en `MovimientoInventario`.
 
-**Decisión de diseño**: Inventario no crea ni edita OC ni pedidos: solo los lee y actualiza su estado de recepción o despacho, de modo que cada módulo sigue siendo dueño de sus datos. La recepción parcial conserva el saldo pendiente en la OC y el despacho referencia el pedido de Ventas mediante su clave foránea. Al igual que HU6, esta historia está diferida de la versión actual (FR-046).
+**Decisión de diseño**:  Inventario no crea ni edita OC ni pedidos: solo los lee y actualiza su estado de recepción o despacho, de modo que cada módulo sigue siendo dueño de sus datos. La recepción parcial conserva el saldo pendiente en la OC y el despacho referencia el pedido de Ventas mediante su clave foránea. Al igual que HU6, esta historia está diferida de la versión actual (FR-046).
 
 
 ## Requisitos *(obligatorio)*
