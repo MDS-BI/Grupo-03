@@ -39,7 +39,7 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 ### Historia de Usuario 1 – Catálogo maestro de productos y proveedores (Prioridad: P1)
 
-Como Administrador del módulo, quiero registrar productos con SKU único, categoría, unidad de medida, punto de reorden, costo unitario y proveedor principal, para que todo el equipo opere sobre un catálogo único, sin duplicados ni datos incompletos.
+Como el Administrador del módulo, quiero registrar productos con SKU único, categoría, unidad de medida, punto de reorden, costo unitario y proveedor principal, para que todo el equipo opere sobre un catálogo único, sin duplicados ni datos incompletos.
 
 **Por qué esta prioridad**: Todas las demás historias referencian un producto. Un catálogo con duplicados (p. ej. "Resma Carta" y "RESMA carta 75g") hace que el stock se divida en registros distintos y los reportes queden mal.
 
