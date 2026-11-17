@@ -37,24 +37,26 @@ Este proyecto sirve como módulo base reutilizable para construir módulos ERP p
 
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
-### Historia de Usuario 1 – Catálogo maestro (Prioridad: P1)
+### Historia de Usuario 1 – Catálogo maestro de productos y proveedores (Prioridad: P1)
 
-Como Administrador, quiero registrar productos y proveedores con datos validados, para que todo el equipo trabaje sobre un catálogo único y sin duplicados.
+Como el Administrador del módulo, quiero registrar productos con SKU único, categoría, unidad de medida, punto de reorden, costo unitario y proveedor principal, para que todo el equipo opere sobre un catálogo único, sin duplicados ni datos incompletos.
 
-**Por qué esta prioridad**: Todas las demás historias dependen de un producto bien definido y de saber quién está operando. Si el catálogo tiene duplicados, el stock se divide en registros distintos y los reportes quedan mal.
+**Por qué esta prioridad**: Todas las demás historias referencian un producto. Un catálogo con duplicados (p. ej. "Resma Carta" y "RESMA carta 75g") hace que el stock se divida en registros distintos y los reportes queden mal.
 
-**Prueba Independiente**: Crear "Resma papel carta 75 g" (SKU `PAP-CAR-075`, categoría Papelería, unidad Paquete, punto de reorden 20, costo $3.200, proveedor "Distribuidora Sur"). Intentar crearlo de nuevo con el mismo SKU y comprobar que el sistema lo rechaza.
+**Prueba Independiente**: Crear "Resma papel carta 75 g" (SKU `PAP-CAR-075`, categoría Papelería, unidad Paquete, punto de reorden 20, costo $3.200, proveedor "Distribuidora Sur"). Verificar que aparece en el listado. Intentar crearlo de nuevo con el mismo SKU y comprobar que el sistema lo rechaza.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que se completan los campos obligatorios (SKU, nombre, categoría, unidad, punto de reorden), **cuando** se guarda, **entonces** el producto queda activo con stock 0.
-2. **Dado** que el SKU ya existe (sin importar mayúsculas o espacios), o el punto de reorden o el costo es negativo, **cuando** se intenta guardar, **entonces** el sistema bloquea el guardado e indica el error.
-3. **Dado** un producto con movimientos, **cuando** se intenta eliminarlo, **entonces** solo se permite desactivarlo (se conserva su historial).
-4. **Dado** cualquier creación, edición o desactivación, **entonces** queda registrada en la auditoría con la persona seleccionada localmente (FR-049) y la fecha.
+1. **Dado** que el Administrador completa todos los campos obligatorios, **cuando** guarda, **entonces** el producto queda activo con stock 0 y aparece en el listado.
+2. **Dado** que ya existe el SKU `PAP-CAR-075`, **cuando** se intenta crear otro producto con el mismo SKU (sin importar mayúsculas o espacios), **entonces** el sistema bloquea el guardado y muestra "El SKU ya existe: Resma papel carta 75 g".
+3. **Dado** que el punto de reorden o el costo es negativo o no numérico, **cuando** se intenta guardar, **entonces** el sistema marca el campo en rojo e indica el valor esperado.
+4. **Dado** un producto que tiene movimientos, **cuando** el Administrador intenta eliminarlo, **entonces** el sistema no lo borra y ofrece desactivarlo (deja de aparecer en entradas y salidas, pero conserva su historial).
+5. **Dado** que se registra un proveedor, **cuando** se ingresa un RUT con formato o dígito verificador inválido, **entonces** el sistema rechaza el registro.
 
-**Datos involucrados**: `Producto`, `Categoria`, `Proveedor`, `Auditoria` (con etiqueta descriptiva de usuario/rol).
+**Datos involucrados**: `Producto` (`id`, `sku`, `nombre`, `categoria_id`, `unidad_medida`, `punto_reorden`, `costo_unitario`, `proveedor_id`, `activo`), `Categoria`, `Proveedor` (`rut`, `razon_social`, `contacto`).
 
-**Decisión de diseño**: El SKU se normaliza antes de validar que sea único. Los productos con movimientos se desactivan, nunca se borran (se conserva su historial). No hay selector de rol ni visibilidad condicionada por rol: los roles son solo etiquetas descriptivas y la visibilidad de costos se rige por FR-044. Las etiquetas del módulo ("Producto", "Movimiento de Inventario") se definen en la configuración del template (detalle en `plan.md`).
+**Decisión de diseño**: El SKU se normaliza (mayúsculas, sin espacios) antes de validar que sea único. Los productos no se eliminan, se desactivan, para no romper la trazabilidad.
+
 
 ---
 
@@ -161,6 +163,25 @@ Como Operador de Bodega, quiero que las órdenes de compra del módulo de Compra
 **Datos involucrados**: `OrdenCompra` y `PedidoVenta` (vienen de los otros módulos), claves foráneas `orden_compra_id` y `pedido_venta_id` en `MovimientoInventario`, y `DemandaNoAtendida` (`producto_id`, `pedido_venta_id`, `cantidad`, `fecha`).
 
 **Decisión de diseño**: Inventario no crea ni edita OC ni pedidos, solo los lee y actualiza su estado de recepción o despacho. Así cada módulo es dueño de sus datos. Esta historia está diferida de la versión actual (FR-046); cuando se implemente, en el MVP (solo frontend) las OC y los pedidos se simularán con datos de ejemplo.
+
+### Historia de Usuario 10 – Integración con Compras y Ventas (Prioridad: P3)
+
+Como Analista de Inventario, quiero que las solicitudes de reposición lleguen al módulo de Compras y que los pedidos de Ventas aparezcan como despachos pendientes, para no digitar dos veces la misma información.
+
+**Por qué esta prioridad**: Cierra el ciclo entre lo que se pide, lo que llega y lo que sale: evita transcribir datos entre módulos y mantiene una sola fuente de verdad. Es P3 porque el módulo de Inventario funciona de forma autónoma sin esta integración.
+
+**Prueba Independiente**: Generar una solicitud de reposición para `TOR-004` (HU5) y enviarla; verificar que Compras la recibe con estado "Enviada" y emite la `OC-0102` por 100 unidades. En Inventario, seleccionar `OC-0102` al registrar una recepción (HU2): las líneas se cargan automáticamente. Recibir 40 y comprobar que la OC queda "Parcial" con 60 pendientes. Luego ver el pedido de Ventas `PV-204` por 15 unidades en "Despachos pendientes", despacharlo (HU3) y verificar que su estado cambia a "Despachado".
+
+**Escenarios de Aceptación**:
+
+1. **Dado** una `SolicitudReposicion` generada en HU5, **cuando** se envía, **entonces** queda disponible para el módulo de Compras con su estado "Enviada".
+2. **Dado** que Compras emite una orden de compra, **cuando** el operador registra la recepción (HU2), **entonces** puede seleccionar la OC y las líneas (producto, cantidad, proveedor) se cargan automáticamente, permitiendo la recepción parcial.
+3. **Dado** un pedido de Ventas, **entonces** aparece en "Despachos pendientes" y, al despacharlo (HU3), su estado cambia a "Despachado".
+
+**Datos involucrados**: `SolicitudReposicion` (con estado "Enviada"), `OrdenCompra` y `PedidoVenta` (desde los otros módulos), y claves foráneas `orden_compra_id` y `pedido_venta_id` en `MovimientoInventario`.
+
+**Decisión de diseño**: Inventario no crea ni edita OC ni pedidos: solo los lee y actualiza su estado de recepción o despacho, de modo que cada módulo sigue siendo dueño de sus datos. La recepción parcial conserva el saldo pendiente en la OC y el despacho referencia el pedido de Ventas mediante su clave foránea. Al igual que HU6, esta historia está diferida de la versión actual (FR-046).
+
 
 ## Requisitos *(obligatorio)*
 
