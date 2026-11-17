@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { getEntity, getLatestLocation, loadDocuments } from '../../src/storage.js';
-import { baseConfig, go, mountApp, seedEntity, seedEntry, setValue, submit, tick } from '../helpers.js';
+import {
+  baseConfig,
+  go,
+  mountApp,
+  seedEntity,
+  seedEntry,
+  setValue,
+  submit,
+  tick
+} from '../helpers.js';
 
 function documentForm() {
   return document.querySelector('[data-testid="document-form"]');
@@ -181,7 +190,9 @@ describe('integración: entradas y salidas de inventario', () => {
     setValue(form.querySelector('[data-testid="document-reason"]'), 'Merma');
     submit(form);
 
-    expect(document.querySelector('[data-field="notes"] .field-error').textContent).toContain('obligatoria');
+    expect(document.querySelector('[data-field="notes"] .field-error').textContent).toContain(
+      'obligatoria'
+    );
     expect(loadDocuments().filter((d) => d.type === 'SALIDA')).toHaveLength(0);
 
     setValue(form.querySelector('[data-testid="document-notes"]'), 'Producto dañado');
@@ -195,8 +206,28 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
   it('muestra kardex con filtros y permite anular un movimiento confirmado', async () => {
     const { voidDocument, getKardex, addDocument } = await import('../../src/storage.js');
     const entity = seedEntity();
-    addDocument({ entity_id: entity.entity_id, type: 'ENTRADA', quantity: 50, aisle: 'A', shelf: '1', level: '1', state: 'confirmed' }, baseConfig);
-    const salida = addDocument({ entity_id: entity.entity_id, type: 'SALIDA', quantity: 30, reason: 'Venta', state: 'confirmed' }, baseConfig);
+    addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 50,
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    const salida = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'SALIDA',
+        quantity: 30,
+        reason: 'Venta',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
 
     const app = mountApp();
     await go(app, 'manage', 'documents');
@@ -205,9 +236,11 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
     expect(document.querySelector('[data-testid="kardex-list"]').textContent).toContain('Saldo');
 
     setValue(document.querySelector('[data-testid="kardex-type"]'), 'SALIDA');
-    expect(document.querySelectorAll('[data-testid^="document-row-"]').length).toBeGreaterThanOrEqual(1);
+    expect(
+      document.querySelectorAll('[data-testid^="document-row-"]').length
+    ).toBeGreaterThanOrEqual(1);
 
-    voidDocument(salida.document_id, { reason: 'Correcci�n', actorLabel: 'admin' });
+    voidDocument(salida.document_id, { reason: 'Correcci�n', actorPerson: 'Ana' });
     await go(app, 'manage', 'documents');
     setValue(document.querySelector('[data-testid="kardex-entity"]'), entity.entity_id);
     const kardex = getKardex(entity.entity_id);
@@ -215,9 +248,20 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
   });
 
   it('ejecuta flujo de conteo ciego, cierre y ajuste aprobado', async () => {
-    const { createPhysicalCount, recordBlindCountDetail, closePhysicalCount, approveCountAdjustment, addDocument, loadDocuments } = await import('../../src/storage.js');
+    const { addDocument, loadDocuments } = await import('../../src/storage.js');
     const entity = seedEntity();
-    addDocument({ entity_id: entity.entity_id, type: 'ENTRADA', quantity: 20, aisle: 'A', shelf: '1', level: '1', state: 'confirmed' }, baseConfig);
+    addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 20,
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
 
     const app = mountApp();
     await go(app, 'manage', 'documents');
@@ -225,7 +269,9 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
     // create count via UI
     document.querySelector('[data-testid="count-create"]').click();
     await tick();
-    const countId = document.querySelector('[data-testid="count-id"]').value || document.querySelector('[data-testid="count-status"]').textContent.match(/(cnt_[^\s]+)/)?.[1];
+    const countId =
+      document.querySelector('[data-testid="count-id"]').value ||
+      document.querySelector('[data-testid="count-status"]').textContent.match(/(cnt_[^\s]+)/)?.[1];
     expect(countId).toBeTruthy();
 
     // blind capture + close + approve

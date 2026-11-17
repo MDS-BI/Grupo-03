@@ -1,9 +1,15 @@
 export const STORAGE_KEYS = {
   entities: 'erp.entities',
-  documents: 'erp.documents',
+  movements: 'erp.movements',
+  documents: 'erp.movements',
+  legacyDocuments: 'erp.documents',
   counts: 'erp.counts',
-  replenishmentRequests: 'erp.replenishmentRequests'
+  replenishmentRequests: 'erp.replenishmentRequests',
+  persons: 'erp.persons',
+  audit: 'erp.audit'
 };
+
+const DEFAULT_PERSONS = ['Ana', 'Bruno', 'Carlos', 'Diana'];
 
 function normalizeCode(value) {
   return String(value ?? '')
@@ -13,9 +19,14 @@ function normalizeCode(value) {
 }
 
 function ensureEntityDefaults(entity) {
-  const unit = trimString(entity?.unit ?? entity?.unitOfMeasure ?? entity?.customFields?.unidad_medida) || 'Unidades';
+  const unit =
+    trimString(entity?.unit ?? entity?.unitOfMeasure ?? entity?.customFields?.unidad_medida) ||
+    'Unidades';
   const reorderPointRaw = entity?.reorderPoint ?? entity?.customFields?.punto_reorden;
-  const reorderPoint = reorderPointRaw === undefined || reorderPointRaw === '' || reorderPointRaw === null ? 0 : Number(reorderPointRaw);
+  const reorderPoint =
+    reorderPointRaw === undefined || reorderPointRaw === '' || reorderPointRaw === null
+      ? 0
+      : Number(reorderPointRaw);
   return {
     ...entity,
     unit,
@@ -68,6 +79,25 @@ function writeCollection(key, value) {
   storage.setItem(key, JSON.stringify(value));
 }
 
+function hasStoredKey(key) {
+  const storage = getStorage();
+  if (!storage) return false;
+  try {
+    return storage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function readDocuments() {
+  if (hasStoredKey(STORAGE_KEYS.movements)) {
+    return readCollection(STORAGE_KEYS.movements);
+  }
+  const legacy = readCollection(STORAGE_KEYS.legacyDocuments);
+  if (legacy.length > 0) writeCollection(STORAGE_KEYS.movements, legacy);
+  return legacy;
+}
+
 function clone(value) {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
@@ -93,6 +123,116 @@ function isBlank(value) {
 function trimString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function normalizePersonLabel(value) {
+  return trimString(value).replace(/\s+/g, ' ').slice(0, 80);
+}
+
+function resolveActor(options = {}, fallback = 'local') {
+  const source = typeof options === 'string' ? { actorPerson: options } : (options ?? {});
+  const candidates = [
+    source.actorPerson,
+    source.person,
+    source.approvedByPerson,
+    source.actorLabel,
+    source.actor
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizePersonLabel(candidate);
+    if (normalized) return normalized;
+  }
+  return fallback;
+}
+
+export function getPersons() {
+  const stored = readCollection(STORAGE_KEYS.persons)
+    .map((item) =>
+      normalizePersonLabel(typeof item === 'string' ? item : (item?.label ?? item?.person))
+    )
+    .filter(Boolean);
+  const seen = new Set();
+  const unique = stored.filter((label) => {
+    const key = label.toLocaleLowerCase('es');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return unique.length > 0 ? unique : [...DEFAULT_PERSONS];
+}
+
+export function savePersons(persons = []) {
+  const source = Array.isArray(persons) ? persons : [];
+  const labels = source
+    .map((item) =>
+      normalizePersonLabel(
+        typeof item === 'string' ? item : (item?.label ?? item?.person ?? item?.name)
+      )
+    )
+    .filter(Boolean);
+  if (labels.length === 0) {
+    throw new ValidationError(
+      { persons: 'Debe existir al menos una persona local.' },
+      'Persona local requerida.'
+    );
+  }
+  const seen = new Set();
+  const unique = labels.filter((label) => {
+    const key = label.toLocaleLowerCase('es');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  writeCollection(STORAGE_KEYS.persons, unique);
+  return [...unique];
+}
+
+export function addPerson(label) {
+  const normalized = normalizePersonLabel(label);
+  if (!normalized) {
+    throw new ValidationError(
+      { person: 'La etiqueta de la persona es obligatoria.' },
+      'Persona inválida.'
+    );
+  }
+  const persons = savePersons([...getPersons(), normalized]);
+  const person = persons.find(
+    (item) => item.toLocaleLowerCase('es') === normalized.toLocaleLowerCase('es')
+  );
+  return { persons, person };
+}
+
+function appendAudit({ entityId = null, action = '', person = '', details = '' } = {}) {
+  const entry = {
+    audit_id: generateId('aud'),
+    entityId: entityId || null,
+    action,
+    person: resolveActor({ actorPerson: person }, 'local'),
+    timestamp: nowIso(),
+    details: trimString(details)
+  };
+  const entries = readCollection(STORAGE_KEYS.audit);
+  entries.push(entry);
+  writeCollection(STORAGE_KEYS.audit, entries);
+  return clone(entry);
+}
+
+export function getAuditTrail(filters = {}) {
+  const { entityId = '', action = '', person = '', fromDate = '', toDate = '' } = filters ?? {};
+  const personFilter = normalizePersonLabel(person).toLocaleLowerCase('es');
+  return readCollection(STORAGE_KEYS.audit)
+    .filter((entry) => {
+      if (entityId && entry.entityId !== entityId) return false;
+      if (action && entry.action !== action) return false;
+      if (personFilter && String(entry.person ?? '').toLocaleLowerCase('es') !== personFilter)
+        return false;
+      const date = String(entry.timestamp ?? '').slice(0, 10);
+      if (fromDate && date < fromDate) return false;
+      if (toDate && date > toDate) return false;
+      return true;
+    })
+    .sort((a, b) => String(a.timestamp ?? '').localeCompare(String(b.timestamp ?? '')))
+    .map((entry) => clone(entry));
 }
 
 function parseOptionalNumber(value) {
@@ -215,14 +355,22 @@ export function normalizeEntityInput(input = {}, config = {}) {
   return normalized;
 }
 
-export function validateEntity(input, config = {}, { entities = loadEntities(), entityId = null } = {}) {
+export function validateEntity(
+  input,
+  config = {},
+  { entities = loadEntities(), entityId = null } = {}
+) {
   const errors = {};
   if (isBlank(input.name)) errors.name = 'El nombre es obligatorio.';
   if (isBlank(input.code)) errors.code = 'El código es obligatorio.';
   if (isBlank(input.category)) errors.category = 'La categoría es obligatoria.';
   if (isBlank(input.unit)) errors.unit = 'La unidad es obligatoria.';
 
-  if (input.reorderPoint === undefined || input.reorderPoint === '' || Number.isNaN(input.reorderPoint)) {
+  if (
+    input.reorderPoint === undefined ||
+    input.reorderPoint === '' ||
+    Number.isNaN(input.reorderPoint)
+  ) {
     errors.reorderPoint = 'El punto de reorden es obligatorio.';
   } else if (typeof input.reorderPoint !== 'number' || !Number.isFinite(input.reorderPoint)) {
     errors.reorderPoint = 'El punto de reorden debe ser un número válido.';
@@ -269,13 +417,14 @@ export function getEntity(entityId) {
   return loadEntities().find((entity) => entity.entity_id === entityId) ?? null;
 }
 
-export function addEntity(input, config = {}, { actorLabel = '' } = {}) {
+export function addEntity(input, config = {}, { actorPerson = '', actorLabel = '' } = {}) {
   const normalized = normalizeEntityInput(input, config);
   const entities = loadEntities();
   const { valid, errors } = validateEntity(normalized, config, { entities });
   if (!valid) throw new ValidationError(errors);
 
   const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
   const entity = {
     entity_id: generateId('ent'),
     ...normalized,
@@ -285,7 +434,8 @@ export function addEntity(input, config = {}, { actorLabel = '' } = {}) {
       {
         action: 'create',
         at: timestamp,
-        actorLabel: trimString(actorLabel) || 'local'
+        actorPerson: actor,
+        actorLabel: actor
       }
     ],
     createdAt: timestamp,
@@ -293,10 +443,21 @@ export function addEntity(input, config = {}, { actorLabel = '' } = {}) {
   };
   entities.push(entity);
   saveEntities(entities);
+  appendAudit({
+    entityId: entity.entity_id,
+    action: 'create',
+    person: actor,
+    details: entity.name
+  });
   return clone(entity);
 }
 
-export function updateEntity(entityId, updates = {}, config = {}, { actorLabel = '' } = {}) {
+export function updateEntity(
+  entityId,
+  updates = {},
+  config = {},
+  { actorPerson = '', actorLabel = '' } = {}
+) {
   const entities = loadEntities();
   const index = entities.findIndex((entity) => entity.entity_id === entityId);
   if (index === -1) throw new NotFoundError('La entidad ya no existe.');
@@ -315,6 +476,7 @@ export function updateEntity(entityId, updates = {}, config = {}, { actorLabel =
   if (!valid) throw new ValidationError(errors);
 
   const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
   const updated = {
     ...existing,
     ...normalized,
@@ -324,30 +486,33 @@ export function updateEntity(entityId, updates = {}, config = {}, { actorLabel =
     createdAt: existing.createdAt,
     audit: [
       ...(Array.isArray(existing.audit) ? existing.audit : []),
-      { action: 'update', at: timestamp, actorLabel: trimString(actorLabel) || 'local' }
+      { action: 'update', at: timestamp, actorPerson: actor, actorLabel: actor }
     ],
     updatedAt: timestamp
   };
   entities[index] = updated;
   saveEntities(entities);
+  appendAudit({ entityId, action: 'update', person: actor, details: updated.name });
   return clone(updated);
 }
 
-export function deactivateEntity(entityId, { actorLabel = '' } = {}) {
+export function deactivateEntity(entityId, { actorPerson = '', actorLabel = '' } = {}) {
   const entities = loadEntities();
   const index = entities.findIndex((entity) => entity.entity_id === entityId);
   if (index === -1) throw new NotFoundError('La entidad ya no existe.');
   const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
   entities[index] = {
     ...entities[index],
     status: 'inactive',
     audit: [
       ...(Array.isArray(entities[index].audit) ? entities[index].audit : []),
-      { action: 'deactivate', at: timestamp, actorLabel: trimString(actorLabel) || 'local' }
+      { action: 'deactivate', at: timestamp, actorPerson: actor, actorLabel: actor }
     ],
     updatedAt: timestamp
   };
   saveEntities(entities);
+  appendAudit({ entityId, action: 'deactivate', person: actor, details: entities[index].name });
   return clone(entities[index]);
 }
 
@@ -355,16 +520,18 @@ export function hasEntityHistory(entityId) {
   return loadDocuments().some((document) => document.entity_id === entityId);
 }
 
-export function deleteEntity(entityId, { force = false, actorLabel = '' } = {}) {
+export function deleteEntity(entityId, { force = false, actorPerson = '', actorLabel = '' } = {}) {
   const entities = loadEntities();
   const index = entities.findIndex((entity) => entity.entity_id === entityId);
   if (index === -1) throw new NotFoundError('La entidad ya no existe.');
 
   const hasHistory = hasEntityHistory(entityId);
   if (hasHistory && !force) {
-    return deactivateEntity(entityId, { actorLabel });
+    return deactivateEntity(entityId, { actorPerson, actorLabel });
   }
 
+  const actor = resolveActor({ actorPerson, actorLabel });
+  appendAudit({ entityId, action: 'delete', person: actor, details: entities[index].name });
   entities.splice(index, 1);
   saveEntities(entities);
   deleteDocumentsForEntity(entityId);
@@ -464,7 +631,12 @@ export function validateDocument(
     if (isBlank(input.toLevel)) errors.toLevel = 'La ubicación de destino es obligatoria.';
   }
 
-  if ((input.type === 'SALIDA' || input.type === 'TRANSFERENCIA') && entity && Number.isInteger(input.quantity) && input.quantity > 0) {
+  if (
+    (input.type === 'SALIDA' || input.type === 'TRANSFERENCIA') &&
+    entity &&
+    Number.isInteger(input.quantity) &&
+    input.quantity > 0
+  ) {
     const available = computeAvailableStock(entity, existingDocument);
     if (input.quantity > available) {
       errors.quantity = `Stock insuficiente: disponible ${available}, solicitado ${input.quantity}.`;
@@ -511,11 +683,19 @@ export function validateDocument(
 }
 
 export function loadDocuments() {
-  return readCollection(STORAGE_KEYS.documents);
+  return readDocuments();
 }
 
 export function saveDocuments(documents) {
-  writeCollection(STORAGE_KEYS.documents, Array.isArray(documents) ? documents : []);
+  writeCollection(STORAGE_KEYS.movements, Array.isArray(documents) ? documents : []);
+  const storage = getStorage();
+  if (storage) {
+    try {
+      storage.removeItem(STORAGE_KEYS.legacyDocuments);
+    } catch {
+      // Storage may be unavailable; the canonical collection remains authoritative.
+    }
+  }
 }
 
 export function loadCounts() {
@@ -557,7 +737,7 @@ function applyStockEffect(entity, document, direction) {
   entity.stockBalance = balance + movementStockDelta(document) * direction;
 }
 
-export function addDocument(input, config = {}) {
+export function addDocument(input, config = {}, { actorPerson = '', actorLabel = '' } = {}) {
   const entities = loadEntities();
   const normalized = normalizeDocumentInput(input, config);
   if (config?.statusLifecycle && isBlank(normalized.status)) {
@@ -568,10 +748,16 @@ export function addDocument(input, config = {}) {
   if (!valid) throw new ValidationError(errors);
 
   const entity = entities.find((item) => item.entity_id === normalized.entity_id);
+  const actor = resolveActor({
+    actorPerson: actorPerson || input.actorPerson,
+    actorLabel: actorLabel || input.actorLabel
+  });
   const document = {
     document_id: generateId('doc'),
     ...normalized,
     state: normalized.state || input.state || 'active',
+    actorPerson: actor,
+    actorLabel: actor,
     createdAt: nowIso(),
     confirmedAt: normalized.confirmedAt || ''
   };
@@ -586,7 +772,12 @@ export function addDocument(input, config = {}) {
   return clone(document);
 }
 
-export function updateDocument(documentId, updates = {}, config = {}) {
+export function updateDocument(
+  documentId,
+  updates = {},
+  config = {},
+  { actorPerson = '', actorLabel = '' } = {}
+) {
   const documents = loadDocuments();
   const index = documents.findIndex((document) => document.document_id === documentId);
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
@@ -626,12 +817,21 @@ export function updateDocument(documentId, updates = {}, config = {}) {
   newEntity.updatedAt = nowIso();
   saveEntities(entities);
 
+  const actor = resolveActor(
+    {
+      actorPerson: actorPerson || updates.actorPerson,
+      actorLabel: actorLabel || updates.actorLabel
+    },
+    resolveActor(existing, existing.actorLabel || 'local')
+  );
   const updated = {
     ...existing,
     ...normalized,
     document_id: existing.document_id,
     createdAt: existing.createdAt,
     state: existing.state ?? 'active',
+    actorPerson: actor,
+    actorLabel: actor,
     confirmedAt: existing.confirmedAt ?? ''
   };
   documents[index] = updated;
@@ -669,7 +869,7 @@ export function deleteDocumentsForEntity(entityId) {
   if (remaining.length !== documents.length) saveDocuments(remaining);
 }
 
-export function voidDocument(documentId, { reason = '', actorLabel = '' } = {}) {
+export function voidDocument(documentId, { reason = '', actorPerson = '', actorLabel = '' } = {}) {
   const documents = loadDocuments();
   const index = documents.findIndex((document) => document.document_id === documentId);
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
@@ -678,24 +878,29 @@ export function voidDocument(documentId, { reason = '', actorLabel = '' } = {}) 
     throw new ValidationError({ _form: 'El movimiento ya fue anulado.' }, 'Movimiento ya anulado.');
   }
   if (original.state === 'draft') {
-    throw new ValidationError({ _form: 'Solo los movimientos confirmados pueden anularse.' }, 'No anulable.');
+    throw new ValidationError(
+      { _form: 'Solo los movimientos confirmados pueden anularse.' },
+      'No anulable.'
+    );
   }
 
   const voidedAt = nowIso();
   const voidReason = trimString(reason);
+  const actor = resolveActor({ actorPerson, actorLabel });
   documents[index] = {
     ...original,
     state: 'voided',
     voidedAt,
     voidReason,
-    voidedBy: trimString(actorLabel) || 'local'
+    voidedByPerson: actor,
+    voidedBy: actor,
+    actorPerson: original.actorPerson || original.actorLabel || actor,
+    actorLabel: original.actorLabel || actor
   };
 
   // Contramovement reverses stock effect and is linked to original
   const inverseType =
-    original.type === 'ENTRADA' ? 'SALIDA'
-    : original.type === 'SALIDA' ? 'ENTRADA'
-    : original.type;
+    original.type === 'ENTRADA' ? 'SALIDA' : original.type === 'SALIDA' ? 'ENTRADA' : original.type;
   const contramovement = {
     ...original,
     document_id: generateId('doc'),
@@ -714,7 +919,8 @@ export function voidDocument(documentId, { reason = '', actorLabel = '' } = {}) 
     voidsMovementId: original.document_id,
     reason: voidReason || original.reason || '',
     notes: voidReason ? `Contramovimiento: ${voidReason}` : `Anulación de ${original.document_id}`,
-    actorLabel: trimString(actorLabel) || 'local',
+    actorPerson: actor,
+    actorLabel: actor,
     createdAt: voidedAt,
     confirmedAt: voidedAt,
     voidedAt: '',
@@ -771,7 +977,9 @@ export function getKardex(entityId, filters = {}) {
 
 export function getLatestLocation(entityId) {
   const entries = loadDocuments().filter(
-    (document) => document.entity_id === entityId && (document.type === 'ENTRADA' || document.type === 'TRANSFERENCIA')
+    (document) =>
+      document.entity_id === entityId &&
+      (document.type === 'ENTRADA' || document.type === 'TRANSFERENCIA')
   );
   if (entries.length === 0) return null;
 
@@ -787,6 +995,49 @@ export function getLatestLocation(entityId) {
     shelf: latest.shelf ?? '',
     level: latest.level ?? ''
   };
+}
+
+function locationKey(location = {}) {
+  const parts = [location?.aisle, location?.shelf, location?.level]
+    .map((value) => trimString(value))
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join('-') : 'Sin ubicación';
+}
+
+export function getLocationBalances(entityId) {
+  const balances = {};
+  let currentLocation = null;
+  const movements = loadDocuments()
+    .filter((document) => document.entity_id === entityId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  function apply(location, quantity) {
+    if (!quantity) return;
+    const key = locationKey(location);
+    balances[key] = (balances[key] || 0) + quantity;
+    if (balances[key] === 0) delete balances[key];
+    currentLocation = key;
+  }
+
+  for (const document of movements) {
+    if (document.state === 'draft' || document.state === 'voided') continue;
+    const quantity = Number(document.quantity) || 0;
+    if (document.type === 'ENTRADA') {
+      apply(document, quantity);
+    } else if (document.type === 'TRANSFERENCIA') {
+      apply(
+        { aisle: document.fromAisle, shelf: document.fromShelf, level: document.fromLevel },
+        -quantity
+      );
+      apply(document, quantity);
+    } else if (document.type === 'SALIDA') {
+      apply(currentLocation ? { aisle: currentLocation } : document, -quantity);
+    } else if (document.type === 'AJUSTE') {
+      apply(currentLocation ? { aisle: currentLocation } : document, movementStockDelta(document));
+    }
+  }
+
+  return balances;
 }
 
 export function getCategories(entities = loadEntities()) {
@@ -898,9 +1149,10 @@ export function getDashboardStats(category = '') {
 export function getReplenishmentSuggestions(filters = {}) {
   const category = typeof filters?.category === 'string' ? filters.category : '';
   const allEntities = loadEntities();
-  const documents = loadDocuments();
   const filtered = category
-    ? allEntities.filter((e) => String(e.category ?? '').toLowerCase() === category.trim().toLowerCase())
+    ? allEntities.filter(
+        (e) => String(e.category ?? '').toLowerCase() === category.trim().toLowerCase()
+      )
     : allEntities;
 
   return filtered
@@ -911,9 +1163,14 @@ export function getReplenishmentSuggestions(filters = {}) {
     .map((entity) => {
       const stock = Number(entity.stockBalance) || 0;
       const reorderPoint = Number(entity.reorderPoint) || 0;
-      const maxStock = Number(entity.maxStock ?? entity.stockMaximo ?? entity.customFields?.stock_maximo);
-      const suggestedQty = Number.isFinite(maxStock) ? Math.max(0, maxStock - stock) : Math.max(0, reorderPoint - stock);
-      const provider = entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+      const maxStock = Number(
+        entity.maxStock ?? entity.stockMaximo ?? entity.customFields?.stock_maximo
+      );
+      const suggestedQty = Number.isFinite(maxStock)
+        ? Math.max(0, maxStock - stock)
+        : Math.max(0, reorderPoint - stock);
+      const provider =
+        entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
       const historyDays = daysSince(entity.createdAt);
       return {
         entity_id: entity.entity_id,
@@ -930,19 +1187,38 @@ export function getReplenishmentSuggestions(filters = {}) {
     });
 }
 
-export function createReplenishmentRequest({ lines = [], actorLabel = 'local' } = {}) {
+export function createReplenishmentRequest({
+  lines = [],
+  actorPerson = '',
+  actorLabel = 'local'
+} = {}) {
   if (!Array.isArray(lines) || lines.length === 0) {
-    throw new ValidationError({ _form: 'Seleccione al menos un producto para generar la solicitud.' }, 'Solicitud vacía.');
+    throw new ValidationError(
+      { _form: 'Seleccione al menos un producto para generar la solicitud.' },
+      'Solicitud vacía.'
+    );
   }
   const entities = loadEntities();
   const normalizedLines = lines.map((line) => {
     const entity = entities.find((e) => e.entity_id === line.entity_id);
-    if (!entity) throw new ValidationError({ _form: 'Una entidad seleccionada ya no existe.' }, 'Entidad inválida.');
+    if (!entity)
+      throw new ValidationError(
+        { _form: 'Una entidad seleccionada ya no existe.' },
+        'Entidad inválida.'
+      );
     const qty = Number(line.suggestedQty ?? line.quantity);
     if (!Number.isFinite(qty) || qty < 0) {
-      throw new ValidationError({ suggestedQty: 'La cantidad sugerida debe ser un número mayor o igual a 0.' }, 'Cantidad inválida.');
+      throw new ValidationError(
+        { suggestedQty: 'La cantidad sugerida debe ser un número mayor o igual a 0.' },
+        'Cantidad inválida.'
+      );
     }
-    const provider = line.provider || entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+    const provider =
+      line.provider ||
+      entity.provider ||
+      entity.supplier ||
+      entity.customFields?.proveedor ||
+      'Sin proveedor';
     return {
       entity_id: entity.entity_id,
       name: entity.name,
@@ -958,10 +1234,12 @@ export function createReplenishmentRequest({ lines = [], actorLabel = 'local' } 
     return acc;
   }, {});
 
+  const actor = resolveActor({ actorPerson, actorLabel });
   const request = {
     request_id: generateId('req'),
     status: 'created',
-    actorLabel: trimString(actorLabel) || 'local',
+    actorPerson: actor,
+    actorLabel: actor,
     createdAt: nowIso(),
     lines: normalizedLines,
     groupedByProvider: grouped
@@ -975,10 +1253,7 @@ export function createReplenishmentRequest({ lines = [], actorLabel = 'local' } 
 export function resetStore() {
   const storage = getStorage();
   if (!storage) return;
-  storage.removeItem(STORAGE_KEYS.entities);
-  storage.removeItem(STORAGE_KEYS.documents);
-  storage.removeItem(STORAGE_KEYS.counts);
-  storage.removeItem(STORAGE_KEYS.replenishmentRequests);
+  Object.values(STORAGE_KEYS).forEach((key) => storage.removeItem(key));
 }
 
 export function isBelowReorderPoint(entity) {
@@ -988,12 +1263,14 @@ export function isBelowReorderPoint(entity) {
   return (Number(entity.stockBalance) || 0) <= reorderPoint;
 }
 
-export function createPhysicalCount({ actorLabel = 'local', notes = '' } = {}) {
+export function createPhysicalCount({ actorPerson = '', actorLabel = 'local', notes = '' } = {}) {
   const counts = loadCounts();
+  const actor = resolveActor({ actorPerson, actorLabel });
   const count = {
     count_id: generateId('cnt'),
     state: 'open',
-    actorLabel: trimString(actorLabel) || 'local',
+    actorPerson: actor,
+    actorLabel: actor,
     notes: trimString(notes),
     details: [],
     createdAt: nowIso(),
@@ -1010,12 +1287,16 @@ export function recordBlindCountDetail(countId, { entity_id, countedQuantity }) 
   const counts = loadCounts();
   const count = counts.find((c) => c.count_id === countId);
   if (!count) throw new NotFoundError('El conteo no existe.');
-  if (count.state !== 'open') throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  if (count.state !== 'open')
+    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
   const entity = getEntity(entity_id);
   if (!entity) throw new NotFoundError('La entidad ya no existe.');
   const qty = Number(countedQuantity);
   if (!Number.isInteger(qty) || qty < 0) {
-    throw new ValidationError({ countedQuantity: 'La cantidad contada debe ser un entero mayor o igual a 0.' }, 'Cantidad inv�lida.');
+    throw new ValidationError(
+      { countedQuantity: 'La cantidad contada debe ser un entero mayor o igual a 0.' },
+      'Cantidad inv�lida.'
+    );
   }
   count.details = Array.isArray(count.details) ? count.details : [];
   const existing = count.details.find((d) => d.entity_id === entity_id);
@@ -1035,7 +1316,8 @@ export function closePhysicalCount(countId) {
   const counts = loadCounts();
   const count = counts.find((c) => c.count_id === countId);
   if (!count) throw new NotFoundError('El conteo no existe.');
-  if (count.state !== 'open') throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  if (count.state !== 'open')
+    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
   const entities = loadEntities();
   count.details = (count.details || []).map((d) => {
     const entity = entities.find((e) => e.entity_id === d.entity_id);
@@ -1053,20 +1335,36 @@ export function closePhysicalCount(countId) {
   return clone(count);
 }
 
-export function approveCountAdjustment(countId, { approverLabel = '', reason = '' } = {}) {
+export function approveCountAdjustment(
+  countId,
+  { approvedByPerson = '', approverLabel = '', reason = '' } = {}
+) {
   const counts = loadCounts();
   const count = counts.find((c) => c.count_id === countId);
   if (!count) throw new NotFoundError('El conteo no existe.');
   if (count.state !== 'closed') {
-    throw new ValidationError({ _form: 'El conteo debe estar cerrado antes de aprobar ajustes.' }, 'Conteo no cerrado.');
+    throw new ValidationError(
+      { _form: 'El conteo debe estar cerrado antes de aprobar ajustes.' },
+      'Conteo no cerrado.'
+    );
   }
-  const approver = trimString(approverLabel) || 'supervisor';
-  if (approver === trimString(count.actorLabel)) {
-    throw new ValidationError({ approverLabel: 'La aprobaci�n debe registrarse con un actor distinto al del conteo.' }, 'Actor inv�lido.');
+  const approver = resolveActor(
+    { actorPerson: approvedByPerson, actorLabel: approverLabel },
+    'supervisor'
+  );
+  const countedBy = resolveActor(count, count.actorLabel || 'operador');
+  if (approver.toLocaleLowerCase('es') === countedBy.toLocaleLowerCase('es')) {
+    throw new ValidationError(
+      { approverLabel: 'La aprobaci�n debe registrarse con un actor distinto al del conteo.' },
+      'Actor inv�lido.'
+    );
   }
   const adjustmentReason = trimString(reason);
   if (!adjustmentReason) {
-    throw new ValidationError({ reason: 'El motivo del ajuste es obligatorio.' }, 'Motivo requerido.');
+    throw new ValidationError(
+      { reason: 'El motivo del ajuste es obligatorio.' },
+      'Motivo requerido.'
+    );
   }
 
   const documents = loadDocuments();
@@ -1088,7 +1386,10 @@ export function approveCountAdjustment(countId, { approverLabel = '', reason = '
       state: 'confirmed',
       reason: adjustmentReason,
       notes: `Ajuste por conteo ${count.count_id}`,
+      actorPerson: approver,
       actorLabel: approver,
+      approvedByPerson: approver,
+      approvedBy: approver,
       countId: count.count_id,
       createdAt: now,
       confirmedAt: now
@@ -1101,6 +1402,7 @@ export function approveCountAdjustment(countId, { approverLabel = '', reason = '
 
   count.state = 'approved';
   count.approvedAt = now;
+  count.approvedByPerson = approver;
   count.approvedBy = approver;
   count.adjustmentReason = adjustmentReason;
 

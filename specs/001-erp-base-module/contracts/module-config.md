@@ -1,6 +1,6 @@
 # Contrato de Configuración del Módulo (`module-config.js`)
 
-**Feature**: `001-erp-base-module` | **Modelo**: [../data-model.md](../data-model.md) | **Fecha**: 2026-11-16
+**Feature**: `001-erp-base-module` | **Modelo**: [../data-model.md](../data-model.md) | **Fecha**: 2026-11-17
 
 ## Propósito
 
@@ -77,6 +77,8 @@ export const userConfig = {
 
 - La configuración **no** puede desactivar reglas base de integridad: unicidad de SKU, campos obligatorios base, validación de stock, inmutabilidad de movimientos confirmados, ni reglas de eliminación/desactivación por historial.
 - La adaptación de terminología no altera el comportamiento de navegación ni la semántica de las reglas base.
+- La configuración NO define roles con permisos ni reglas de visibilidad por rol: costos y valorización se muestran según FR-044 (FR-047).
+- La identidad de auditoría/probación proviene del selector local de persona (FR-049), no de la configuración del módulo.
 
 ## Extensibilidad Garantizada
 

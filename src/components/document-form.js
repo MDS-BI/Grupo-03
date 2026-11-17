@@ -128,12 +128,54 @@ export function renderDocumentForm(
     'data-testid': 'document-level'
   });
 
-  const fromAisleInput = h('input', { type: 'text', name: 'fromAisle', value: document?.fromAisle ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-from-aisle' });
-  const fromShelfInput = h('input', { type: 'text', name: 'fromShelf', value: document?.fromShelf ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-from-shelf' });
-  const fromLevelInput = h('input', { type: 'text', name: 'fromLevel', value: document?.fromLevel ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-from-level' });
-  const toAisleInput = h('input', { type: 'text', name: 'toAisle', value: document?.toAisle ?? document?.aisle ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-to-aisle' });
-  const toShelfInput = h('input', { type: 'text', name: 'toShelf', value: document?.toShelf ?? document?.shelf ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-to-shelf' });
-  const toLevelInput = h('input', { type: 'text', name: 'toLevel', value: document?.toLevel ?? document?.level ?? '', disabled: true, autocomplete: 'off', 'data-testid': 'transfer-to-level' });
+  const fromAisleInput = h('input', {
+    type: 'text',
+    name: 'fromAisle',
+    value: document?.fromAisle ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-from-aisle'
+  });
+  const fromShelfInput = h('input', {
+    type: 'text',
+    name: 'fromShelf',
+    value: document?.fromShelf ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-from-shelf'
+  });
+  const fromLevelInput = h('input', {
+    type: 'text',
+    name: 'fromLevel',
+    value: document?.fromLevel ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-from-level'
+  });
+  const toAisleInput = h('input', {
+    type: 'text',
+    name: 'toAisle',
+    value: document?.toAisle ?? document?.aisle ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-to-aisle'
+  });
+  const toShelfInput = h('input', {
+    type: 'text',
+    name: 'toShelf',
+    value: document?.toShelf ?? document?.shelf ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-to-shelf'
+  });
+  const toLevelInput = h('input', {
+    type: 'text',
+    name: 'toLevel',
+    value: document?.toLevel ?? document?.level ?? '',
+    disabled: true,
+    autocomplete: 'off',
+    'data-testid': 'transfer-to-level'
+  });
 
   const reasonSelect = h(
     'select',
@@ -183,12 +225,39 @@ export function renderDocumentForm(
     'section',
     { class: 'panel', 'data-testid': 'transfer-section', hidden: true },
     h('div', { class: 'panel-header' }, h('h3', {}, 'Transferencia entre ubicaciones')),
-    h('div', { class: 'form-grid' },
-      formField({ label: 'Pasillo origen', name: 'fromAisle', control: fromAisleInput, required: true }),
-      formField({ label: 'Estante origen', name: 'fromShelf', control: fromShelfInput, required: true }),
-      formField({ label: 'Nivel origen', name: 'fromLevel', control: fromLevelInput, required: true }),
-      formField({ label: 'Pasillo destino', name: 'toAisle', control: toAisleInput, required: true }),
-      formField({ label: 'Estante destino', name: 'toShelf', control: toShelfInput, required: true }),
+    h(
+      'div',
+      { class: 'form-grid' },
+      formField({
+        label: 'Pasillo origen',
+        name: 'fromAisle',
+        control: fromAisleInput,
+        required: true
+      }),
+      formField({
+        label: 'Estante origen',
+        name: 'fromShelf',
+        control: fromShelfInput,
+        required: true
+      }),
+      formField({
+        label: 'Nivel origen',
+        name: 'fromLevel',
+        control: fromLevelInput,
+        required: true
+      }),
+      formField({
+        label: 'Pasillo destino',
+        name: 'toAisle',
+        control: toAisleInput,
+        required: true
+      }),
+      formField({
+        label: 'Estante destino',
+        name: 'toShelf',
+        control: toShelfInput,
+        required: true
+      }),
       formField({ label: 'Nivel destino', name: 'toLevel', control: toLevelInput, required: true })
     )
   );
@@ -353,7 +422,14 @@ export function renderDocumentForm(
     }
 
     const enableTransferLocation = isTransfer && Boolean(entitySelect.value) && validQuantity;
-    [fromAisleInput, fromShelfInput, fromLevelInput, toAisleInput, toShelfInput, toLevelInput].forEach((input) => {
+    [
+      fromAisleInput,
+      fromShelfInput,
+      fromLevelInput,
+      toAisleInput,
+      toShelfInput,
+      toLevelInput
+    ].forEach((input) => {
       input.disabled = !enableTransferLocation;
     });
     if (!isTransfer) {

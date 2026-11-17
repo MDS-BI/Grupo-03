@@ -13,7 +13,7 @@ function locationText(location) {
 
 export function renderEntityList(
   container,
-  { config, entities = [], onEdit, onDelete, onCreate, showActions = true, showValuation = true }
+  { config, entities = [], onEdit, onDelete, onCreate, showActions = true }
 ) {
   const labels = config.labels.entity;
   const customDefinitions = config.customFields?.entity ?? [];
@@ -55,9 +55,7 @@ export function renderEntityList(
     headerCells.push(h('th', { scope: 'col' }, definition.label));
   });
 
-  if (showValuation) {
-    headerCells.push(h('th', { scope: 'col' }, 'Valoración'));
-  }
+  headerCells.push(h('th', { scope: 'col' }, 'Valoración'));
   if (actionsEnabled) {
     headerCells.push(h('th', { scope: 'col' }, 'Acciones'));
   }
@@ -78,12 +76,10 @@ export function renderEntityList(
       );
     });
 
-    if (showValuation) {
-      const hasCost =
-        entity.unitCost !== undefined && entity.unitCost !== null && entity.unitCost !== '';
-      const valuation = (Number(entity.stockBalance) || 0) * (Number(entity.unitCost) || 0);
-      cells.push(h('td', {}, hasCost ? formatCurrency(valuation) : '—'));
-    }
+    const hasCost =
+      entity.unitCost !== undefined && entity.unitCost !== null && entity.unitCost !== '';
+    const valuation = (Number(entity.stockBalance) || 0) * (Number(entity.unitCost) || 0);
+    cells.push(h('td', {}, hasCost ? formatCurrency(valuation) : '—'));
 
     if (actionsEnabled) {
       cells.push(

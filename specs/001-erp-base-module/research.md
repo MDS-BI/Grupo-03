@@ -1,6 +1,6 @@
 # Investigación (Phase 0): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-16
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
 
 Este documento resuelve las decisiones técnicas y de dominio necesarias antes del diseño. No quedan marcadores `NEEDS CLARIFICATION`.
 
@@ -21,12 +21,12 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 
 ## Decisión 4: Modelo de inventario nativo y saldo derivado por movimientos
 **Decisión**: El núcleo soporta nativamente Entidades y Movimientos de inventario (Entrada, Salida, Transferencia, Ajuste), además de Conteo Físico y Solicitud de Reposición. El saldo total y por ubicación se deriva/aplica mediante movimientos confirmados (nunca edición manual directa del stock).
-**Justificación**: Alineado con aclaración 2026-11-16 (HU2–HU5 nativas) y con trazabilidad (HU4). La capa de almacenamiento aplica efectos de forma atómica al confirmar.
-**Alternativas consideradas**: Limitar base a Entrada/Salida (contradice spec) o editar stock a mano (rompe integridad).
+**Justificación**: Alineado con las aclaraciones de 2026-11-17 (HU1–HU5 nativas; HU6 diferida) y con trazabilidad (HU4). La capa de almacenamiento aplica efectos de forma atómica al confirmar.
+**Alternativas consideradas**: Limitar base a Entrada/Salida (contradice FR-043/FR-048) o editar stock a mano (rompe integridad).
 
 ## Decisión 5: Ubicación por movimiento y ubicación actual derivada
-**Decisión**: La ubicación física se registra en documentos de Entrada (y origen/destino en Transferencias). La “ubicación actual” mostrada en el detalle del producto se deriva del documento de entrada más reciente.
-**Justificación**: Preserva historial y evita duplicación/inconsistencia (FR-041, aclaraciones previas).
+**Decisión**: La ubicación física se registra en documentos de Entrada (y origen/destino en Transferencias). La “ubicación actual” mostrada en el detalle del producto se deriva del documento de entrada o transferencia confirmado más reciente (FR-041).
+**Justificación**: Preserva historial y evita duplicación/inconsistencia; la transferencia también cambia la ubicación vigente del producto.
 **Alternativas consideradas**: Ubicación única en entidad o duplicada en entidad+documento.
 
 ## Decisión 6: Campos obligatorios, unicidad y costo opcional
@@ -39,17 +39,22 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 **Justificación**: Integridad referencial y trazabilidad/auditoría (FR-003, FR-008/FR-009/FR-018, HU4).
 **Alternativas consideradas**: Borrado en cascada siempre o edición directa de confirmados (rompen historial).
 
-## Decisión 8: Roles simulados sin autenticación
-**Decisión**: Los roles son etiquetas/simulación de vista en UI local (p. ej. selector) en un único espacio de trabajo; no hay login, cuentas gestionables ni permisos/enforcement reales. La auditoría usa etiquetas locales de actor.
-**Justificación**: Aclaración 2026-11-16 y supuestos del MVP con `localStorage`.
-**Alternativas consideradas**: Autenticación/permisos reales o gestión local de perfiles con enforcement (fuera de alcance/complejidad innecesaria).
+## Decisión 8: Sin roles operativos; identidad local de persona
+**Decisión**: Los roles son solo etiquetas descriptivas. No hay login, cuentas, permisos, selector de rol ni visibilidad de costos/contactos condicionada por rol (FR-047). La identidad se toma de un selector local de persona sin contraseña, y esa etiqueta se registra en la auditoría y en `aprobado_por` (FR-049).
+**Justificación**: Aclaraciones de 2026-11-10 y 2026-11-17; evita una falsa sensación de seguridad y permite verificar que el aprobador de un ajuste no es quien contó (HU4#4).
+**Alternativas consideradas**: Selector de rol con ocultación visual (retirado), autenticación/permisos reales o usuario implícito sin separación de funciones (todos rechazados).
 
 ## Decisión 9: Conteos, ajustes y solicitudes como registros nativos
 **Decisión**: Modelar conteos físicos (ciegos, con diferencias) y solicitudes de reposición (con detalle y cantidad sugerida) como registros nativos vinculados a entidades/movimientos, con ajustes aprobados representados como movimientos de tipo Ajuste y referencias de trazabilidad.
-**Justificación**: HU4/HU5 forman parte del alcance nativo; permite KPIs y kardex coherentes.
-**Alternativas consideradas**: Dejar a extensiones (contradice alcance aclarado).
+**Justificación**: HU4/HU5 forman parte del alcance nativo; permite KPIs y kardex coherentes. La aprobación usa la persona local del selector (FR-049), distinta de quien contó.
+**Alternativas consideradas**: Dejar a extensiones (contradice FR-046) o aprobar sin distinción de personas (contradice HU4#4).
 
 ## Decisión 10: Pruebas, renderizado seguro y accesibilidad
 **Decisión**: Vitest + jsdom con pruebas unitarias e integración; escapar HTML/atributos al renderizar datos de usuario; controles nativos, labels, foco visible y `aria-current`; barra lateral contraíble.
 **Justificación**: Cumple Constitución (II, III) y supuestos de seguridad/XSS de la spec.
 **Alternativas consideradas**: Solo pruebas manuales o inserción directa de HTML no sanitizado.
+
+## Decisión 11: Integración HU6 diferida
+**Decisión**: No se implementa en esta versión la integración con Compras y Ventas: no hay `orden_compra_id`, `pedido_venta_id` ni `DemandaNoAtendida` operativos. El módulo queda preparado para añadirlos sin cambiar el núcleo.
+**Justificación**: Decisión de alcance de 2026-11-17 (FR-046); HU6 es P3 y el módulo funciona sin ella.
+**Alternativas consideradas**: Simular OC y pedidos con datos de ejemplo desde el inicio (añade superficie de prueba sin valor para HU1–HU5).

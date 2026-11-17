@@ -1,8 +1,8 @@
 # Modelo de Datos (Phase 1): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-16
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
 
-Modelo alineado con las clarificaciones vigentes: alcance nativo de inventario avanzado (HU2–HU5), roles simulados sin autenticación, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
+Modelo alineado con las clarificaciones vigentes: alcance nativo HU1–HU5 (HU6 diferida), Transferencia como tercer tipo de documento, sin roles operativos ni visibilidad por rol, selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
 
 ## 1. Diagrama Entidad-Relación (conceptual)
 
@@ -14,6 +14,9 @@ erDiagram
     ENTIDAD ||--o{ SOLICITUD_REPOSICION_DET : "solicita"
     SOLICITUD_REPOSICION ||--o{ SOLICITUD_REPOSICION_DET : "agrupa"
     MOVIMIENTO ||--o| MOVIMIENTO : "anula_a / contramovimiento"
+    PERSONA_LOCAL ||--o{ MOVIMIENTO : "actor / aprobador"
+    PERSONA_LOCAL ||--o{ AUDITORIA : "registra"
+    ENTIDAD ||--o{ AUDITORIA : "afectada"
 
     ENTIDAD {
         string entity_id PK
@@ -41,15 +44,30 @@ erDiagram
         string notes "Opcional"
         string reason "Opcional/obligatorio según caso"
         string voidsMovementId "FK opcional (contramovimiento)"
-        string actorLabel "Etiqueta local simulada"
+        string actorPerson "Persona local que ejecuta (FR-049)"
+        string approvedByPerson "Persona local que aprueba (ajustes)"
         datetime createdAt
         datetime confirmedAt
+    }
+
+    PERSONA_LOCAL {
+        string person_id PK
+        string label "Etiqueta visible elegida en el selector local"
+    }
+
+    AUDITORIA {
+        string audit_id PK
+        string entityId FK "Opcional"
+        string action "create|update|deactivate|delete"
+        string person "Etiqueta de PersonaLocal"
+        datetime timestamp
+        string details "Opcional"
     }
 
     CONTEO_FISICO {
         string count_id PK
         string state "open|closed"
-        string actorLabel
+        string actorPerson "Persona local que contó (FR-049)"
         datetime createdAt
         datetime closedAt
     }
@@ -124,7 +142,8 @@ Registro transaccional vinculado a una entidad que afecta o traza stock.
 | `reason` | string | Según caso | Motivo; obligatorio en ajustes y cuando aplique (p. ej. merma en salida si se modela así) |
 | `notes` | string | No | Texto libre |
 | `voidsMovementId` | string | No | Referencia al movimiento anulado (contramovimiento) |
-| `actorLabel` | string | No | Etiqueta local simulada (rol/actor) |
+| `actorPerson` | string | Sí al confirmar | Etiqueta de la persona local del selector (FR-049); no es un rol |
+| `approvedByPerson` | string | Solo ajustes | Persona local que aprueba; debe diferir de quien contó (HU4#4) |
 | `createdAt` | ISO string | Sí (auto) | Marca de tiempo del registro |
 | `confirmedAt` | ISO string | Condicional | Al confirmar |
 
@@ -145,13 +164,21 @@ Soporte nativo para reposición (HU5): solicitud con líneas por entidad/product
 
 Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleName`, `labels`, `customFields`, `statusLifecycle`, `theme.accentColor`.
 
+### 2.6 PERSONA_LOCAL y AUDITORIA
+
+- **PERSONA_LOCAL**: etiqueta elegida en un selector local sin contraseña ni permisos (FR-049). No es un rol y no habilita ni oculta funcionalidad.
+- **AUDITORIA**: registro automático de cada creación, edición o desactivación de entidad (HU1#4) con `action`, `person` (PersonaLocal), `timestamp` y, si aplica, `entityId` y `details`. Las aprobaciones de ajustes guardan además `approvedByPerson` en el movimiento.
+
+La separación de funciones se valida comparando la persona del conteo con `approvedByPerson`; ambas deben ser distintas.
+
 ## 3. Relaciones e Integridad
 
 - `ENTIDAD 1 — 0..* MOVIMIENTO` (y otros registros asociados como conteos/solicitudes).
 - Integridad referencial: movimientos/conteos/solicitudes referencian entidades existentes.
-- **Eliminación**: si existen registros asociados, la entidad no se elimina físicamente; se desactiva. Si no existen, se permite eliminación física.
-- Ubicación actual del producto: derivada del movimiento de entrada confirmado más reciente (no duplicada en entidad).
+- **Eliminación**: si existen registros asociados, la entidad no se elimina físicamente; se desactiva. Si no existen, se permite eliminación física (FR-003/FR-009).
+- Ubicación actual del producto: derivada del movimiento de entrada o transferencia confirmado más reciente (no duplicada en entidad; FR-041).
 - Campos personalizados se persisten junto a campos base sin cambiar la estructura.
+- Toda operación de entidad genera auditoría con la persona local activa (FR-049).
 
 ## 4. Reglas de Validación
 
@@ -171,14 +198,15 @@ Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleN
 4. `ENTRADA`: ubicación completa (`aisle`,`shelf`,`level`).
 5. `TRANSFERENCIA`: origen y destino válidos; cantidad ≤ stock disponible en origen.
 6. `SALIDA`: cantidad ≤ stock disponible (validación al confirmar, no solo al abrir formulario).
-7. `AJUSTE`: motivo obligatorio; respeta flujo de aprobación con actor distinto al conteo cuando proviene de conteo.
+7. `AJUSTE`: motivo obligatorio; `approvedByPerson` obligatorio y distinto de la persona que hizo el conteo (HU4#4, FR-049).
 8. Confirmados: inmutables; corrección solo por anulación/contramovimiento.
 9. Estado/ciclo de vida: si hay `statusLifecycle` configurado, transiciones válidas; si no, texto libre donde corresponda.
 
 ### Conteo y reposición
 1. Conteo ciego: no exponer cantidad de sistema durante captura.
-2. Ajuste derivado requiere motivo y aprobación válida.
+2. Ajuste derivado requiere motivo y aprobación con persona local distinta a la del conteo.
 3. Solicitud de reposición agrupa líneas y sugiere cantidad editable según regla definida.
+4. Toda creación/edición/desactivación de entidad queda en auditoría con persona local y fecha.
 
 ### Configuración
 1. Inválida/conflictiva se informa claramente (sin fallo silencioso).
@@ -195,7 +223,7 @@ Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleN
 | `AJUSTE` | Corrige saldo según diferencia aprobada; queda trazado en kardex |
 
 - El saldo se actualiza de forma atómica al confirmar; cancelar/abortar no altera stock.
-- Kardex: lista movimientos en orden cronológico con tipo, documento, cantidad, saldo, ubicación y etiqueta de actor, filtrable por fecha y tipo.
+- Kardex: lista movimientos en orden cronológico con tipo, documento, cantidad, saldo, ubicación y persona local responsable, filtrable por fecha y tipo.
 - Anulación: genera contramovimiento enlazado al original; el saldo debe poder reconstruirse desde el historial.
 
 ## 6. Indicadores del Panel (HU5)

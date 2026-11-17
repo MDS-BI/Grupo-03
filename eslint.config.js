@@ -21,6 +21,7 @@ export default [
         window: 'readonly',
         document: 'readonly',
         localStorage: 'readonly',
+        DOMParser: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',

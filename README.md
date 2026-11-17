@@ -33,7 +33,6 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 
 > Nota: la configuración declarativa en src/module-config.js permite adaptar etiquetas, campos personalizados, ciclo de vida y tema. Las capacidades nativas de inventario descritas arriba forman parte del módulo base implementado.
 
-
 La adaptación del módulo base a **Logística e Inventario** se define a través del objeto `userConfig` en el archivo `src/module-config.js`:
 
 - **Nombre del Módulo (`moduleName`):** "Logística e Inventario"

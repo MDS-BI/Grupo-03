@@ -1,15 +1,15 @@
 # Contrato de Interfaz de Usuario
 
-**Feature**: `001-erp-base-module` | **Spec**: [../spec.md](../spec.md) | **Fecha**: 2026-11-16
+**Feature**: `001-erp-base-module` | **Spec**: [../spec.md](../spec.md) | **Fecha**: 2026-11-17
 
 ## Propósito
 
-Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). El alcance incluye simulación visual de rol (sin autenticación/permisos reales).
+Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). No hay roles operativos: la identidad se elige en un selector local de persona solo para auditoría y aprobaciones (FR-049). HU6 queda fuera de este contrato (FR-046).
 
 ## Marco persistente (workspace shell)
 
 - Barra superior con logotipo monograma SVG derivado de `moduleName` y nombre del módulo.
-- Selector de **rol simulado** (etiqueta de vista local) disponible en el marco; cambia solo la presentación/ocultación visual permitida (p. ej. costos/valoración/contactos en vista Operador) y no implementa control de acceso ni seguridad.
+- Selector de **persona local** disponible en el marco; su etiqueta se usa en auditoría, movimientos y aprobaciones. No es un rol, no da permisos y no oculta costos ni contactos (FR-047/FR-049).
 - Barra lateral con botones de módulo: Panel, Entidades, Documentos y Buscar; el activo se resalta (`aria-current`).
 - En anchos reducidos la barra lateral se contrae a iconos manteniéndose operable.
 - El marco permanece visible en todas las pantallas.
@@ -34,8 +34,9 @@ Definir pantallas, navegación y comportamiento observable de la SPA. Las etique
 | Eliminación de entidad | Si no tiene historial: permite eliminar. Si tiene historial: bloquea eliminación y ofrece solo desactivación (conserva historial) |
 | Formulario de movimiento | Registrar borrador/confirmación de Entrada, Salida, Transferencia y Ajuste según reglas; ubicación en entradas; origen/destino en transferencias; motivo cuando aplique |
 | Inmutabilidad | Movimientos confirmados no se editan ni eliminan; se corrigen por anulación con contramovimiento. Borradores pueden editarse/cancelarse |
-| Conteos físicos | Soporte para conteo ciego, cierre con diferencias y generación/aprobación de ajustes (etiqueta de actor distinta, simulada) |
-| Kardex/historial | Consulta cronológica por entidad con filtros (fecha/tipo), saldo, ubicación y actor; accesible desde gestión/detalle |
+| Conteos físicos | Conteo ciego, cierre con diferencias y ajustes con motivo obligatorio; la aprobación exige persona local distinta de quien contó (FR-049) |
+| Kardex/historial | Consulta cronológica por entidad con filtros (fecha/tipo), saldo, ubicación y persona local responsable; accesible desde gestión/detalle |
+| Auditoría | Creación, edición y desactivación de entidades quedan registradas con persona local y fecha (HU1#4) |
 | Lista de entidades | No se muestra como listado principal en esta pantalla (FR-016); gestión se enfoca en formularios/acciones |
 | Validación | Bloquea guardados inválidos con mensajes descriptivos (campos obligatorios, SKU duplicado, stock insuficiente, etc.) |
 
@@ -55,10 +56,11 @@ Definir pantallas, navegación y comportamiento observable de la SPA. Las etique
 - Datos intactos al navegar (FR-022, SC-007).
 - Salir de formularios con cambios sin guardar requiere confirmación.
 
-## Etiquetado y simulación de rol
+## Etiquetado e identidad local
 
 - Todas las etiquetas visibles derivan de `labels` (FR-029); fallback a términos base (FR-024).
-- El selector de rol simulado afecta solo visibilidad/presentación en UI local (sin enforcement de seguridad).
+- No existe selector de rol ni ocultación de costos/contactos por rol (FR-047): la visibilidad de costos y valorización se rige por FR-044 (panel y catálogo).
+- El selector de persona local solo identifica al responsable de movimientos, conteos, aprobaciones y auditoría (FR-049).
 
 ## Estados de retroalimentación
 

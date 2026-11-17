@@ -56,7 +56,11 @@ export function seedEntity(overrides = {}, config = baseConfig) {
       category: 'Ferretería',
       unit,
       reorderPoint,
-      customFields: { sku: customFields.sku ?? code, punto_reorden: customFields.punto_reorden ?? reorderPoint, ...customFields },
+      customFields: {
+        sku: customFields.sku ?? code,
+        punto_reorden: customFields.punto_reorden ?? reorderPoint,
+        ...customFields
+      },
       ...overrides
     },
     config

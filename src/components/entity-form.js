@@ -38,7 +38,7 @@ function customControl(definition, value) {
 
 export function renderEntityForm(
   container,
-  { config, entity = null, categories = [], onSubmit, onCancel, onDelete, canViewCost = true }
+  { config, entity = null, categories = [], onSubmit, onCancel, onDelete }
 ) {
   const labels = config.labels.entity;
   const isEditing = Boolean(entity);
@@ -236,14 +236,12 @@ export function renderEntityForm(
         required: true,
         hint: 'Umbral para marcar stock crítico.'
       }),
-      canViewCost
-        ? formField({
-            label: 'Costo unitario',
-            name: 'unitCost',
-            control: unitCostInput,
-            hint: 'Solo se usa para la valoración del catálogo y del panel.'
-          })
-        : null,
+      formField({
+        label: 'Costo unitario',
+        name: 'unitCost',
+        control: unitCostInput,
+        hint: 'Solo se usa para la valoración del catálogo y del panel.'
+      }),
       ...customFields
     ),
     datalist,

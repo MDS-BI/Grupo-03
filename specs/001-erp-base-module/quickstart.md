@@ -1,6 +1,6 @@
 # Quickstart: Validación del Módulo Base ERP — Logística e Inventario
 
-**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-16
+**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-17
 
 Guía para ejecutar y validar el módulo de extremo a extremo. Contratos en [contracts/](./contracts/).
 
@@ -27,15 +27,15 @@ npm run preview
 
 ## Escenarios de validación
 
-### HU1 — Catálogo maestro, unicidad, eliminación/desactivación y rol simulado
-1. Crear producto con campos obligatorios: nombre, código/SKU, categoría, unidad y punto de reorden (y `costo_unitario` opcional si aplica).
-2. **Esperado**: se guarda activo con stock 0.
+### HU1 — Catálogo maestro, unicidad, eliminación/desactivación y auditoría
+1. Seleccionar una persona en el selector local y crear producto con campos obligatorios: nombre, código/SKU, categoría, unidad y punto de reorden (y `costo_unitario` opcional si aplica).
+2. **Esperado**: se guarda activo con stock 0 y queda un registro de auditoría con esa persona y la fecha.
 3. Intentar crear/editar con SKU duplicado (ignorando mayúsculas/espacios) o con punto de reorden/costo negativo.
 4. **Esperado**: guardado bloqueado con mensaje descriptivo.
 5. Intentar eliminar un producto con movimientos/historial.
 6. **Esperado**: eliminación bloqueada y solo se permite desactivación conservando historial. Si no tiene historial, la eliminación física es posible.
-7. Cambiar a rol simulado **Operador**.
-8. **Esperado**: la vista oculta costos/valoración/contactos de proveedores (solo simulación visual, sin permisos reales).
+7. Buscar una vista que permita ocultar costos por "rol Operador".
+8. **Esperado**: no existe tal selector ni visibilidad condicionada por rol; costos y valorización se muestran solo en panel/catálogo (FR-044, FR-047).
 
 ### HU2 — Recepción (entrada) y transferencia con ubicación
 1. Registrar Entrada confirmada con cantidad y ubicación (pasillo-estante-nivel).
@@ -57,7 +57,7 @@ npm run preview
 3. Intentar editar/eliminar un movimiento confirmado.
 4. **Esperado**: no permitido; corrección vía anulación con contramovimiento vinculado.
 5. Realizar conteo físico.
-6. **Esperado**: captura ciega (sin cantidad del sistema), diferencias al cerrar; ajuste con motivo obligatorio y aprobación con etiqueta de actor distinta a la del conteo; ajuste aprobado aparece como `AJUSTE`.
+6. **Esperado**: captura ciega (sin cantidad del sistema), diferencias al cerrar; ajuste con motivo obligatorio y aprobación con persona local distinta a la que contó; ajuste aprobado aparece como `AJUSTE`.
 
 ### HU5 — Panel, KPIs y solicitudes de reposición
 1. Abrir Panel con datos.
@@ -74,6 +74,9 @@ npm run preview
 | Campos obligatorios entidad (nombre, SKU, categoría, unidad, punto de reorden) | Bloqueo y mensajes claros si faltan |
 | SKU único global (normalizado) | Bloqueo en alta/edición duplicada |
 | Eliminación con/sin historial | Sin historial: elimina; con historial: solo desactiva |
+| Visibilidad por rol | No existe: sin selector de rol ni ocultación de costos/contactos (FR-047) |
+| Persona local en auditoría | Toda creación/edición/desactivación registra persona y fecha (FR-049) |
+| Aprobación de ajustes | Requiere persona distinta de la del conteo (HU4#4) |
 | Movimientos confirmados | Inmutables; corrección por contramovimiento |
 | Stock insuficiente (salida/transferencia) | Bloqueado con mensaje |
 | Navegación entre pantallas y recarga | Datos intactos en `localStorage` |
@@ -89,15 +92,21 @@ npm run preview
 
 ## Notas de alineación
 
-- Los roles son simulación visual local: no hay login ni permisos reales.
+- Los roles son etiquetas descriptivas: no hay login, permisos, selector de rol ni visibilidad por rol.
+- La identidad se elige en un selector local de persona sin contraseña; se registra en auditoría y aprobaciones.
 - `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
-- Ubicación actual del producto: derivada del último documento de entrada confirmado.
+- Ubicación actual del producto: derivada del último documento de entrada o transferencia confirmado.
+- HU6 (Compras/Ventas) está fuera de esta versión.
 
 
-## Resultados de validación (2026-11-16)
+## Resultados de validación (2026-11-17; tras las clarificaciones)
 
-- `npm run test:run`: **PASS** (10 archivos, 78 pruebas).
-- HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo/roles simulados, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
+- `npm run test:run`: **PASS** (10 archivos, 82 pruebas).
+- `npm run build`: **PASS** (Vite 8.2.1; 17 módulos transformados; salida en `dist/`).
+- `npm run lint`: **PASS** (ESLint sin errores ni advertencias).
+- `npm run format:check`: **PASS** (Prettier: todos los archivos cumplen el estilo).
+- HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
+- Clarificaciones aplicadas y verificadas: sin selector de rol ni visibilidad por rol; `TRANSFERENCIA` como tercer tipo de documento con ubicación derivada; persona local para auditoría/aprobaciones con `actorPerson`/`approvedByPerson`; entidades con historial se desactivan conservando documentos; clave canónica `erp.movements` con migración desde `erp.documents`.
 - Búsqueda: filtrado por término y categoría con estados vacíos seguros; renderizado sin `innerHTML` con datos de usuario.
 - Seguridad XSS: componentes usan creación de nodos/`textContent`; se eliminó el uso de inserción HTML sin sanitizar en utilidades compartidas.
 - Accesibilidad/responsivo: navegación con `aria-current`, controles con etiquetas, retroalimentación con `role`/`aria-live` donde aplica, barra lateral colapsable por ancho reducido.

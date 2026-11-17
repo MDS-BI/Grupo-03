@@ -1,6 +1,6 @@
 # Implementation Plan: Módulo Base ERP — Logística e Inventario
 
-**Branch**: `001-erp-base-module` | **Date**: 2026-11-16 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-erp-base-module` | **Date**: 2026-11-17 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-erp-base-module/spec.md`
 
@@ -8,7 +8,7 @@
 
 Construir un módulo base ERP frontend reutilizable para gestión de datos maestros (Entidades/Productos) y operaciones nativas de inventario (Entradas, Salidas, Transferencias, Ajustes, conteos físicos, anulaciones con contramovimiento y solicitudes de reposición), con saldo/ubicación por movimiento, validación de existencias, kardex, panel de KPIs y reetiquetado total desde configuración. El MVP se implementa como una SPA con Vite, HTML, CSS y JavaScript vanilla, persistencia en `localStorage` y pruebas con Vitest + jsdom.
 
-Alcance aclarado (2026-11-16): los roles son solo etiquetas/simulación de vista en un único espacio de trabajo local (sin autenticación, gestión de usuarios ni permisos reales); la entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
+Alcance aclarado (2026-11-17): entran en esta versión HU1–HU5; HU6 (integración con Compras y Ventas) queda diferida. Los roles son solo etiquetas descriptivas, sin autenticación, permisos, selector de rol ni visibilidad condicionada por rol; la identidad de la persona se toma de un selector local sin contraseña y se registra en auditoría y aprobaciones. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
 
 ## Technical Context
 
@@ -26,9 +26,9 @@ Alcance aclarado (2026-11-16): los roles son solo etiquetas/simulación de vista
 
 **Performance Goals**: Listado y búsqueda correctos y responsivos con al menos 500 entidades (FR-032, SC-004); crear entidad y verla en la lista < 2 min (SC-001); búsqueda < 10 s (SC-002); navegación a gestión/búsqueda < 10 s (SC-005)
 
-**Constraints**: Sin backend, sin autenticación ni permisos (rol simulado solo visual); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
+**Constraints**: Sin backend, sin autenticación ni permisos; sin selector de rol ni visibilidad por rol (FR-047); selector local de persona para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
 
-**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 5 historias de usuario; 3 pantallas (Panel, Gestión, Búsqueda); 45 requisitos funcionales + 5 requisitos de extensibilidad
+**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 5 historias de usuario en alcance (HU1–HU5; HU6 diferida); 3 pantallas (Panel, Gestión, Búsqueda); 49 requisitos funcionales + 5 requisitos de extensibilidad
 
 ## Constitution Check
 
@@ -38,7 +38,7 @@ Alcance aclarado (2026-11-16): los roles son solo etiquetas/simulación de vista
 |-----------|------|--------------|
 | I. Code Quality & Maintainability | Código modular con responsabilidades separadas (almacenamiento, configuración, componentes, shell) y funciones pequeñas | PASS — la estructura propuesta aísla almacenamiento, configuración y UI; reglas de dominio e inmutabilidad en la capa de almacenamiento |
 | II. Test-First & Verification | Pruebas unitarias e integración para comportamiento visible y lógica de negocio antes/junto a la implementación | PASS — Vitest + jsdom cubre validación, stock, unicidad, inmutabilidad/contramovimientos, configuración y flujos críticos |
-| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad; simulación de rol solo visual | PASS — tokens compartidos, etiquetas desde configuración, controles nativos accesibles y ocultación visual explícita sin control de acceso |
+| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad; identidad local sin control de acceso por rol | PASS — tokens compartidos, etiquetas desde configuración, controles nativos accesibles, persona local para auditoría y sin visibilidad condicionada por rol |
 | IV. Performance & Reliability | Presupuestos de rendimiento y comportamiento responsivo bajo uso esperado | PASS — objetivos medibles para 500 registros; operaciones locales y búsqueda sin trabajo bloqueante innecesario |
 
 **Resultado**: Sin violaciones. No se requiere Complexity Tracking.
@@ -75,6 +75,7 @@ src/
 ├── styles.css           # Tokens de diseño, shell, formularios, listas y responsive
 └── components/
     ├── shell.js         # Barra superior, logotipo SVG, barra lateral y módulo activo
+    ├── person-selector.js # Persona local para auditoría y aprobaciones (FR-049)
     ├── dashboard.js     # Acciones rápidas, KPIs, alertas y solicitudes de reposición
     ├── entity-form.js   # Alta/edición/desactivación de entidades y campos personalizados
     ├── entity-list.js   # Listado, acciones y estados vacíos
@@ -118,7 +119,7 @@ Salidas:
 |-----------|---------------------------|-----------|
 | I. Code Quality & Maintainability | Contratos separados por responsabilidad; reglas de stock/inmutabilidad centralizadas; extensibilidad por configuración | PASS |
 | II. Test-First & Verification | Contratos definen validaciones y efectos verificables (unicidad, stock, contramovimientos, conteos); quickstart mapea historias a pruebas | PASS |
-| III. User Experience Consistency | Contrato UI fija navegación, estados, mensajes y simulación visual de rol sin permisos reales | PASS |
+| III. User Experience Consistency | Contrato UI fija navegación, estados, mensajes y selector local de persona sin permisos por rol | PASS |
 | IV. Performance & Reliability | Modelo local apto para 500 registros; recálculo de KPIs y stock por operaciones explícitas | PASS |
 
 **Resultado post-diseño**: Sin violaciones. Se puede proceder a `/speckit.tasks`.

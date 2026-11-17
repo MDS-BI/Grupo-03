@@ -84,7 +84,10 @@ function warningContent(errors) {
   ];
 }
 
-export function mountShell(root, { config, errors = [], onNavigate = () => {}, onRoleChange = () => {}, role = 'admin' }) {
+export function mountShell(
+  root,
+  { config, errors = [], onNavigate = () => {}, personControl = null }
+) {
   const logo = monogram(config.moduleName);
   const brandName = h(
     'h1',
@@ -92,24 +95,12 @@ export function mountShell(root, { config, errors = [], onNavigate = () => {}, o
     config.moduleName
   );
 
-  const roleSelect = h(
-    'select',
-    {
-      class: 'role-select',
-      'data-testid': 'role-selector',
-      'aria-label': 'Rol simulado',
-      onchange: (event) => onRoleChange?.(event.target.value)
-    },
-    h('option', { value: 'admin', selected: role === 'admin' }, 'Administrador (simulado)'),
-    h('option', { value: 'operador', selected: role === 'operador' }, 'Operador (simulado)')
-  );
-
   const topbar = h(
     'header',
     { class: 'topbar' },
     h('div', { class: 'brand' }, logo, brandName),
     h('div', { class: 'topbar-spacer' }),
-    h('div', { class: 'topbar-actions' }, roleSelect)
+    h('div', { class: 'topbar-actions' }, personControl)
   );
 
   const navDefinitions = [
@@ -185,10 +176,5 @@ export function mountShell(root, { config, errors = [], onNavigate = () => {}, o
     }
   }
 
-  function setRole(nextRole = 'admin') {
-    roleSelect.value = nextRole;
-  }
-
-  setRole(role);
-  return { view, main, setActive, setWarnings, navButtons, setRole };
+  return { view, main, setActive, setWarnings, navButtons };
 }

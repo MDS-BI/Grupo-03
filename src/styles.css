@@ -123,6 +123,26 @@ a {
   flex: 1;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.person-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.person-select {
+  max-width: 180px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
 .sidebar {
   grid-area: sidebar;
   background: var(--surface);
