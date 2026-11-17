@@ -35,12 +35,16 @@ describe('integración: etiquetas, ciclo de vida y tema', () => {
     expect(document.querySelector('[data-testid="entity-save"]').textContent).toBe(
       'Crear Producto'
     );
+    expect(document.querySelector('[data-testid="documents-panel"]')).toBeNull();
+
+    await go(app, 'manage', 'documents');
     expect(document.querySelector('[data-testid="document-save"]').textContent).toBe(
       'Crear Movimiento de Inventario'
     );
     expect(document.querySelector('[data-testid="document-form"]').textContent).toContain(
       'Producto'
     );
+    expect(document.querySelector('[data-testid="entities-panel"]')).toBeNull();
   });
 
   it('aplica el color de acento configurado y advierte si es inválido', () => {

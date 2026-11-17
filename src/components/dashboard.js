@@ -1,7 +1,8 @@
-import { formatCurrency, h, option } from './dom.js';
+﻿import { formatCurrency, h, option } from './dom.js';
 import {
+  createReplenishmentRequest,
   getDashboardStats,
-  getReorderAlerts,
+  getReplenishmentSuggestions,
   loadDocuments,
   loadEntities,
   searchEntities
@@ -30,10 +31,19 @@ function quickAction({ id, label, iconName, onClick }) {
 
 export function renderDashboard(
   container,
-  { config, initialCategory = '', onQuickAction, onEditEntity, onDeleteEntity, onCategoryChange }
+  {
+    config,
+    initialCategory = '',
+    onQuickAction,
+    onEditEntity,
+    onDeleteEntity,
+    onCategoryChange,
+    actorPerson = 'local'
+  }
 ) {
   const labels = config.labels;
   let selectedCategory = initialCategory;
+  let replenishmentNotice = '';
 
   function render() {
     container.replaceChildren();
@@ -41,7 +51,7 @@ export function renderDashboard(
     const allEntities = loadEntities();
     const allDocuments = loadDocuments();
     const stats = getDashboardStats(selectedCategory);
-    const alerts = getReorderAlerts(selectedCategory);
+    const suggestions = getReplenishmentSuggestions({ category: selectedCategory });
     const filteredEntities = searchEntities('', selectedCategory);
     const filteredEntityIds = new Set(filteredEntities.map((entity) => entity.entity_id));
     const filteredDocuments = selectedCategory
@@ -50,7 +60,7 @@ export function renderDashboard(
 
     const quickActions = h(
       'section',
-      { class: 'quick-actions', 'aria-label': 'Acciones rápidas' },
+      { class: 'quick-actions', 'aria-label': 'Acciones rapidas' },
       quickAction({
         id: 'new-entity',
         label: `${newLabel(labels.entity)} ${labels.entity.singular.toLowerCase()}`,
@@ -95,7 +105,7 @@ export function renderDashboard(
       h(
         'article',
         { class: 'kpi-card', 'data-testid': 'kpi-valuation' },
-        h('p', { class: 'kpi-label' }, 'Valoración del stock'),
+        h('p', { class: 'kpi-label' }, 'Valoracion del stock'),
         h('p', { class: 'kpi-value' }, formatCurrency(stats.valuation))
       ),
       h(
@@ -104,8 +114,14 @@ export function renderDashboard(
           class: `kpi-card ${stats.critical > 0 ? 'is-critical' : ''}`,
           'data-testid': 'kpi-critical'
         },
-        h('p', { class: 'kpi-label' }, 'Nivel crítico'),
+        h('p', { class: 'kpi-label' }, 'Nivel critico'),
         h('p', { class: 'kpi-value' }, String(stats.critical))
+      ),
+      h(
+        'article',
+        { class: 'kpi-card', 'data-testid': 'kpi-no-movement' },
+        h('p', { class: 'kpi-label' }, 'Sin movimiento (90 dias)'),
+        h('p', { class: 'kpi-value' }, String(stats.noMovement90Days ?? 0))
       )
     );
 
@@ -115,14 +131,14 @@ export function renderDashboard(
         name: 'category',
         id: 'dashboard-category',
         'data-testid': 'dashboard-category',
-        'aria-label': 'Filtrar por categoría',
+        'aria-label': 'Filtrar por categoria',
         onchange: (event) => {
           selectedCategory = event.target.value;
           onCategoryChange?.(selectedCategory);
           render();
         }
       },
-      option('', 'Todas las categorías', !selectedCategory),
+      option('', 'Todas las categorias', !selectedCategory),
       ...stats.categories.map((category) =>
         option(category, category, category === selectedCategory)
       )
@@ -134,9 +150,16 @@ export function renderDashboard(
       h(
         'div',
         { class: 'field' },
-        h('label', { for: 'dashboard-category' }, 'Categoría'),
+        h('label', { for: 'dashboard-category' }, 'Categoria'),
         categorySelect
       ),
+      selectedCategory
+        ? h(
+            'span',
+            { class: 'badge', 'data-testid': 'active-filter' },
+            `Filtro: ${selectedCategory}`
+          )
+        : null,
       h(
         'button',
         {
@@ -159,80 +182,16 @@ export function renderDashboard(
         ? h(
             'div',
             { class: 'alert alert-warning', 'data-testid': 'critical-alert', role: 'alert' },
-            `Hay ${stats.critical} ${labels.entity.plural.toLowerCase()} en nivel crítico de stock.`
+            `Hay ${stats.critical} ${labels.entity.plural.toLowerCase()} en nivel critico de stock.`
           )
         : null;
-
-    const alertsPanel = h(
-      'section',
-      { class: 'panel', 'data-testid': 'reorder-alerts' },
-      h(
-        'div',
-        { class: 'panel-header' },
-        h(
-          'div',
-          {},
-          h('h3', {}, 'Alertas de reposición'),
-          h(
-            'p',
-            { class: 'panel-subtitle' },
-            'Productos con stock por debajo del punto de reorden.'
-          )
-        )
-      ),
-      alerts.length === 0
-        ? h(
-            'div',
-            { class: 'empty-state', 'data-testid': 'reorder-alerts-empty' },
-            h('h3', {}, 'No hay alertas de reposición'),
-            h('p', {}, 'Todos los productos están en nivel adecuado o sin punto de reorden.')
-          )
-        : h(
-            'div',
-            { class: 'table-wrap' },
-            h(
-              'table',
-              { class: 'data-table', 'data-testid': 'reorder-alerts-table' },
-              h(
-                'thead',
-                {},
-                h(
-                  'tr',
-                  {},
-                  h('th', { scope: 'col' }, 'Código'),
-                  h('th', { scope: 'col' }, 'Nombre'),
-                  h('th', { scope: 'col' }, 'Categoría'),
-                  h('th', { scope: 'col' }, 'Stock'),
-                  h('th', { scope: 'col' }, 'Punto de reorden'),
-                  h('th', { scope: 'col' }, 'Faltante')
-                )
-              ),
-              h(
-                'tbody',
-                {},
-                ...alerts.map((alert) =>
-                  h(
-                    'tr',
-                    { 'data-testid': `alert-row-${alert.entity_id}` },
-                    h('td', {}, alert.code || '—'),
-                    h('td', {}, alert.name || '—'),
-                    h('td', {}, alert.category || '—'),
-                    h('td', {}, String(alert.stock)),
-                    h('td', {}, String(alert.reorderPoint)),
-                    h('td', {}, String(alert.shortage))
-                  )
-                )
-              )
-            )
-          )
-    );
 
     const emptyState =
       allEntities.length === 0 && allDocuments.length === 0
         ? h(
             'div',
             { class: 'empty-state', 'data-testid': 'dashboard-empty' },
-            h('h3', {}, 'Aún no hay datos en el panel'),
+            h('h3', {}, 'Aun no hay datos en el panel'),
             h(
               'p',
               {},
@@ -250,6 +209,123 @@ export function renderDashboard(
           )
         : null;
 
+    const replenishmentRows = suggestions.map((item) => {
+      const checkbox = h('input', {
+        type: 'checkbox',
+        'data-testid': `replenish-select-${item.entity_id}`
+      });
+      checkbox.checked = true;
+      const qtyInput = h('input', {
+        type: 'number',
+        min: '0',
+        step: '1',
+        value: String(item.suggestedQty ?? 0),
+        'data-testid': `replenish-qty-${item.entity_id}`,
+        class: 'input-compact'
+      });
+      const levelLabel = item.alertLevel === 'red' ? 'Rojo (sin stock)' : 'Amarillo (bajo punto)';
+      return {
+        item,
+        row: h(
+          'tr',
+          { 'data-testid': `replenish-row-${item.entity_id}` },
+          h('td', {}, checkbox),
+          h('td', {}, item.name || '-'),
+          h('td', {}, item.code || '-'),
+          h('td', {}, item.provider || 'Sin proveedor'),
+          h('td', {}, String(item.stockBalance ?? 0)),
+          h('td', {}, String(item.reorderPoint ?? 0)),
+          h('td', {}, qtyInput),
+          h('td', {}, levelLabel),
+          h(
+            'td',
+            { 'data-testid': `replenish-rotation-${item.entity_id}` },
+            item.rotationLabel || '-'
+          )
+        ),
+        getSelected: () => checkbox.checked,
+        getQty: () => qtyInput.value
+      };
+    });
+
+    const replenishmentTable =
+      suggestions.length === 0
+        ? h(
+            'div',
+            { class: 'empty-state', 'data-testid': 'replenishment-empty' },
+            h('p', {}, 'No hay productos en alerta de reposicion.')
+          )
+        : h(
+            'div',
+            { class: 'table-wrap' },
+            h(
+              'table',
+              { class: 'data-table', 'data-testid': 'replenishment-table' },
+              h(
+                'thead',
+                {},
+                h(
+                  'tr',
+                  {},
+                  h('th', {}, 'Sel.'),
+                  h('th', {}, 'Producto'),
+                  h('th', {}, 'Codigo'),
+                  h('th', {}, 'Proveedor'),
+                  h('th', {}, 'Stock'),
+                  h('th', {}, 'Punto reorden'),
+                  h('th', {}, 'Cantidad sugerida'),
+                  h('th', {}, 'Alerta'),
+                  h('th', {}, 'Rotacion')
+                )
+              ),
+              h('tbody', {}, ...replenishmentRows.map((r) => r.row))
+            )
+          );
+
+    const generateBtn = h(
+      'button',
+      {
+        type: 'button',
+        class: 'button button-primary',
+        'data-testid': 'generate-replenishment',
+        disabled: suggestions.length === 0,
+        onclick: () => {
+          try {
+            const lines = replenishmentRows
+              .filter((r) => r.getSelected())
+              .map((r) => ({
+                entity_id: r.item.entity_id,
+                provider: r.item.provider,
+                suggestedQty: r.getQty()
+              }));
+            const request = createReplenishmentRequest({ lines, actorPerson });
+            const groups = Object.keys(request.groupedByProvider || {}).length;
+            replenishmentNotice = `Solicitud ${request.request_id} generada (${lines.length} lineas, ${groups} proveedor(es)).`;
+            render();
+          } catch (error) {
+            replenishmentNotice = error?.message || 'No se pudo generar la solicitud.';
+            render();
+          }
+        }
+      },
+      'Generar solicitud'
+    );
+
+    const alertsPanel = h(
+      'section',
+      { class: 'panel', 'data-testid': 'dashboard-alerts' },
+      h('div', { class: 'panel-header' }, h('div', {}, h('h3', {}, 'Alertas de reposicion'))),
+      replenishmentNotice
+        ? h(
+            'p',
+            { class: 'alert alert-info', 'data-testid': 'replenishment-notice', role: 'status' },
+            replenishmentNotice
+          )
+        : null,
+      replenishmentTable,
+      h('div', { class: 'actions' }, generateBtn)
+    );
+
     const productTable = h('div');
     renderEntityList(productTable, {
       config,
@@ -257,8 +333,7 @@ export function renderDashboard(
       onEdit: onEditEntity,
       onDelete: onDeleteEntity,
       onCreate: () => onQuickAction?.('new-entity'),
-      showActions: true,
-      showValuation: true
+      showActions: true
     });
 
     const recentMovements = h('div');
@@ -285,7 +360,7 @@ export function renderDashboard(
             h(
               'p',
               { class: 'page-subtitle' },
-              'Resumen operativo del inventario y accesos rápidos.'
+              'Resumen operativo del inventario y accesos rapidos.'
             )
           )
         ),
@@ -301,11 +376,11 @@ export function renderDashboard(
           h(
             'div',
             { class: 'panel-header' },
-            h('div', {}, h('h3', {}, `Catálogo de ${labels.entity.plural.toLowerCase()}`)),
+            h('div', {}, h('h3', {}, `Catalogo de ${labels.entity.plural.toLowerCase()}`)),
             h(
               'p',
               { class: 'panel-subtitle' },
-              'La valoración se muestra solo en el catálogo y el panel.'
+              'La valoracion se muestra solo en el catalogo y el panel.'
             )
           ),
           productTable

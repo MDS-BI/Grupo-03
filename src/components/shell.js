@@ -13,7 +13,14 @@ const ICONS = {
 };
 
 export function icon(name) {
-  return h('span', { class: 'nav-icon', html: ICONS[name] ?? ICONS.dashboard });
+  const wrapper = h('span', { class: 'nav-icon', 'aria-hidden': 'true' });
+  const svgMarkup = ICONS[name] ?? ICONS.dashboard;
+  const doc = new DOMParser().parseFromString(svgMarkup, 'image/svg+xml');
+  const svg = doc.documentElement;
+  if (svg && !doc.querySelector('parsererror')) {
+    wrapper.append(document.importNode(svg, true));
+  }
+  return wrapper;
 }
 
 export function getInitials(moduleName) {
@@ -77,7 +84,10 @@ function warningContent(errors) {
   ];
 }
 
-export function mountShell(root, { config, errors = [], onNavigate = () => {} }) {
+export function mountShell(
+  root,
+  { config, errors = [], onNavigate = () => {}, personControl = null }
+) {
   const logo = monogram(config.moduleName);
   const brandName = h(
     'h1',
@@ -89,7 +99,8 @@ export function mountShell(root, { config, errors = [], onNavigate = () => {} })
     'header',
     { class: 'topbar' },
     h('div', { class: 'brand' }, logo, brandName),
-    h('div', { class: 'topbar-spacer' })
+    h('div', { class: 'topbar-spacer' }),
+    h('div', { class: 'topbar-actions' }, personControl)
   );
 
   const navDefinitions = [

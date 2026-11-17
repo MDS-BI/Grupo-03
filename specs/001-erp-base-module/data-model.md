@@ -1,42 +1,96 @@
 # Modelo de Datos (Phase 1): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-10
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
 
-Este modelo refleja las clarificaciones del 2026-11-10: categoría obligatoria, `costo_unitario` opcional, ubicación por movimiento de entrada y documentos sin rango de fechas.
+Modelo alineado con las clarificaciones vigentes: alcance nativo HU1–HU5 (HU6 diferida), Transferencia como tercer tipo de documento, sin roles operativos ni visibilidad por rol, selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
 
-## 1. Diagrama Entidad-Relación
+## 1. Diagrama Entidad-Relación (conceptual)
 
 ```mermaid
 erDiagram
-    ENTIDAD ||--o{ DOCUMENTO : "posee / elimina en cascada"
+    ENTIDAD ||--o{ MOVIMIENTO : "tiene historial"
+    ENTIDAD ||--o{ CONTEO_FISICO : "se cuenta"
+    CONTEO_FISICO ||--o{ DETALLE_CONTEO : "incluye"
+    ENTIDAD ||--o{ SOLICITUD_REPOSICION_DET : "solicita"
+    SOLICITUD_REPOSICION ||--o{ SOLICITUD_REPOSICION_DET : "agrupa"
+    MOVIMIENTO ||--o| MOVIMIENTO : "anula_a / contramovimiento"
+    PERSONA_LOCAL ||--o{ MOVIMIENTO : "actor / aprobador"
+    PERSONA_LOCAL ||--o{ AUDITORIA : "registra"
+    ENTIDAD ||--o{ AUDITORIA : "afectada"
 
     ENTIDAD {
-        string entity_id PK "Autogenerado"
+        string entity_id PK
         string name "Obligatorio"
-        string code "Obligatorio"
+        string code "Obligatorio, único global"
         string category "Obligatorio"
-        string description "Opcional"
-        string targetDate "Opcional, fecha válida"
-        string unitOfMeasure "Opcional: Unidades|Cajas|Kg|Litros"
-        number reorderPoint "Opcional, >= 0"
+        string unit "Obligatorio"
+        number reorderPoint "Obligatorio, >= 0"
+        string status "active | inactive"
+        number stockBalance ">= 0, derivado/aplicado"
         number unitCost "Opcional, >= 0"
-        number stockBalance ">= 0, por defecto 0"
-        object customFields "Según ModuleConfig"
-        datetime createdAt "Autogenerado"
-        datetime updatedAt "Autogenerado"
+        object customFields
+        datetime createdAt
+        datetime updatedAt
     }
 
-    DOCUMENTO {
-        string document_id PK "Autogenerado"
-        string entity_id FK "Obligatorio, existente"
-        string type "ENTRADA | SALIDA"
+    MOVIMIENTO {
+        string movement_id PK
+        string entity_id FK
+        string type "ENTRADA|SALIDA|TRANSFERENCIA|AJUSTE"
+        string state "draft|confirmed|voided"
         number quantity "> 0"
-        string aisle "Obligatorio en ENTRADA"
-        string shelf "Obligatorio en ENTRADA"
-        string level "Obligatorio en ENTRADA"
+        object location "entrada: pasillo/estante/nivel"
+        object transfer "origen/destino (transferencia)"
         string notes "Opcional"
-        string status "Texto libre o ciclo configurado"
-        datetime createdAt "Autogenerado"
+        string reason "Opcional/obligatorio según caso"
+        string voidsMovementId "FK opcional (contramovimiento)"
+        string actorPerson "Persona local que ejecuta (FR-049)"
+        string approvedByPerson "Persona local que aprueba (ajustes)"
+        datetime createdAt
+        datetime confirmedAt
+    }
+
+    PERSONA_LOCAL {
+        string person_id PK
+        string label "Etiqueta visible elegida en el selector local"
+    }
+
+    AUDITORIA {
+        string audit_id PK
+        string entityId FK "Opcional"
+        string action "create|update|deactivate|delete"
+        string person "Etiqueta de PersonaLocal"
+        datetime timestamp
+        string details "Opcional"
+    }
+
+    CONTEO_FISICO {
+        string count_id PK
+        string state "open|closed"
+        string actorPerson "Persona local que contó (FR-049)"
+        datetime createdAt
+        datetime closedAt
+    }
+
+    DETALLE_CONTEO {
+        string detail_id PK
+        string count_id FK
+        string entity_id FK
+        number countedQty
+        number systemQtyAtClose "registrado al cerrar"
+    }
+
+    SOLICITUD_REPOSICION {
+        string request_id PK
+        string status "draft|created"
+        datetime createdAt
+    }
+
+    SOLICITUD_REPOSICION_DET {
+        string detail_id PK
+        string request_id FK
+        string entity_id FK
+        number suggestedQty
     }
 
     MODULE_CONFIG {
@@ -48,131 +102,132 @@ erDiagram
     }
 ```
 
-`MODULE_CONFIG` no es una entidad persistida: se carga al arrancar y configura etiquetas, campos, ciclo de vida y tema.
+`MODULE_CONFIG` no se persiste como entidad de negocio; se carga al arrancar y configura etiquetas, campos, ciclo de vida y tema.
 
-## 2. Entidades
+## 2. Entidades y registros
 
-### 2.1 ENTIDAD (Producto / Proveedor)
-
-Registro de datos maestros. Los módulos personalizados definen su significado real mediante configuración.
+### 2.1 ENTIDAD (Producto / maestro)
 
 | Campo | Tipo | Obligatorio | Regla |
 |-------|------|-------------|-------|
-| `entity_id` | string | Sí (autogenerado) | Único; vincula documentos |
-| `name` | string | Sí | No vacío; se muestra en listas y búsqueda |
-| `code` | string | Sí | No vacío; identifica el registro (p. ej., SKU) |
-| `category` | string | Sí | No vacío; habilita filtro y agrupación |
+| `entity_id` | string | Sí (auto) | Único |
+| `name` | string | Sí | No vacío |
+| `code` | string | Sí | No vacío; único global tras normalización (SKU) |
+| `category` | string | Sí | No vacío |
+| `unit` | string | Sí | Unidad de medida (p. ej. Paquete, Unidades, Cajas, Kg, Litros) |
+| `reorderPoint` | number | Sí | ≥ 0 |
+| `status` | string | Sí | `active` o `inactive` (desactivada); nuevas entidades inician `active` |
 | `description` | string | No | Texto libre |
-| `targetDate` | string (YYYY-MM-DD) | No | Fecha de calendario válida cuando existe |
-| `unitOfMeasure` | string | No | `Unidades`, `Cajas`, `Kg` o `Litros` |
-| `reorderPoint` | number | No | ≥ 0; umbral de nivel crítico |
-| `unitCost` | number | No | ≥ 0; base de la valoración de stock |
-| `stockBalance` | number | Sí | ≥ 0; inicia en 0 |
-| `customFields` | object | No | Claves/valores validados según `ModuleConfig` |
-| `createdAt` | string ISO | Sí (autogenerado) | Marca de tiempo de creación |
-| `updatedAt` | string ISO | Sí (autogenerado) | Se actualiza en cada edición |
+| `targetDate` | string (YYYY-MM-DD) | No | Fecha válida si existe |
+| `unitCost` | number | No | ≥ 0; usado solo para valoración en panel/catálogo |
+| `stockBalance` | number | Sí | ≥ 0; inicia en 0; solo cambia por movimientos confirmados |
+| `customFields` | object | No | Validado según `ModuleConfig` |
+| `createdAt` / `updatedAt` | ISO string | Sí (auto) | Marcas de tiempo |
 
-**Campos personalizados del módulo de logística** (declarados en `userConfig.customFields`):
+**Reglas**: no se permite crear/editar con `code` duplicado (excluyendo la propia entidad en edición). Si la entidad tiene movimientos/historial asociado, no se elimina físicamente: solo se desactiva (`inactive`) conservando historial. Si no tiene historial, puede eliminarse físicamente.
 
-| Clave | Tipo | Obligatorio | Opciones |
-|-------|------|-------------|----------|
-| `sku` | text | Sí | — |
-| `punto_reorden` | number | Sí | — |
-| `unidad_medida` | select | No | Unidades, Cajas, Kg, Litros |
+### 2.2 MOVIMIENTO / Documento de inventario
 
-`costo_unitario` es un campo base opcional, no un campo personalizado, porque alimenta el KPI de valoración.
-
-### 2.2 DOCUMENTO (Movimiento de Inventario)
-
-Registro transaccional asociado exactamente a una entidad.
+Registro transaccional vinculado a una entidad que afecta o traza stock.
 
 | Campo | Tipo | Obligatorio | Regla |
 |-------|------|-------------|-------|
-| `document_id` | string | Sí (autogenerado) | Único |
-| `entity_id` | string | Sí | Debe coincidir con una entidad existente |
-| `type` | string | Sí | `ENTRADA` o `SALIDA` |
-| `quantity` | number | Sí | Entero > 0 |
-| `aisle` | string | Solo `ENTRADA` | Pasillo; no vacío |
-| `shelf` | string | Solo `ENTRADA` | Estante; no vacío |
-| `level` | string | Solo `ENTRADA` | Nivel; no vacío |
+| `movement_id` | string | Sí (auto) | Único |
+| `entity_id` | string | Sí | Referencia entidad existente |
+| `type` | string | Sí | `ENTRADA`, `SALIDA`, `TRANSFERENCIA`, `AJUSTE` |
+| `state` | string | Sí | `draft`, `confirmed`, `voided` (o contramovimiento generado) |
+| `quantity` | number | Sí | > 0 |
+| `location` | object | Según tipo | Entrada: `{ aisle, shelf, level }` obligatorio |
+| `transfer` | object | Transferencia | `{ from: {aisle,shelf,level}, to: {aisle,shelf,level} }` |
+| `reason` | string | Según caso | Motivo; obligatorio en ajustes y cuando aplique (p. ej. merma en salida si se modela así) |
 | `notes` | string | No | Texto libre |
-| `status` | string | No | Texto libre, o estado válido del ciclo configurado |
-| `createdAt` | string ISO | Sí (autogenerado) | Marca de tiempo del movimiento |
+| `voidsMovementId` | string | No | Referencia al movimiento anulado (contramovimiento) |
+| `actorPerson` | string | Sí al confirmar | Etiqueta de la persona local del selector (FR-049); no es un rol |
+| `approvedByPerson` | string | Solo ajustes | Persona local que aprueba; debe diferir de quien contó (HU4#4) |
+| `createdAt` | ISO string | Sí (auto) | Marca de tiempo del registro |
+| `confirmedAt` | ISO string | Condicional | Al confirmar |
 
-No existen `startDate`, `endDate` ni rango de fechas en documentos.
+**Inmutabilidad**: movimientos `confirmed` no se editan ni eliminan; las correcciones se realizan mediante anulación que genera un contramovimiento vinculado. Solo `draft`/no confirmados pueden editarse o cancelarse. No existe rango de fechas inicial/final como campo del registro.
 
-### 2.3 MODULE_CONFIG
+### 2.3 CONTEO FISICO y DETALLE_CONTEO
 
-Objeto de configuración cargado al arrancar. Contrato completo en [contracts/module-config.md](./contracts/module-config.md).
+Soporte nativo para conteo ciego y ajustes derivados.
+- `CONTEO_FISICO`: estado (`open`/`closed`), actor de conteo (etiqueta local), fechas. La cantidad del sistema no se muestra durante la captura (conteo ciego) y la diferencia se calcula/expone al cerrar.
+- `DETALLE_CONTEO`: por entidad, cantidad contada y cantidad de sistema registrada al cierre para traza.
+- Diferencias generan ajustes (movimiento `AJUSTE`) con motivo obligatorio; la aprobación se registra con etiqueta de actor distinta a la del conteo.
 
-| Campo | Tipo | Efecto |
-|-------|------|--------|
-| `moduleName` | string | Nombre en barra superior y logotipo derivado |
-| `labels` | object | Reetiqueta entidad, documento, botones, pestañas y mensajes |
-| `customFields` | array | Campos dinámicos en formularios, listas, validación y búsqueda |
-| `statusLifecycle` | object | Estados y transiciones permitidas de documentos |
-| `theme.accentColor` | string | Color de acento válido; si falta o es inválido, se usa el valor base |
+### 2.4 SOLICITUD_REPOSICION y detalle
+
+Soporte nativo para reposición (HU5): solicitud con líneas por entidad/producto, cantidad sugerida editable (`stock_maximo − stock_actual` cuando aplique) y agrupación por proveedor como vista/lógica de negocio. Vinculada a entidades y estado de stock.
+
+### 2.5 MODULE_CONFIG
+
+Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleName`, `labels`, `customFields`, `statusLifecycle`, `theme.accentColor`.
+
+### 2.6 PERSONA_LOCAL y AUDITORIA
+
+- **PERSONA_LOCAL**: etiqueta elegida en un selector local sin contraseña ni permisos (FR-049). No es un rol y no habilita ni oculta funcionalidad.
+- **AUDITORIA**: registro automático de cada creación, edición o desactivación de entidad (HU1#4) con `action`, `person` (PersonaLocal), `timestamp` y, si aplica, `entityId` y `details`. Las aprobaciones de ajustes guardan además `approvedByPerson` en el movimiento.
+
+La separación de funciones se valida comparando la persona del conteo con `approvedByPerson`; ambas deben ser distintas.
 
 ## 3. Relaciones e Integridad
 
-- `ENTIDAD 1 — 0..* DOCUMENTO`: cada documento referencia exactamente una entidad por `entity_id`.
-- Al eliminar una entidad se eliminan en cascada todos sus documentos (FR-009, XR-004).
-- El saldo de stock pertenece a la entidad y se modifica solo mediante documentos de movimiento.
-- La ubicación física pertenece al documento de entrada; el detalle del producto deriva la ubicación del documento de entrada más reciente.
-- Los valores de campos personalizados se persisten junto a los campos base sin cambiar la estructura.
+- `ENTIDAD 1 — 0..* MOVIMIENTO` (y otros registros asociados como conteos/solicitudes).
+- Integridad referencial: movimientos/conteos/solicitudes referencian entidades existentes.
+- **Eliminación**: si existen registros asociados, la entidad no se elimina físicamente; se desactiva. Si no existen, se permite eliminación física (FR-003/FR-009).
+- Ubicación actual del producto: derivada del movimiento de entrada o transferencia confirmado más reciente (no duplicada en entidad; FR-041).
+- Campos personalizados se persisten junto a campos base sin cambiar la estructura.
+- Toda operación de entidad genera auditoría con la persona local activa (FR-049).
 
 ## 4. Reglas de Validación
 
 ### Entidad
+1. `name`, `code`, `category`, `unit` no vacíos.
+2. `reorderPoint` obligatorio y ≥ 0.
+3. `code` único global (normalizado), excluyendo la propia entidad en edición.
+4. `unitCost` y `reorderPoint` numéricos ≥ 0 cuando aplican.
+5. `targetDate` válida si existe.
+6. Campos personalizados obligatorios/tipados según configuración.
+7. `stockBalance` nunca negativo.
 
-1. `name` no vacío (FR-001, FR-006).
-2. `code` no vacío (FR-001).
-3. `category` no vacío (clarificación 2026-11-10).
-4. `targetDate`, si existe, debe ser una fecha de calendario válida.
-5. Campos personalizados obligatorios deben tener valor; el tipo debe coincidir con el declarado (FR-027).
-6. `reorderPoint` y `unitCost`, si existen, deben ser números ≥ 0.
-7. `stockBalance` nunca puede ser negativo.
+### Movimiento
+1. `entity_id` existente y entidad elegible para operar.
+2. `type` válido (`ENTRADA|SALIDA|TRANSFERENCIA|AJUSTE`).
+3. `quantity` > 0.
+4. `ENTRADA`: ubicación completa (`aisle`,`shelf`,`level`).
+5. `TRANSFERENCIA`: origen y destino válidos; cantidad ≤ stock disponible en origen.
+6. `SALIDA`: cantidad ≤ stock disponible (validación al confirmar, no solo al abrir formulario).
+7. `AJUSTE`: motivo obligatorio; `approvedByPerson` obligatorio y distinto de la persona que hizo el conteo (HU4#4, FR-049).
+8. Confirmados: inmutables; corrección solo por anulación/contramovimiento.
+9. Estado/ciclo de vida: si hay `statusLifecycle` configurado, transiciones válidas; si no, texto libre donde corresponda.
 
-### Documento
-
-1. `entity_id` debe existir (integridad referencial).
-2. `type` debe ser `ENTRADA` o `SALIDA` (FR-043).
-3. `quantity` debe ser entero > 0.
-4. Un documento `ENTRADA` exige `aisle`, `shelf` y `level` no vacíos (FR-041).
-5. Una `SALIDA` cuya `quantity` supere `stockBalance` se rechaza con mensaje descriptivo (FR-042).
-6. `status`, si el ciclo de vida está configurado, debe ser un estado válido y respetar las transiciones permitidas (FR-030).
+### Conteo y reposición
+1. Conteo ciego: no exponer cantidad de sistema durante captura.
+2. Ajuste derivado requiere motivo y aprobación con persona local distinta a la del conteo.
+3. Solicitud de reposición agrupa líneas y sugiere cantidad editable según regla definida.
+4. Toda creación/edición/desactivación de entidad queda en auditoría con persona local y fecha.
 
 ### Configuración
+1. Inválida/conflictiva se informa claramente (sin fallo silencioso).
+2. Sin configuración: valores base Entidad/Documento, sin campos personalizados ni ciclo de vida.
+3. Choques de claves o tipos inválidos se informan.
 
-1. Configuración inválida o conflictiva se informa claramente, sin fallar en silencio (FR-025).
-2. Sin configuración se usan los valores base Entidad/Documento, sin campos personalizados ni ciclo de vida (FR-024).
-3. Un campo personalizado cuya clave choque con un campo base debe rechazarse o informarse.
-4. Un tipo de campo desconocido o una transición inválida debe informarse.
+## 5. Efectos de stock y trazabilidad
 
-## 5. Transiciones de Estado y Efectos sobre Stock
+| Tipo | Efecto (al confirmar) |
+|------|------------------------|
+| `ENTRADA` | Incrementa stock total y de la ubicación de entrada |
+| `SALIDA` | Disminuye stock (bloqueada si excede disponible) |
+| `TRANSFERENCIA` | Disminuye origen y aumenta destino; total sin cambio |
+| `AJUSTE` | Corrige saldo según diferencia aprobada; queda trazado en kardex |
 
-### Efectos de stock
+- El saldo se actualiza de forma atómica al confirmar; cancelar/abortar no altera stock.
+- Kardex: lista movimientos en orden cronológico con tipo, documento, cantidad, saldo, ubicación y persona local responsable, filtrable por fecha y tipo.
+- Anulación: genera contramovimiento enlazado al original; el saldo debe poder reconstruirse desde el historial.
 
-| Tipo de documento | Efecto | Condición |
-|-------------------|--------|-----------|
-| `ENTRADA` | `stockBalance = stockBalance + quantity` | Siempre válida |
-| `SALIDA` | `stockBalance = stockBalance - quantity` | Solo si `quantity ≤ stockBalance` |
+## 6. Indicadores del Panel (HU5)
 
-El saldo se actualiza de forma atómica al guardar el documento. Cancelar o volver sin guardar no altera el saldo (FR-040, escenarios US3/US4).
-
-### Ciclo de vida de documentos
-
-- Sin `statusLifecycle` configurado: `status` es texto libre (FR-031).
-- Con `statusLifecycle` configurado: solo se ofrecen estados y transiciones declarados; las transiciones inválidas se rechazan con explicación (FR-030).
-- El efecto sobre stock se aplica al confirmar el documento según la regla de negocio del módulo; el estado no cambia el signo del movimiento.
-
-## 6. Indicadores del Panel
-
-| KPI | Cálculo | Fuente |
-|-----|---------|--------|
-| Total de registros | Número de entidades almacenadas | ENTIDAD |
-| Valoración total del stock | `Σ(stockBalance × unitCost)` | ENTIDAD |
-| Productos en nivel crítico | Entidades con `stockBalance < reorderPoint` | ENTIDAD |
-| Movimientos recientes | Documentos ordenados por `createdAt` descendente | DOCUMENTO |
-
-Los KPIs se recalculan al mostrar el panel y al aplicar un filtro de categoría (US5). La valoración se muestra solo en panel/catálogo, nunca como entrada en formularios de movimiento.
+- N° de productos activos, valoración total `Σ(stockBalance × unitCost)` (solo panel/catálogo), N° en alerta (stock ≤ punto de reorden), productos sin movimiento en 90 días.
+- Alertas: rojo si stock 0, amarillo si bajo punto de reorden; cantidad sugerida `stock_maximo − stock_actual` editable cuando aplique.
+- Filtros (p. ej. categoría) recalculan KPIs y tabla; rotación con < 30 días de historial se muestra como "Datos insuficientes".

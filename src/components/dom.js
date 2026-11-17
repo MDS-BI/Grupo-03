@@ -34,8 +34,6 @@ export function h(tag, attributes = {}, ...children) {
       Object.assign(element.dataset, value);
     } else if (key === 'text') {
       element.textContent = String(value);
-    } else if (key === 'html') {
-      element.innerHTML = String(value);
     } else if (key.startsWith('on') && typeof value === 'function') {
       element.addEventListener(key.slice(2).toLowerCase(), value);
     } else if (

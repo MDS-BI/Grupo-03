@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadEntities } from '../../src/storage.js';
-import { configuredConfig, go, mountApp, seedEntity, setValue, tick } from '../helpers.js';
+import { getAuditTrail, getPersons, loadEntities } from '../../src/storage.js';
+import { configuredConfig, go, mountApp, seedEntity, setValue, submit, tick } from '../helpers.js';
 
 function navCurrent(testId) {
   return document.querySelector(`[data-testid="${testId}"]`).getAttribute('aria-current');
@@ -21,6 +21,41 @@ describe('integración: shell, navegación y búsqueda', () => {
     expect(navCurrent('nav-search')).toBe('page');
   });
 
+  it('usa la persona local del marco para la auditoría y no expone selector de rol', async () => {
+    const app = mountApp(configuredConfig);
+    expect(document.querySelector('[data-testid="role-selector"]')).toBeNull();
+    expect(document.querySelector('[data-testid="person-selector"]')).toBeTruthy();
+
+    setValue(document.querySelector('[data-testid="person-selector"]'), 'Bruno');
+    await go(app, 'manage', 'entities');
+    const form = document.querySelector('[data-testid="entity-form"]');
+    setValue(form.querySelector('[data-testid="entity-name"]'), 'Producto auditado');
+    setValue(form.querySelector('[data-testid="entity-code"]'), 'AUD-01');
+    setValue(form.querySelector('[data-testid="entity-category"]'), 'Ferretería');
+    setValue(form.querySelector('[data-testid="custom-sku"]'), 'AUD-01');
+    setValue(form.querySelector('[data-testid="custom-punto_reorden"]'), '5');
+    submit(form);
+
+    const audit = getAuditTrail({ action: 'create' });
+    expect(audit).toHaveLength(1);
+    expect(audit[0].person).toBe('Bruno');
+  });
+
+  it('agrega una persona local desde el marco y la deja seleccionada', () => {
+    mountApp(configuredConfig);
+    vi.spyOn(window, 'prompt').mockReturnValue('Elena');
+
+    document.querySelector('[data-testid="person-add"]').click();
+
+    expect(getPersons()).toContain('Elena');
+    const selector = document.querySelector('[data-testid="person-selector"]');
+    expect(selector.value).toBe('Elena');
+    expect(Array.from(selector.options).some((option) => option.value === 'Elena')).toBe(true);
+    expect(
+      document.querySelector('[data-testid="person-selector-feedback"]').textContent
+    ).toContain('Elena');
+  });
+
   it('navega mediante los botones del menú lateral', async () => {
     mountApp(configuredConfig);
 
@@ -28,11 +63,13 @@ describe('integración: shell, navegación y búsqueda', () => {
     await tick();
     expect(window.location.hash).toBe('#/entities');
     expect(document.querySelector('[data-testid="entities-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="documents-panel"]')).toBeNull();
 
     document.querySelector('[data-testid="nav-documents"]').click();
     await tick();
     expect(window.location.hash).toBe('#/documents');
     expect(document.querySelector('[data-testid="documents-panel"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="entities-panel"]')).toBeNull();
 
     document.querySelector('[data-testid="nav-dashboard"]').click();
     await tick();

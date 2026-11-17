@@ -1,12 +1,14 @@
 # Implementation Plan: Módulo Base ERP — Logística e Inventario
 
-**Branch**: `001-erp-base-module` | **Date**: 2026-11-10 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-erp-base-module` | **Date**: 2026-11-17 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-erp-base-module/spec.md`
 
 ## Summary
 
-Construir un módulo base ERP frontend reutilizable para gestión de datos maestros (Entidades/Productos) y documentos transaccionales (Movimientos de Inventario), con saldo de stock, ubicaciones físicas, validación de existencias, búsqueda, panel de KPIs y reetiquetado total desde configuración. El MVP se implementa como una aplicación de página única con Vite, HTML, CSS y JavaScript vanilla, persistencia en `localStorage` y pruebas unitarias/integración con Vitest. El alcance excluye autenticación y permisos: los roles son etiquetas descriptivas de las historias. La valoración de stock usa un `costo_unitario` opcional mostrado solo en panel/catálogo y nunca como entrada en formularios de movimiento.
+Construir un módulo base ERP frontend reutilizable para gestión de datos maestros (Entidades/Productos) y operaciones nativas de inventario (Entradas, Salidas, Transferencias, Ajustes, conteos físicos, anulaciones con contramovimiento y solicitudes de reposición), con saldo/ubicación por movimiento, validación de existencias, kardex, panel de KPIs y reetiquetado total desde configuración. El MVP se implementa como una SPA con Vite, HTML, CSS y JavaScript vanilla, persistencia en `localStorage` y pruebas con Vitest + jsdom.
+
+Alcance aclarado (2026-11-17): entran en esta versión HU1–HU5; HU6 (integración con Compras y Ventas) queda diferida. Los roles son solo etiquetas descriptivas, sin autenticación, permisos, selector de rol ni visibilidad condicionada por rol; la identidad de la persona se toma de un selector local sin contraseña y se registra en auditoría y aprobaciones. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
 
 ## Technical Context
 
@@ -16,17 +18,17 @@ Construir un módulo base ERP frontend reutilizable para gestión de datos maest
 
 **Storage**: `localStorage` del navegador (un único espacio de trabajo, sin backend)
 
-**Testing**: Vitest con entorno jsdom; pruebas unitarias para almacenamiento/validación/configuración y de integración para flujos de usuario
+**Testing**: Vitest con entorno jsdom; pruebas unitarias para almacenamiento/validación/configuración/stock y de integración para flujos de usuario
 
-**Target Platform**: Navegadores modernos de escritorio y anchos reducidos (aplicación web de página única)
+**Target Platform**: Navegadores modernos de escritorio y anchos reducidos (SPA)
 
 **Project Type**: Aplicación web frontend de proyecto único (SPA)
 
 **Performance Goals**: Listado y búsqueda correctos y responsivos con al menos 500 entidades (FR-032, SC-004); crear entidad y verla en la lista < 2 min (SC-001); búsqueda < 10 s (SC-002); navegación a gestión/búsqueda < 10 s (SC-005)
 
-**Constraints**: Sin backend, sin autenticación ni permisos; etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble
+**Constraints**: Sin backend, sin autenticación ni permisos; sin selector de rol ni visibilidad por rol (FR-047); selector local de persona para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
 
-**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 6 historias de usuario; 3 pantallas (Panel, Gestión, Búsqueda); 44 requisitos funcionales + 5 requisitos de extensibilidad
+**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 5 historias de usuario en alcance (HU1–HU5; HU6 diferida); 3 pantallas (Panel, Gestión, Búsqueda); 49 requisitos funcionales + 5 requisitos de extensibilidad
 
 ## Constitution Check
 
@@ -34,10 +36,10 @@ Construir un módulo base ERP frontend reutilizable para gestión de datos maest
 
 | Principio | Gate | Cumplimiento |
 |-----------|------|--------------|
-| I. Code Quality & Maintainability | Código modular con responsabilidades separadas (almacenamiento, configuración, componentes, shell) y funciones pequeñas | PASS — la estructura propuesta aísla almacenamiento, configuración y UI; el contrato de extensibilidad queda documentado |
-| II. Test-First & Verification | Pruebas unitarias e integración para comportamiento visible y lógica de negocio antes/junto a la implementación | PASS — Vitest + jsdom cubre validación, stock, búsqueda, configuración y flujos críticos; cada historia define prueba independiente |
-| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad | PASS — tokens de diseño compartidos, etiquetas desde configuración y controles nativos accesibles |
-| IV. Performance & Reliability | Presupuestos de rendimiento y comportamiento responsivo bajo uso esperado | PASS — objetivos medibles para 500 registros; renderizado y búsqueda sin trabajo bloqueante innecesario |
+| I. Code Quality & Maintainability | Código modular con responsabilidades separadas (almacenamiento, configuración, componentes, shell) y funciones pequeñas | PASS — la estructura propuesta aísla almacenamiento, configuración y UI; reglas de dominio e inmutabilidad en la capa de almacenamiento |
+| II. Test-First & Verification | Pruebas unitarias e integración para comportamiento visible y lógica de negocio antes/junto a la implementación | PASS — Vitest + jsdom cubre validación, stock, unicidad, inmutabilidad/contramovimientos, configuración y flujos críticos |
+| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad; identidad local sin control de acceso por rol | PASS — tokens compartidos, etiquetas desde configuración, controles nativos accesibles, persona local para auditoría y sin visibilidad condicionada por rol |
+| IV. Performance & Reliability | Presupuestos de rendimiento y comportamiento responsivo bajo uso esperado | PASS — objetivos medibles para 500 registros; operaciones locales y búsqueda sin trabajo bloqueante innecesario |
 
 **Resultado**: Sin violaciones. No se requiere Complexity Tracking.
 
@@ -47,18 +49,18 @@ Construir un módulo base ERP frontend reutilizable para gestión de datos maest
 
 ```text
 specs/001-erp-base-module/
-├── plan.md              # Este archivo
-├── research.md          # Fase 0: decisiones y alternativas
-├── data-model.md        # Fase 1: modelo de datos y validaciones
-├── quickstart.md        # Fase 1: guía de validación end-to-end
-├── contracts/           # Fase 1: contratos de almacenamiento, configuración y UI
+├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
 │   ├── entity-storage.md
 │   ├── module-config.md
 │   └── ui.md
 ├── checklists/
 │   └── requirements.md
 ├── spec.md
-└── tasks.md             # Generado por /speckit.tasks (no por /speckit.plan)
+└── tasks.md
 ```
 
 ### Source Code (repository root)
@@ -69,15 +71,16 @@ src/
 ├── main.js              # Arranque, carga de configuración y montaje
 ├── app.js               # Enrutamiento de vistas, estado y coordinación
 ├── module-config.js     # Configuración del módulo (nombre, etiquetas, campos, tema)
-├── storage.js           # Entidades, documentos, stock, validación y persistencia
+├── storage.js           # Entidades, movimientos, conteos, solicitudes, stock y persistencia
 ├── styles.css           # Tokens de diseño, shell, formularios, listas y responsive
 └── components/
     ├── shell.js         # Barra superior, logotipo SVG, barra lateral y módulo activo
-    ├── dashboard.js     # Acciones rápidas y tarjetas KPI
-    ├── entity-form.js   # Alta/edición de entidades y campos personalizados
+    ├── person-selector.js # Persona local para auditoría y aprobaciones (FR-049)
+    ├── dashboard.js     # Acciones rápidas, KPIs, alertas y solicitudes de reposición
+    ├── entity-form.js   # Alta/edición/desactivación de entidades y campos personalizados
     ├── entity-list.js   # Listado, acciones y estados vacíos
-    ├── document-form.js # Alta/edición de movimientos y ubicación
-    ├── document-list.js # Listado de movimientos por entidad
+    ├── document-form.js # Registro de movimientos (entrada/salida/transferencia/ajuste)
+    ├── document-list.js # Kardex y listado de movimientos por entidad
     └── search-bar.js    # Entrada de búsqueda y filtros
 
 tests/
@@ -95,16 +98,16 @@ tests/
     └── workspace-shell.test.js
 ```
 
-**Structure Decision**: Proyecto único frontend. Se usa la estructura de proyecto único del template porque no hay backend ni aplicación móvil. `storage.js` concentra persistencia y reglas de dominio; `module-config.js` es el único punto de adaptación por módulo; los componentes de UI consumen ambos sin lógica de dominio duplicada.
+**Structure Decision**: Proyecto único frontend sin backend. `storage.js` concentra persistencia y reglas de dominio (unicidad de SKU, stock por ubicación/total derivado, inmutabilidad de confirmados, contramovimientos, conteos y solicitudes). `module-config.js` es el único punto de adaptación. La UI consume contratos sin duplicar reglas de negocio.
 
 ## Phase 0: Research
 
-Salida: [research.md](./research.md). Resuelve las decisiones tecnológicas y de dominio sin `NEEDS CLARIFICATION`.
+Salida: [research.md](./research.md). Resuelve decisiones tecnológicas y de dominio alineadas con las clarificaciones vigentes.
 
 ## Phase 1: Design & Contracts
 
 Salidas:
-- [data-model.md](./data-model.md): entidades, campos, relaciones, validaciones y transiciones de estado.
+- [data-model.md](./data-model.md): entidades, movimientos, conteos, solicitudes, validaciones y transiciones.
 - [contracts/entity-storage.md](./contracts/entity-storage.md): forma de datos y operaciones de persistencia.
 - [contracts/module-config.md](./contracts/module-config.md): contrato de configuración y extensibilidad.
 - [contracts/ui.md](./contracts/ui.md): pantallas, navegación, etiquetas y comportamiento esperado.
@@ -114,10 +117,10 @@ Salidas:
 
 | Principio | Re-evaluación tras diseño | Resultado |
 |-----------|---------------------------|-----------|
-| I. Code Quality & Maintainability | Contratos separados por responsabilidad; UI sin reglas de stock embebidas | PASS |
-| II. Test-First & Verification | Los contratos definen validaciones y efectos verificables; quickstart mapea cada historia a pruebas | PASS |
-| III. User Experience Consistency | Contrato UI fija navegación, estados y etiquetas configurables | PASS |
-| IV. Performance & Reliability | Modelo plano y búsqueda sobre arreglos locales aptos para 500 registros | PASS |
+| I. Code Quality & Maintainability | Contratos separados por responsabilidad; reglas de stock/inmutabilidad centralizadas; extensibilidad por configuración | PASS |
+| II. Test-First & Verification | Contratos definen validaciones y efectos verificables (unicidad, stock, contramovimientos, conteos); quickstart mapea historias a pruebas | PASS |
+| III. User Experience Consistency | Contrato UI fija navegación, estados, mensajes y selector local de persona sin permisos por rol | PASS |
+| IV. Performance & Reliability | Modelo local apto para 500 registros; recálculo de KPIs y stock por operaciones explícitas | PASS |
 
 **Resultado post-diseño**: Sin violaciones. Se puede proceder a `/speckit.tasks`.
 

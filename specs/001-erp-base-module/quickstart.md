@@ -1,14 +1,12 @@
 # Quickstart: Validación del Módulo Base ERP — Logística e Inventario
 
-**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-10
+**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-17
 
-Guía para ejecutar y validar el módulo de extremo a extremo. Los detalles de datos y contratos están en [data-model.md](./data-model.md) y [contracts/](./contracts/); no se duplican aquí.
+Guía para ejecutar y validar el módulo de extremo a extremo. Contratos en [contracts/](./contracts/).
 
 ## Prerrequisitos
 
-- Node.js 18 o superior.
-- npm.
-- Navegador moderno.
+- Node.js 18 o superior, npm, navegador moderno.
 
 ## Instalación y ejecución
 
@@ -16,119 +14,100 @@ Guía para ejecutar y validar el módulo de extremo a extremo. Los detalles de d
 npm install
 npm run dev
 ```
-
-Abrir la URL que muestra Vite (por defecto `http://localhost:5173`).
+Abrir la URL de Vite (por defecto `http://localhost:5173`).
 
 ## Pruebas automatizadas
 
 ```bash
 npm run test:run
-```
-
-Modo watch durante desarrollo:
-
-```bash
-npm test
-```
-
-Build de producción:
-
-```bash
+npm test        # watch
 npm run build
 npm run preview
 ```
 
 ## Escenarios de validación
 
-Cada escenario corresponde a una historia de usuario de [spec.md](./spec.md).
+### HU1 — Catálogo maestro, unicidad, eliminación/desactivación y auditoría
+1. Seleccionar una persona en el selector local y crear producto con campos obligatorios: nombre, código/SKU, categoría, unidad y punto de reorden (y `costo_unitario` opcional si aplica).
+2. **Esperado**: se guarda activo con stock 0 y queda un registro de auditoría con esa persona y la fecha.
+3. Intentar crear/editar con SKU duplicado (ignorando mayúsculas/espacios) o con punto de reorden/costo negativo.
+4. **Esperado**: guardado bloqueado con mensaje descriptivo.
+5. Intentar eliminar un producto con movimientos/historial.
+6. **Esperado**: eliminación bloqueada y solo se permite desactivación conservando historial. Si no tiene historial, la eliminación física es posible.
+7. Buscar una vista que permita ocultar costos por "rol Operador".
+8. **Esperado**: no existe tal selector ni visibilidad condicionada por rol; costos y valorización se muestran solo en panel/catálogo (FR-044, FR-047).
 
-### US1 — Parametrización y datos maestros
+### HU2 — Recepción (entrada) y transferencia con ubicación
+1. Registrar Entrada confirmada con cantidad y ubicación (pasillo-estante-nivel).
+2. **Esperado**: stock total y por ubicación aumentan; se registra movimiento con fecha/hora y etiqueta de actor local.
+3. Transferir cantidad entre ubicaciones.
+4. **Esperado**: origen baja, destino sube, total sin cambio; si excede stock de origen, se bloquea.
+5. Intentar guardar sin ubicación/cantidad válida o cancelar a mitad.
+6. **Esperado**: bloqueo con mensaje o ningún cambio persistido.
 
-1. Abrir Gestión → formulario de entidad.
-2. Crear un producto con `name`, `code`, `category` y los campos personalizados obligatorios (`sku`, `punto_reorden`).
-3. **Esperado**: se guarda, aparece disponible para movimientos y se valida un campo obligatorio vacío con mensaje descriptivo.
-4. Editar `src/module-config.js` (nombre/etiquetas/campos) y recargar.
-5. **Esperado**: la UI adopta los nuevos términos y campos sin romper registros existentes.
+### HU3 — Salida con validación de stock
+1. Seleccionar producto con stock y registrar Salida.
+2. **Esperado**: se muestra stock por ubicación y sugerencia (p. ej. FIFO); no permite exceder disponible.
+3. Confirmar salida válida.
+4. **Esperado**: stock disminuye exactamente; si queda ≤ punto de reorden se refleja alerta (HU5). Validación también al confirmar.
 
-### US2/US3 — Recepción y entradas
+### HU4 — Kardex, inmutabilidad, conteo ciego y ajustes
+1. Abrir kardex de un producto.
+2. **Esperado**: movimientos cronológicos (tipo, documento, cantidad, saldo, ubicación, actor), filtrables por fecha/tipo.
+3. Intentar editar/eliminar un movimiento confirmado.
+4. **Esperado**: no permitido; corrección vía anulación con contramovimiento vinculado.
+5. Realizar conteo físico.
+6. **Esperado**: captura ciega (sin cantidad del sistema), diferencias al cerrar; ajuste con motivo obligatorio y aprobación con persona local distinta a la que contó; ajuste aprobado aparece como `AJUSTE`.
 
-1. Crear un producto nuevo.
-2. Registrar un documento de tipo `ENTRADA` con cantidad `100` y ubicación Pasillo `A`, Estante `3`, Nivel `2`.
-3. **Esperado**: el stock del producto pasa a `100` y el detalle muestra la ubicación de esa entrada.
-4. Intentar guardar una entrada sin cantidad o sin ubicación.
-5. **Esperado**: se bloquea con mensaje de campos faltantes.
-6. Cancelar/volver a mitad de una entrada.
-7. **Esperado**: no se guarda nada y el stock no cambia.
-
-### US4 — Salidas y despachos
-
-1. Registrar una `SALIDA` con cantidad mayor al stock disponible.
-2. **Esperado**: alerta de inventario insuficiente y botón de guardado deshabilitado.
-3. Ajustar a una cantidad válida y guardar.
-4. **Esperado**: el stock disminuye exactamente en la cantidad despachada.
-
-### US5 — Panel analítico
-
-1. Abrir el Panel con datos cargados.
-2. **Esperado**: tarjetas de total de entidades, valoración del stock y productos en nivel crítico.
-3. Seleccionar una categoría en el filtro.
-4. **Esperado**: la tabla y las tarjetas se recalculan solo para esa categoría.
-5. Pulsar "limpiar filtros".
-6. **Esperado**: vuelven los valores globales.
-7. Reducir el stock de un producto bajo su `punto_reorden` y volver al panel.
-8. **Esperado**: aumenta el indicador de productos críticos y aparece alerta visual.
-
-### US6 — Reetiquetado desde configuración
-
-1. Configurar `Entidad → Producto` y `Documento → Movimiento de Inventario`.
-2. Recorrer Panel, Gestión y Búsqueda.
-3. **Esperado**: botones, tablas, formularios, mensajes y estados vacíos usan los términos configurados; la navegación y persistencia no cambian.
-4. Quitar los mapeos y recargar.
-5. **Esperado**: se usan los términos base del módulo ERP.
+### HU5 — Panel, KPIs y solicitudes de reposición
+1. Abrir Panel con datos.
+2. **Esperado**: KPIs de productos activos, valoración `Σ(stock×unitCost)` (solo panel/catálogo), alertas y productos sin movimiento en 90 días.
+3. Ver productos en alerta (stock ≤ punto de reorden).
+4. **Esperado**: indicador rojo/amarillo y cantidad sugerida editable; generar solicitud de reposición agrupada por proveedor.
+5. Aplicar/limpiar filtros.
+6. **Esperado**: KPIs y tabla se recalculan; productos con < 30 días de historial muestran rotación "Datos insuficientes".
 
 ## Validación transversal
 
 | Comprobación | Esperado |
 |--------------|----------|
-| Campos obligatorios vacíos | Errores visibles y guardado bloqueado |
-| Fecha objetivo inválida | Rechazo con explicación |
-| Búsqueda sin coincidencias | Estado vacío claro |
-| Eliminar entidad con documentos | Cascada sin registros huérfanos |
-| Navegar entre pantallas | Datos intactos |
-| Recargar la página | Datos persisten en `localStorage` |
-| 500 entidades | Listado y búsqueda siguen siendo usables |
-| Ventana estrecha | Barra lateral contraída a iconos, operable |
-| Datos con HTML/scripts | Se muestran escapados, sin ejecución |
-| Salida mayor al stock | Bloqueada con mensaje |
-| Costo unitario | Visible en panel/catálogo; ausente como entrada en movimientos |
+| Campos obligatorios entidad (nombre, SKU, categoría, unidad, punto de reorden) | Bloqueo y mensajes claros si faltan |
+| SKU único global (normalizado) | Bloqueo en alta/edición duplicada |
+| Eliminación con/sin historial | Sin historial: elimina; con historial: solo desactiva |
+| Visibilidad por rol | No existe: sin selector de rol ni ocultación de costos/contactos (FR-047) |
+| Persona local en auditoría | Toda creación/edición/desactivación registra persona y fecha (FR-049) |
+| Aprobación de ajustes | Requiere persona distinta de la del conteo (HU4#4) |
+| Movimientos confirmados | Inmutables; corrección por contramovimiento |
+| Stock insuficiente (salida/transferencia) | Bloqueado con mensaje |
+| Navegación entre pantallas y recarga | Datos intactos en `localStorage` |
+| 500 entidades | Listado/búsqueda usables (FR-032) |
+| Ventana estrecha | Barra lateral contraíble operable |
+| Datos con HTML/scripts | Escapados, sin ejecución (XSS) |
+| Configuración inválida | Aviso visible sin fallo silencioso; fallback seguro |
 
 ## Extender el módulo base
 
-1. Editar solo `src/module-config.js`: nombre, etiquetas, campos personalizados, ciclo de vida y color de acento.
-2. **Esperado**: cero modificaciones en `src/storage.js`, `src/app.js` o componentes centrales (SC-008).
-3. Sin configuración, la aplicación funciona con Entidad/Documento y sin campos ni ciclo de vida.
+1. Editar solo `src/module-config.js` (nombre, etiquetas, campos, ciclo de vida, color de acento).
+2. **Esperado**: cero modificaciones en código central (SC-008); reglas base de integridad se mantienen.
 
-Contratos de referencia:
-- [contracts/entity-storage.md](./contracts/entity-storage.md)
-- [contracts/module-config.md](./contracts/module-config.md)
-- [contracts/ui.md](./contracts/ui.md)
+## Notas de alineación
 
-## Resultados de validación (2026-11-10)
+- Los roles son etiquetas descriptivas: no hay login, permisos, selector de rol ni visibilidad por rol.
+- La identidad se elige en un selector local de persona sin contraseña; se registra en auditoría y aprobaciones.
+- `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
+- Ubicación actual del producto: derivada del último documento de entrada o transferencia confirmado.
+- HU6 (Compras/Ventas) está fuera de esta versión.
 
-| Comando | Resultado |
-|---------|-----------|
-| `npm run test:run` | 10 archivos, 58 pruebas aprobadas |
-| `npm run lint` | Sin errores ni advertencias |
-| `npm run build` | Build de producción correcto (Vite 8.2.1) |
 
-Cobertura de escenarios:
+## Resultados de validación (2026-11-17; tras las clarificaciones)
 
-| Escenario | Evidencia |
-|-----------|-----------|
-| US1 — datos maestros y campos personalizados | `tests/unit/storage.test.js`, `tests/integration/create-entity.test.js`, `tests/integration/edit-delete-entity.test.js` |
-| US2/US3 — entradas, ubicación y cancelación | `tests/unit/stock.test.js`, `tests/integration/inventory-movements.test.js` |
-| US4 — salidas y stock insuficiente | `tests/unit/stock.test.js`, `tests/integration/inventory-movements.test.js` |
-| US5 — panel, KPIs, filtros y búsqueda | `tests/unit/storage.test.js`, `tests/integration/dashboard.test.js`, `tests/integration/workspace-shell.test.js` |
-| US6 — reetiquetado y ciclo de vida | `tests/unit/module-config.test.js`, `tests/integration/relabeling.test.js` |
-| Transversal — escapado, persistencia y 500 entidades | `tests/integration/security-persistence.test.js` |
-| Enlaces profundos y navegación | `tests/integration/workspace-shell.test.js` |
+- `npm run test:run`: **PASS** (10 archivos, 82 pruebas).
+- `npm run build`: **PASS** (Vite 8.2.1; 17 módulos transformados; salida en `dist/`).
+- `npm run lint`: **PASS** (ESLint sin errores ni advertencias).
+- `npm run format:check`: **PASS** (Prettier: todos los archivos cumplen el estilo).
+- HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
+- Clarificaciones aplicadas y verificadas: sin selector de rol ni visibilidad por rol; `TRANSFERENCIA` como tercer tipo de documento con ubicación derivada; persona local para auditoría/aprobaciones con `actorPerson`/`approvedByPerson`; entidades con historial se desactivan conservando documentos; clave canónica `erp.movements` con migración desde `erp.documents`.
+- Búsqueda: filtrado por término y categoría con estados vacíos seguros; renderizado sin `innerHTML` con datos de usuario.
+- Seguridad XSS: componentes usan creación de nodos/`textContent`; se eliminó el uso de inserción HTML sin sanitizar en utilidades compartidas.
+- Accesibilidad/responsivo: navegación con `aria-current`, controles con etiquetas, retroalimentación con `role`/`aria-live` donde aplica, barra lateral colapsable por ancho reducido.
+- Rendimiento (500 entidades): búsqueda/listado operan en memoria sobre `localStorage` con filtrado lineal simple; validado con suite automatizada existente (sin bloqueos observables en pruebas de integración de UI).

@@ -81,8 +81,9 @@ export function renderEntityForm(
   const unitOfMeasureInput = h(
     'select',
     { name: 'unitOfMeasure', 'data-testid': 'entity-unit' },
-    option('', 'Sin especificar', !entity?.unitOfMeasure),
-    ...UNIT_OPTIONS.map((unit) => option(unit, unit, unit === entity?.unitOfMeasure))
+    ...UNIT_OPTIONS.map((unit) =>
+      option(unit, unit, (entity?.unitOfMeasure ?? entity?.unit ?? 'Unidades') === unit)
+    )
   );
   const reorderPointInput = h('input', {
     type: 'number',
@@ -232,6 +233,7 @@ export function renderEntityForm(
         label: 'Punto de reorden',
         name: 'reorderPoint',
         control: reorderPointInput,
+        required: true,
         hint: 'Umbral para marcar stock crítico.'
       }),
       formField({

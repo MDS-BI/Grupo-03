@@ -1,119 +1,82 @@
-# Contrato de Almacenamiento de Entidades y Documentos
+# Contrato de Almacenamiento (Entidades, Movimientos e Inventario)
 
-**Feature**: `001-erp-base-module` | **Modelo**: [data-model.md](../data-model.md) | **Fecha**: 2026-11-10
+**Feature**: `001-erp-base-module` | **Modelo**: [../data-model.md](../data-model.md) | **Fecha**: 2026-11-17
 
 ## Propósito
 
-Definir la forma de los datos y las operaciones de persistencia que `src/storage.js` expone a la UI. El almacenamiento usa `localStorage` del navegador en un único espacio de trabajo.
+Definir la forma de datos y las operaciones de persistencia/reglas de dominio expuestas por `src/storage.js` (o capa equivalente). Almacenamiento en `localStorage`, espacio de trabajo único. La UI no accede directamente a `localStorage`.
 
-## Claves de almacenamiento
+## Claves de almacenamiento (sugeridas)
 
 | Clave | Contenido |
 |-------|-----------|
 | `erp.entities` | Arreglo JSON de entidades |
-| `erp.documents` | Arreglo JSON de documentos |
+| `erp.movements` | Arreglo JSON de movimientos/documentos de inventario |
+| `erp.counts` | Arreglo JSON de conteos físicos y detalles |
+| `erp.replenishmentRequests` | Arreglo JSON de solicitudes de reposición |
+| `erp.persons` | Arreglo JSON de etiquetas de PersonaLocal del selector |
+| `erp.audit` | Arreglo JSON de registros de auditoría |
 
-## Forma de una Entidad
+(Los nombres exactos pueden ajustarse en implementación siempre que el contrato lógico se mantenga.)
 
-```json
-{
-  "entity_id": "ent_01H...",
-  "name": "Caja de tornillos 5 mm",
-  "code": "TOR-005",
-  "category": "Ferretería",
-  "description": "Tornillos de acero",
-  "targetDate": "2026-12-31",
-  "unitOfMeasure": "Cajas",
-  "reorderPoint": 20,
-  "unitCost": 1500,
-  "stockBalance": 100,
-  "customFields": {
-    "sku": "TOR-005",
-    "punto_reorden": 20,
-    "unidad_medida": "Cajas"
-  },
-  "createdAt": "2026-11-10T12:00:00.000Z",
-  "updatedAt": "2026-11-10T12:00:00.000Z"
-}
-```
+## Entidad
 
-Reglas:
-- `entity_id`, `createdAt` y `updatedAt` los genera la capa de almacenamiento.
-- `name`, `code` y `category` son obligatorios y no vacíos.
-- `stockBalance` inicia en `0` y nunca puede ser negativo.
-- `reorderPoint` y `unitCost`, si existen, son números ≥ 0.
-- `targetDate`, si existe, es una fecha de calendario válida (`YYYY-MM-DD`).
-- Los campos personalizados se validan según [module-config.md](./module-config.md).
+Campos base obligatorios: `name`, `code` (SKU, único global normalizado), `category`, `unit`, `reorderPoint` (≥ 0). Campos base adicionales: `entity_id`, `status` (`active`/`inactive`), `description?`, `targetDate?`, `unitCost?` (≥ 0), `stockBalance` (≥ 0, inicia 0), `customFields`, `createdAt`, `updatedAt`.
 
-## Forma de un Documento
+Reglas: unicidad de `code`; `stockBalance` solo cambia por movimientos confirmados; sin historial asociado puede eliminarse físicamente, con historial solo desactivación; toda creación/edición/desactivación escribe un registro en `erp.audit` con la persona local activa y la fecha (HU1#4, FR-049).
 
-```json
-{
-  "document_id": "doc_01H...",
-  "entity_id": "ent_01H...",
-  "type": "ENTRADA",
-  "quantity": 100,
-  "aisle": "A",
-  "shelf": "3",
-  "level": "2",
-  "notes": "Recepción de proveedor",
-  "status": "Completado",
-  "createdAt": "2026-11-10T12:05:00.000Z"
-}
-```
+## Movimiento (Documento de inventario)
 
-Reglas:
-- `document_id` y `createdAt` los genera la capa de almacenamiento.
-- `entity_id` debe existir; si no, se rechaza el guardado.
-- `type` es `ENTRADA` o `SALIDA`.
-- `quantity` es un entero > 0.
-- `ENTRADA` exige `aisle`, `shelf` y `level` no vacíos.
-- `SALIDA` no usa campos de ubicación.
-- No existen `startDate` ni `endDate`.
-- Una `SALIDA` con `quantity > stockBalance` se rechaza.
+Campos: `movement_id`, `entity_id`, `type` (`ENTRADA`|`SALIDA`|`TRANSFERENCIA`|`AJUSTE`), `state` (`draft`|`confirmed`|`voided`), `quantity` (> 0), `location` (entrada: `aisle`,`shelf`,`level`), `transfer` (origen/destino), `reason?`, `notes?`, `voidsMovementId?`, `actorPerson` (persona local), `approvedByPerson?` (solo ajustes), `createdAt`, `confirmedAt?`.
 
-## Operaciones de Entidades
+Reglas: entrada requiere ubicación completa; salida/transferencia validan stock disponible (al confirmar); transferencia mueve entre ubicaciones sin cambiar total; ajuste con motivo y `approvedByPerson` distinto de la persona del conteo (HU4#4); confirmados inmutables, corrección por anulación con contramovimiento; sin rango de fechas inicial/final. La ubicación actual del producto se deriva de la entrada o transferencia confirmada más reciente (FR-041).
 
-| Operación | Firma | Contrato |
-|-----------|-------|----------|
-| `loadEntities()` | `() => Entity[]` | Devuelve todas las entidades; arreglo vacío si no hay datos o el JSON es inválido |
-| `saveEntities(entities)` | `(Entity[]) => void` | Persiste la lista completa preservando el orden |
-| `addEntity(input)` | `(EntityInput) => Entity` | Genera identidad y marcas de tiempo; valida; persiste |
-| `updateEntity(entityId, updates)` | `(string, Partial<Entity>) => Entity` | Actualiza y refresca `updatedAt`; valida |
-| `deleteEntity(entityId)` | `(string) => void` | Elimina la entidad y sus documentos en cascada |
+## Conteos y Solicitudes
 
-## Operaciones de Documentos
+- **Conteo físico**: captura ciega (sin mostrar cantidad sistema), cierre con diferencias por entidad, ajustes derivados aprobados con persona local distinta a la del conteo (FR-049).
+- **Solicitud de reposición**: líneas por entidad con cantidad sugerida editable, estado de solicitud y soporte de agrupación por proveedor.
 
-| Operación | Firma | Contrato |
-|-----------|-------|----------|
-| `loadDocuments()` | `() => Document[]` | Devuelve todos los documentos |
-| `saveDocuments(documents)` | `(Document[]) => void` | Persiste la lista completa |
-| `addDocument(input)` | `(DocumentInput) => Document` | Valida, genera identidad/tiempo y aplica el efecto de stock |
-| `updateDocument(documentId, updates)` | `(string, Partial<Document>) => Document` | Valida y ajusta el stock por la diferencia |
-| `deleteDocument(documentId)` | `(string) => void` | Elimina y revierte el efecto de stock |
-| `deleteDocumentsForEntity(entityId)` | `(string) => void` | Elimina todos los documentos de una entidad |
+## Operaciones (contrato lógico)
 
-## Operaciones de Consulta
+### Entidades
+| Operación | Contrato |
+|-----------|----------|
+| `loadEntities` / `saveEntities` | Carga/persiste lista completa |
+| `addEntity(input)` | Valida obligatorios y unicidad de `code`, genera ids/fechas, `status=active`, `stockBalance=0` |
+| `updateEntity(id, updates)` | Valida y actualiza (incluye `unitCost` opcional y custom fields); respeta unicidad de `code` excluyendo la propia entidad |
+| `deleteEntity(id)` | Si no hay historial asociado: elimina físicamente. Si hay historial: rechaza eliminación física y/o expone desactivación |
+| `deactivateEntity(id)` | Marca `inactive` conservando historial |
 
-| Operación | Firma | Contrato |
-|-----------|-------|----------|
-| `searchEntities(term, category?)` | `(string, string?) => Entity[]` | Busca por nombre, código, categoría, descripción y campos personalizados; vacío devuelve todo |
-| `getLatestLocation(entityId)` | `(string) => Location \| null` | Deriva la ubicación del documento `ENTRADA` más reciente |
-| `getDashboardStats(category?)` | `(string?) => Stats` | Devuelve conteo, valoración y críticos, opcionalmente filtrados por categoría |
+### Movimientos
+| Operación | Contrato |
+|-----------|----------|
+| `loadMovements` / `saveMovements` | Carga/persiste lista |
+| `addMovement(input)` | Crea borrador o confirma según flujo; al confirmar valida y aplica efecto de stock de forma atómica |
+| `confirmMovement(id)` | Valida reglas de tipo/stock/ubicación y aplica stock; pasa a inmutable |
+| `updateDraftMovement(id, updates)` | Solo permitido si no está confirmado |
+| `cancelDraftMovement(id)` | Cancela/elimina borrador sin afectar stock |
+| `voidMovement(id, reason, person)` | Anula movimiento confirmado generando contramovimiento vinculado que revierte el efecto |
 
-## Validación
+### Consultas y dominio
+| Operación | Contrato |
+|-----------|----------|
+| `searchEntities(term, category?)` | Busca por nombre, código, categoría, descripción y campos personalizados |
+| `getLatestLocation(entityId)` | Ubicación derivada del movimiento de entrada o transferencia confirmado más reciente (FR-041) |
+| `getKardex(entityId, filters?)` | Movimientos cronológicos con saldo/ubicación/persona local, filtrables por fecha y tipo |
+| `getDashboardStats(filters?)` | Conteos, valoración `Σ(stock×unitCost)`, alertas por punto de reorden, productos sin movimiento 90 días |
+| `getReplenishmentSuggestions(filters?)` | Entidades en alerta con cantidad sugerida |
+| `getPersons()` / `savePersons(list)` | Lista de etiquetas del selector local de persona (FR-049) |
+| `getAuditTrail(filters?)` | Registros de auditoría por entidad/acción/persona/fecha (HU1#4) |
 
-- Una entidad sin `name`, `code` o `category` se rechaza antes de persistir.
-- Un campo personalizado obligatorio vacío o con tipo inválido se rechaza.
-- Un documento sin `entity_id` válido se rechaza.
-- Un documento `ENTRADA` sin ubicación completa se rechaza.
-- Una `SALIDA` con cantidad superior al stock se rechaza.
-- Un `status` fuera del ciclo configurado se rechaza.
-- Eliminar una entidad elimina todos sus documentos.
-- Las operaciones preservan el orden de la lista salvo que el llamador lo cambie explícitamente.
+### Conteos y reposición
+Operaciones para crear/cerrar conteos ciegos, registrar diferencias, generar ajustes aprobados y crear solicitudes de reposición con detalle.
+
+## Validación y errores
+
+- Errores descriptivos para: campos obligatorios faltantes, `code` duplicado, `reorderPoint`/`unitCost` inválidos, entidad inexistente, cantidad ≤ 0, ubicación incompleta en entrada, stock insuficiente en salida/transferencia, intento de editar/eliminar confirmado, intento de eliminar entidad con historial, ajuste sin `approvedByPerson` o con la misma persona que contó.
+- La UI debe presentar retroalimentación clara y consistente (FR-006).
 
 ## Extensibilidad
 
-- Los campos adicionales de módulos personalizados se persisten junto a los campos base sin manejo especial.
-- Las firmas anteriores son estables para que los módulos personalizados construyan sobre ellas sin modificar el núcleo.
-- La UI nunca accede directamente a `localStorage`; siempre usa estas operaciones.
+- Campos personalizados persistidos junto a campos base.
+- Firmas/contratos estables para módulos personalizados; la base garantiza identidad, marcas de tiempo e integridad referencial.

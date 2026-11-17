@@ -84,3 +84,53 @@ describe('integración: panel analítico', () => {
     expect(document.querySelector('[data-testid="critical-alert"]')).toBeTruthy();
   });
 });
+
+describe('integraci�n: panel US5 reposici�n', () => {
+  it('renderiza alertas de reposici�n y genera solicitud agrupada por proveedor', async () => {
+    const { loadReplenishmentRequests } = await import('../../src/storage.js');
+    const a = seedEntity({
+      name: 'A',
+      code: 'RA',
+      category: 'Cat',
+      reorderPoint: 20,
+      customFields: { proveedor: 'Prov A' }
+    });
+    seedEntry(a.entity_id, { quantity: 10 });
+    const b = seedEntity({
+      name: 'B',
+      code: 'RB',
+      category: 'Cat',
+      reorderPoint: 20,
+      customFields: { proveedor: 'Prov B' }
+    });
+    seedEntry(b.entity_id, { quantity: 5 });
+
+    mountApp();
+
+    expect(document.querySelector('[data-testid="dashboard-alerts"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="replenishment-table"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="kpi-no-movement"]')).toBeTruthy();
+
+    // ensure suggested quantities editable and generate request
+    const qtyA = document.querySelector(`[data-testid="replenish-qty-${a.entity_id}"]`);
+    setValue(qtyA, '7');
+    document.querySelector('[data-testid="generate-replenishment"]').click();
+
+    expect(loadReplenishmentRequests().length).toBe(1);
+    expect(document.querySelector('[data-testid="replenishment-notice"]').textContent).toContain(
+      'proveedor'
+    );
+  });
+
+  it('mantiene comportamiento de filtros y limpiar filtros en el panel', () => {
+    const a = seedEntity({ name: 'A', code: 'FA', category: 'Ferreter�a', reorderPoint: 1 });
+    seedEntry(a.entity_id, { quantity: 5 });
+    seedEntity({ name: 'B', code: 'FB', category: 'Oficina', reorderPoint: 1 });
+    mountApp();
+
+    setValue(document.querySelector('[data-testid="dashboard-category"]'), 'Ferreter�a');
+    expect(document.querySelector('[data-testid="active-filter"]')).toBeTruthy();
+    document.querySelector('[data-testid="clear-filters"]').click();
+    expect(document.querySelector('[data-testid="dashboard-category"]').value).toBe('');
+  });
+});

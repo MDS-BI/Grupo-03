@@ -1,7 +1,40 @@
 export const STORAGE_KEYS = {
   entities: 'erp.entities',
-  documents: 'erp.documents'
+  movements: 'erp.movements',
+  documents: 'erp.movements',
+  legacyDocuments: 'erp.documents',
+  counts: 'erp.counts',
+  replenishmentRequests: 'erp.replenishmentRequests',
+  persons: 'erp.persons',
+  audit: 'erp.audit'
 };
+
+const DEFAULT_PERSONS = ['Ana', 'Bruno', 'Carlos', 'Diana'];
+
+function normalizeCode(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+function ensureEntityDefaults(entity) {
+  const unit =
+    trimString(entity?.unit ?? entity?.unitOfMeasure ?? entity?.customFields?.unidad_medida) ||
+    'Unidades';
+  const reorderPointRaw = entity?.reorderPoint ?? entity?.customFields?.punto_reorden;
+  const reorderPoint =
+    reorderPointRaw === undefined || reorderPointRaw === '' || reorderPointRaw === null
+      ? 0
+      : Number(reorderPointRaw);
+  return {
+    ...entity,
+    unit,
+    unitOfMeasure: entity?.unitOfMeasure ?? unit,
+    reorderPoint: Number.isFinite(reorderPoint) ? reorderPoint : 0,
+    status: entity?.status === 'inactive' ? 'inactive' : 'active'
+  };
+}
 
 export class ValidationError extends Error {
   constructor(errors, message = 'Datos inválidos.') {
@@ -46,6 +79,25 @@ function writeCollection(key, value) {
   storage.setItem(key, JSON.stringify(value));
 }
 
+function hasStoredKey(key) {
+  const storage = getStorage();
+  if (!storage) return false;
+  try {
+    return storage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function readDocuments() {
+  if (hasStoredKey(STORAGE_KEYS.movements)) {
+    return readCollection(STORAGE_KEYS.movements);
+  }
+  const legacy = readCollection(STORAGE_KEYS.legacyDocuments);
+  if (legacy.length > 0) writeCollection(STORAGE_KEYS.movements, legacy);
+  return legacy;
+}
+
 function clone(value) {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
@@ -71,6 +123,116 @@ function isBlank(value) {
 function trimString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function normalizePersonLabel(value) {
+  return trimString(value).replace(/\s+/g, ' ').slice(0, 80);
+}
+
+function resolveActor(options = {}, fallback = 'local') {
+  const source = typeof options === 'string' ? { actorPerson: options } : (options ?? {});
+  const candidates = [
+    source.actorPerson,
+    source.person,
+    source.approvedByPerson,
+    source.actorLabel,
+    source.actor
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizePersonLabel(candidate);
+    if (normalized) return normalized;
+  }
+  return fallback;
+}
+
+export function getPersons() {
+  const stored = readCollection(STORAGE_KEYS.persons)
+    .map((item) =>
+      normalizePersonLabel(typeof item === 'string' ? item : (item?.label ?? item?.person))
+    )
+    .filter(Boolean);
+  const seen = new Set();
+  const unique = stored.filter((label) => {
+    const key = label.toLocaleLowerCase('es');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return unique.length > 0 ? unique : [...DEFAULT_PERSONS];
+}
+
+export function savePersons(persons = []) {
+  const source = Array.isArray(persons) ? persons : [];
+  const labels = source
+    .map((item) =>
+      normalizePersonLabel(
+        typeof item === 'string' ? item : (item?.label ?? item?.person ?? item?.name)
+      )
+    )
+    .filter(Boolean);
+  if (labels.length === 0) {
+    throw new ValidationError(
+      { persons: 'Debe existir al menos una persona local.' },
+      'Persona local requerida.'
+    );
+  }
+  const seen = new Set();
+  const unique = labels.filter((label) => {
+    const key = label.toLocaleLowerCase('es');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  writeCollection(STORAGE_KEYS.persons, unique);
+  return [...unique];
+}
+
+export function addPerson(label) {
+  const normalized = normalizePersonLabel(label);
+  if (!normalized) {
+    throw new ValidationError(
+      { person: 'La etiqueta de la persona es obligatoria.' },
+      'Persona inválida.'
+    );
+  }
+  const persons = savePersons([...getPersons(), normalized]);
+  const person = persons.find(
+    (item) => item.toLocaleLowerCase('es') === normalized.toLocaleLowerCase('es')
+  );
+  return { persons, person };
+}
+
+function appendAudit({ entityId = null, action = '', person = '', details = '' } = {}) {
+  const entry = {
+    audit_id: generateId('aud'),
+    entityId: entityId || null,
+    action,
+    person: resolveActor({ actorPerson: person }, 'local'),
+    timestamp: nowIso(),
+    details: trimString(details)
+  };
+  const entries = readCollection(STORAGE_KEYS.audit);
+  entries.push(entry);
+  writeCollection(STORAGE_KEYS.audit, entries);
+  return clone(entry);
+}
+
+export function getAuditTrail(filters = {}) {
+  const { entityId = '', action = '', person = '', fromDate = '', toDate = '' } = filters ?? {};
+  const personFilter = normalizePersonLabel(person).toLocaleLowerCase('es');
+  return readCollection(STORAGE_KEYS.audit)
+    .filter((entry) => {
+      if (entityId && entry.entityId !== entityId) return false;
+      if (action && entry.action !== action) return false;
+      if (personFilter && String(entry.person ?? '').toLocaleLowerCase('es') !== personFilter)
+        return false;
+      const date = String(entry.timestamp ?? '').slice(0, 10);
+      if (fromDate && date < fromDate) return false;
+      if (toDate && date > toDate) return false;
+      return true;
+    })
+    .sort((a, b) => String(a.timestamp ?? '').localeCompare(String(b.timestamp ?? '')))
+    .map((entry) => clone(entry));
 }
 
 function parseOptionalNumber(value) {
@@ -170,36 +332,67 @@ function normalizeCustomValues(values, definitions) {
 
 export function normalizeEntityInput(input = {}, config = {}) {
   const definitions = config?.customFields?.entity ?? [];
+  const customValues = normalizeCustomValues(input.customFields, definitions);
   const normalized = {
     name: trimString(input.name),
     code: trimString(input.code),
     category: trimString(input.category),
+    unit: trimString(input.unit ?? input.unitOfMeasure ?? customValues.unidad_medida) || 'Unidades',
     description: trimString(input.description),
     targetDate: trimString(input.targetDate),
-    unitOfMeasure: trimString(input.unitOfMeasure),
-    customFields: normalizeCustomValues(input.customFields, definitions)
+    customFields: customValues
   };
 
-  const reorderPoint = parseOptionalNumber(input.reorderPoint);
-  if (reorderPoint !== undefined) normalized.reorderPoint = reorderPoint;
+  const reorderPoint = parseOptionalNumber(input.reorderPoint ?? customValues.punto_reorden);
+  normalized.reorderPoint = reorderPoint === undefined ? 0 : reorderPoint;
 
   const unitCost = parseOptionalNumber(input.unitCost);
   if (unitCost !== undefined) normalized.unitCost = unitCost;
 
+  // Keep legacy field in sync for existing UI/data compatibility
+  if (normalized.unit) normalized.unitOfMeasure = normalized.unit;
+
   return normalized;
 }
 
-export function validateEntity(input, config = {}) {
+export function validateEntity(
+  input,
+  config = {},
+  { entities = loadEntities(), entityId = null } = {}
+) {
   const errors = {};
   if (isBlank(input.name)) errors.name = 'El nombre es obligatorio.';
   if (isBlank(input.code)) errors.code = 'El código es obligatorio.';
   if (isBlank(input.category)) errors.category = 'La categoría es obligatoria.';
+  if (isBlank(input.unit)) errors.unit = 'La unidad es obligatoria.';
+
+  if (
+    input.reorderPoint === undefined ||
+    input.reorderPoint === '' ||
+    Number.isNaN(input.reorderPoint)
+  ) {
+    errors.reorderPoint = 'El punto de reorden es obligatorio.';
+  } else if (typeof input.reorderPoint !== 'number' || !Number.isFinite(input.reorderPoint)) {
+    errors.reorderPoint = 'El punto de reorden debe ser un número válido.';
+  } else if (input.reorderPoint < 0) {
+    errors.reorderPoint = 'El punto de reorden debe ser mayor o igual a 0.';
+  }
+
   if (!isBlank(input.targetDate) && !isValidDate(input.targetDate)) {
     errors.targetDate = 'La fecha objetivo no es una fecha de calendario válida.';
   }
 
-  validateOptionalNumber(input.reorderPoint, 'reorderPoint', 'El punto de reorden', errors);
   validateOptionalNumber(input.unitCost, 'unitCost', 'El costo unitario', errors);
+
+  if (!isBlank(input.code)) {
+    const normalized = normalizeCode(input.code);
+    const duplicate = entities.find(
+      (entity) => entity.entity_id !== entityId && normalizeCode(entity.code) === normalized
+    );
+    if (duplicate) {
+      errors.code = 'Ya existe una entidad con este código (SKU).';
+    }
+  }
 
   const customValues =
     input.customFields && typeof input.customFields === 'object' ? input.customFields : {};
@@ -213,7 +406,7 @@ export function validateEntity(input, config = {}) {
 }
 
 export function loadEntities() {
-  return readCollection(STORAGE_KEYS.entities);
+  return readCollection(STORAGE_KEYS.entities).map(ensureEntityDefaults);
 }
 
 export function saveEntities(entities) {
@@ -224,26 +417,47 @@ export function getEntity(entityId) {
   return loadEntities().find((entity) => entity.entity_id === entityId) ?? null;
 }
 
-export function addEntity(input, config = {}) {
+export function addEntity(input, config = {}, { actorPerson = '', actorLabel = '' } = {}) {
   const normalized = normalizeEntityInput(input, config);
-  const { valid, errors } = validateEntity(normalized, config);
+  const entities = loadEntities();
+  const { valid, errors } = validateEntity(normalized, config, { entities });
   if (!valid) throw new ValidationError(errors);
 
-  const entities = loadEntities();
   const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
   const entity = {
     entity_id: generateId('ent'),
     ...normalized,
+    status: 'active',
     stockBalance: 0,
+    audit: [
+      {
+        action: 'create',
+        at: timestamp,
+        actorPerson: actor,
+        actorLabel: actor
+      }
+    ],
     createdAt: timestamp,
     updatedAt: timestamp
   };
   entities.push(entity);
   saveEntities(entities);
+  appendAudit({
+    entityId: entity.entity_id,
+    action: 'create',
+    person: actor,
+    details: entity.name
+  });
   return clone(entity);
 }
 
-export function updateEntity(entityId, updates = {}, config = {}) {
+export function updateEntity(
+  entityId,
+  updates = {},
+  config = {},
+  { actorPerson = '', actorLabel = '' } = {}
+) {
   const entities = loadEntities();
   const index = entities.findIndex((entity) => entity.entity_id === entityId);
   if (index === -1) throw new NotFoundError('La entidad ya no existe.');
@@ -258,30 +472,70 @@ export function updateEntity(entityId, updates = {}, config = {}) {
     }
   };
   const normalized = normalizeEntityInput(merged, config);
-  normalized.stockBalance = existing.stockBalance;
-
-  const { valid, errors } = validateEntity(normalized, config);
+  const { valid, errors } = validateEntity(normalized, config, { entities, entityId });
   if (!valid) throw new ValidationError(errors);
 
+  const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
   const updated = {
     ...existing,
     ...normalized,
+    status: existing.status === 'inactive' ? 'inactive' : 'active',
     entity_id: existing.entity_id,
     stockBalance: existing.stockBalance,
     createdAt: existing.createdAt,
-    updatedAt: nowIso()
+    audit: [
+      ...(Array.isArray(existing.audit) ? existing.audit : []),
+      { action: 'update', at: timestamp, actorPerson: actor, actorLabel: actor }
+    ],
+    updatedAt: timestamp
   };
   entities[index] = updated;
   saveEntities(entities);
+  appendAudit({ entityId, action: 'update', person: actor, details: updated.name });
   return clone(updated);
 }
 
-export function deleteEntity(entityId) {
+export function deactivateEntity(entityId, { actorPerson = '', actorLabel = '' } = {}) {
   const entities = loadEntities();
-  const remaining = entities.filter((entity) => entity.entity_id !== entityId);
-  if (remaining.length === entities.length) throw new NotFoundError('La entidad ya no existe.');
-  saveEntities(remaining);
+  const index = entities.findIndex((entity) => entity.entity_id === entityId);
+  if (index === -1) throw new NotFoundError('La entidad ya no existe.');
+  const timestamp = nowIso();
+  const actor = resolveActor({ actorPerson, actorLabel });
+  entities[index] = {
+    ...entities[index],
+    status: 'inactive',
+    audit: [
+      ...(Array.isArray(entities[index].audit) ? entities[index].audit : []),
+      { action: 'deactivate', at: timestamp, actorPerson: actor, actorLabel: actor }
+    ],
+    updatedAt: timestamp
+  };
+  saveEntities(entities);
+  appendAudit({ entityId, action: 'deactivate', person: actor, details: entities[index].name });
+  return clone(entities[index]);
+}
+
+export function hasEntityHistory(entityId) {
+  return loadDocuments().some((document) => document.entity_id === entityId);
+}
+
+export function deleteEntity(entityId, { force = false, actorPerson = '', actorLabel = '' } = {}) {
+  const entities = loadEntities();
+  const index = entities.findIndex((entity) => entity.entity_id === entityId);
+  if (index === -1) throw new NotFoundError('La entidad ya no existe.');
+
+  const hasHistory = hasEntityHistory(entityId);
+  if (hasHistory && !force) {
+    return deactivateEntity(entityId, { actorPerson, actorLabel });
+  }
+
+  const actor = resolveActor({ actorPerson, actorLabel });
+  appendAudit({ entityId, action: 'delete', person: actor, details: entities[index].name });
+  entities.splice(index, 1);
+  saveEntities(entities);
   deleteDocumentsForEntity(entityId);
+  return null;
 }
 
 export function normalizeDocumentInput(input = {}, config = {}) {
@@ -291,6 +545,7 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     type,
     quantity: parseQuantity(input.quantity),
     notes: trimString(input.notes),
+    reason: trimString(input.reason ?? input.motivo),
     status: typeof input.status === 'string' ? input.status.trim() : '',
     customFields: normalizeCustomValues(input.customFields, config?.customFields?.document ?? [])
   };
@@ -299,6 +554,17 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     normalized.aisle = trimString(input.aisle);
     normalized.shelf = trimString(input.shelf);
     normalized.level = trimString(input.level);
+  } else if (type === 'TRANSFERENCIA') {
+    normalized.fromAisle = trimString(input.fromAisle ?? input.aisle);
+    normalized.fromShelf = trimString(input.fromShelf ?? input.shelf);
+    normalized.fromLevel = trimString(input.fromLevel ?? input.level);
+    normalized.toAisle = trimString(input.toAisle);
+    normalized.toShelf = trimString(input.toShelf);
+    normalized.toLevel = trimString(input.toLevel);
+    // keep latest location at destination for compatibility
+    normalized.aisle = normalized.toAisle;
+    normalized.shelf = normalized.toShelf;
+    normalized.level = normalized.toLevel;
   } else {
     normalized.aisle = '';
     normalized.shelf = '';
@@ -340,7 +606,7 @@ export function validateDocument(
     errors.entity_id = 'La entidad seleccionada no existe.';
   }
 
-  if (!['ENTRADA', 'SALIDA'].includes(input.type)) {
+  if (!['ENTRADA', 'SALIDA', 'TRANSFERENCIA', 'AJUSTE'].includes(input.type)) {
     errors.type = 'Seleccione un tipo de movimiento válido.';
   }
 
@@ -356,10 +622,34 @@ export function validateDocument(
     if (isBlank(input.level)) errors.level = 'El nivel es obligatorio para una entrada.';
   }
 
-  if (input.type === 'SALIDA' && entity && Number.isInteger(input.quantity) && input.quantity > 0) {
+  if (input.type === 'TRANSFERENCIA') {
+    if (isBlank(input.fromAisle)) errors.fromAisle = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.fromShelf)) errors.fromShelf = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.fromLevel)) errors.fromLevel = 'La ubicación de origen es obligatoria.';
+    if (isBlank(input.toAisle)) errors.toAisle = 'La ubicación de destino es obligatoria.';
+    if (isBlank(input.toShelf)) errors.toShelf = 'La ubicación de destino es obligatoria.';
+    if (isBlank(input.toLevel)) errors.toLevel = 'La ubicación de destino es obligatoria.';
+  }
+
+  if (
+    (input.type === 'SALIDA' || input.type === 'TRANSFERENCIA') &&
+    entity &&
+    Number.isInteger(input.quantity) &&
+    input.quantity > 0
+  ) {
     const available = computeAvailableStock(entity, existingDocument);
     if (input.quantity > available) {
       errors.quantity = `Stock insuficiente: disponible ${available}, solicitado ${input.quantity}.`;
+    }
+  }
+
+  if (input.type === 'SALIDA') {
+    const reason = trimString(input.reason);
+    if (reason && !['Venta', 'Consumo interno', 'Merma', 'Devolución'].includes(reason)) {
+      errors.reason = 'Seleccione un motivo de salida válido.';
+    }
+    if (reason === 'Merma' && isBlank(input.notes)) {
+      errors.notes = 'La observación es obligatoria cuando el motivo es Merma.';
     }
   }
 
@@ -393,25 +683,61 @@ export function validateDocument(
 }
 
 export function loadDocuments() {
-  return readCollection(STORAGE_KEYS.documents);
+  return readDocuments();
 }
 
 export function saveDocuments(documents) {
-  writeCollection(STORAGE_KEYS.documents, Array.isArray(documents) ? documents : []);
+  writeCollection(STORAGE_KEYS.movements, Array.isArray(documents) ? documents : []);
+  const storage = getStorage();
+  if (storage) {
+    try {
+      storage.removeItem(STORAGE_KEYS.legacyDocuments);
+    } catch {
+      // Storage may be unavailable; the canonical collection remains authoritative.
+    }
+  }
+}
+
+export function loadCounts() {
+  return readCollection(STORAGE_KEYS.counts);
+}
+
+export function saveCounts(counts) {
+  writeCollection(STORAGE_KEYS.counts, Array.isArray(counts) ? counts : []);
+}
+
+export function loadReplenishmentRequests() {
+  return readCollection(STORAGE_KEYS.replenishmentRequests);
+}
+
+export function saveReplenishmentRequests(requests) {
+  writeCollection(STORAGE_KEYS.replenishmentRequests, Array.isArray(requests) ? requests : []);
 }
 
 export function getDocument(documentId) {
   return loadDocuments().find((document) => document.document_id === documentId) ?? null;
 }
 
-function applyStockEffect(entity, document, direction) {
-  if (!entity) return;
-  const quantity = (Number(document.quantity) || 0) * direction;
-  const balance = Number(entity.stockBalance) || 0;
-  entity.stockBalance = document.type === 'ENTRADA' ? balance + quantity : balance - quantity;
+function movementStockDelta(document) {
+  const qty = Number(document.quantity) || 0;
+  if (document.type === 'ENTRADA') return qty;
+  if (document.type === 'SALIDA') return -qty;
+  if (document.type === 'AJUSTE') {
+    if (document.delta !== undefined && document.delta !== null && document.delta !== '') {
+      return Number(document.delta) || 0;
+    }
+    return qty;
+  }
+  return 0; // TRANSFERENCIA
 }
 
-export function addDocument(input, config = {}) {
+function applyStockEffect(entity, document, direction) {
+  if (!entity) return;
+  const balance = Number(entity.stockBalance) || 0;
+  entity.stockBalance = balance + movementStockDelta(document) * direction;
+}
+
+export function addDocument(input, config = {}, { actorPerson = '', actorLabel = '' } = {}) {
   const entities = loadEntities();
   const normalized = normalizeDocumentInput(input, config);
   if (config?.statusLifecycle && isBlank(normalized.status)) {
@@ -422,10 +748,18 @@ export function addDocument(input, config = {}) {
   if (!valid) throw new ValidationError(errors);
 
   const entity = entities.find((item) => item.entity_id === normalized.entity_id);
+  const actor = resolveActor({
+    actorPerson: actorPerson || input.actorPerson,
+    actorLabel: actorLabel || input.actorLabel
+  });
   const document = {
     document_id: generateId('doc'),
     ...normalized,
-    createdAt: nowIso()
+    state: normalized.state || input.state || 'active',
+    actorPerson: actor,
+    actorLabel: actor,
+    createdAt: nowIso(),
+    confirmedAt: normalized.confirmedAt || ''
   };
 
   applyStockEffect(entity, document, 1);
@@ -438,12 +772,24 @@ export function addDocument(input, config = {}) {
   return clone(document);
 }
 
-export function updateDocument(documentId, updates = {}, config = {}) {
+export function updateDocument(
+  documentId,
+  updates = {},
+  config = {},
+  { actorPerson = '', actorLabel = '' } = {}
+) {
   const documents = loadDocuments();
   const index = documents.findIndex((document) => document.document_id === documentId);
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
 
   const existing = documents[index];
+  if (existing.state === 'confirmed' || existing.state === 'voided' || existing.voidsMovementId) {
+    throw new ValidationError(
+      { _form: 'Los movimientos confirmados son inmutables. Use anulación con contramovimiento.' },
+      'Movimiento inmutable.'
+    );
+  }
+
   const merged = {
     ...existing,
     ...updates,
@@ -471,11 +817,22 @@ export function updateDocument(documentId, updates = {}, config = {}) {
   newEntity.updatedAt = nowIso();
   saveEntities(entities);
 
+  const actor = resolveActor(
+    {
+      actorPerson: actorPerson || updates.actorPerson,
+      actorLabel: actorLabel || updates.actorLabel
+    },
+    resolveActor(existing, existing.actorLabel || 'local')
+  );
   const updated = {
     ...existing,
     ...normalized,
     document_id: existing.document_id,
-    createdAt: existing.createdAt
+    createdAt: existing.createdAt,
+    state: existing.state ?? 'active',
+    actorPerson: actor,
+    actorLabel: actor,
+    confirmedAt: existing.confirmedAt ?? ''
   };
   documents[index] = updated;
   saveDocuments(documents);
@@ -488,6 +845,12 @@ export function deleteDocument(documentId) {
   if (index === -1) throw new NotFoundError('El documento ya no existe.');
 
   const document = documents[index];
+  if (document.state === 'confirmed' || document.state === 'voided' || document.voidsMovementId) {
+    throw new ValidationError(
+      { _form: 'Los movimientos confirmados no se eliminan. Use anulación con contramovimiento.' },
+      'Movimiento inmutable.'
+    );
+  }
   const entities = loadEntities();
   const entity = entities.find((item) => item.entity_id === document.entity_id);
   if (entity) {
@@ -506,9 +869,117 @@ export function deleteDocumentsForEntity(entityId) {
   if (remaining.length !== documents.length) saveDocuments(remaining);
 }
 
+export function voidDocument(documentId, { reason = '', actorPerson = '', actorLabel = '' } = {}) {
+  const documents = loadDocuments();
+  const index = documents.findIndex((document) => document.document_id === documentId);
+  if (index === -1) throw new NotFoundError('El documento ya no existe.');
+  const original = documents[index];
+  if (original.state === 'voided' || original.voidedAt) {
+    throw new ValidationError({ _form: 'El movimiento ya fue anulado.' }, 'Movimiento ya anulado.');
+  }
+  if (original.state === 'draft') {
+    throw new ValidationError(
+      { _form: 'Solo los movimientos confirmados pueden anularse.' },
+      'No anulable.'
+    );
+  }
+
+  const voidedAt = nowIso();
+  const voidReason = trimString(reason);
+  const actor = resolveActor({ actorPerson, actorLabel });
+  documents[index] = {
+    ...original,
+    state: 'voided',
+    voidedAt,
+    voidReason,
+    voidedByPerson: actor,
+    voidedBy: actor,
+    actorPerson: original.actorPerson || original.actorLabel || actor,
+    actorLabel: original.actorLabel || actor
+  };
+
+  // Contramovement reverses stock effect and is linked to original
+  const inverseType =
+    original.type === 'ENTRADA' ? 'SALIDA' : original.type === 'SALIDA' ? 'ENTRADA' : original.type;
+  const contramovement = {
+    ...original,
+    document_id: generateId('doc'),
+    type: inverseType,
+    state: 'confirmed',
+    delta: original.type === 'AJUSTE' ? -movementStockDelta(original) : undefined,
+    fromAisle: original.type === 'TRANSFERENCIA' ? original.toAisle : original.fromAisle,
+    fromShelf: original.type === 'TRANSFERENCIA' ? original.toShelf : original.fromShelf,
+    fromLevel: original.type === 'TRANSFERENCIA' ? original.toLevel : original.fromLevel,
+    toAisle: original.type === 'TRANSFERENCIA' ? original.fromAisle : original.toAisle,
+    toShelf: original.type === 'TRANSFERENCIA' ? original.fromShelf : original.toShelf,
+    toLevel: original.type === 'TRANSFERENCIA' ? original.fromLevel : original.toLevel,
+    aisle: original.type === 'TRANSFERENCIA' ? original.fromAisle : original.aisle,
+    shelf: original.type === 'TRANSFERENCIA' ? original.fromShelf : original.shelf,
+    level: original.type === 'TRANSFERENCIA' ? original.fromLevel : original.level,
+    voidsMovementId: original.document_id,
+    reason: voidReason || original.reason || '',
+    notes: voidReason ? `Contramovimiento: ${voidReason}` : `Anulación de ${original.document_id}`,
+    actorPerson: actor,
+    actorLabel: actor,
+    createdAt: voidedAt,
+    confirmedAt: voidedAt,
+    voidedAt: '',
+    voidReason: ''
+  };
+
+  const entities = loadEntities();
+  const entity = entities.find((item) => item.entity_id === original.entity_id);
+  if (entity) {
+    applyStockEffect(entity, contramovement, 1);
+    entity.updatedAt = voidedAt;
+    saveEntities(entities);
+  }
+
+  documents.push(contramovement);
+  saveDocuments(documents);
+  return { voided: clone(documents[index]), contramovement: clone(contramovement) };
+}
+
+export function getKardex(entityId, filters = {}) {
+  const { fromDate = '', toDate = '', type = '' } = filters;
+  const movements = loadDocuments()
+    .filter((d) => d.entity_id === entityId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  let running = 0;
+  const rows = [];
+  for (const movement of movements) {
+    // Only confirmed/voided/active legacy records affect/history shown; drafts excluded from kardex totals except maybe not created
+    if (movement.state === 'draft') continue;
+    const delta = movementStockDelta(movement);
+    running += delta;
+    const created = movement.createdAt ? new Date(movement.createdAt) : null;
+    if (fromDate && created && created < new Date(fromDate)) {
+      rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+      continue;
+    }
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      if (created && created > end) {
+        rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+        continue;
+      }
+    }
+    if (type && movement.type !== type) {
+      rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+      continue;
+    }
+    rows.push({ ...clone(movement), saldo: running, _filteredOut: false });
+  }
+  return rows.filter((r) => !r._filteredOut).map(({ _filteredOut, ...rest }) => rest);
+}
+
 export function getLatestLocation(entityId) {
   const entries = loadDocuments().filter(
-    (document) => document.entity_id === entityId && document.type === 'ENTRADA'
+    (document) =>
+      document.entity_id === entityId &&
+      (document.type === 'ENTRADA' || document.type === 'TRANSFERENCIA')
   );
   if (entries.length === 0) return null;
 
@@ -524,6 +995,49 @@ export function getLatestLocation(entityId) {
     shelf: latest.shelf ?? '',
     level: latest.level ?? ''
   };
+}
+
+function locationKey(location = {}) {
+  const parts = [location?.aisle, location?.shelf, location?.level]
+    .map((value) => trimString(value))
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join('-') : 'Sin ubicación';
+}
+
+export function getLocationBalances(entityId) {
+  const balances = {};
+  let currentLocation = null;
+  const movements = loadDocuments()
+    .filter((document) => document.entity_id === entityId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  function apply(location, quantity) {
+    if (!quantity) return;
+    const key = locationKey(location);
+    balances[key] = (balances[key] || 0) + quantity;
+    if (balances[key] === 0) delete balances[key];
+    currentLocation = key;
+  }
+
+  for (const document of movements) {
+    if (document.state === 'draft' || document.state === 'voided') continue;
+    const quantity = Number(document.quantity) || 0;
+    if (document.type === 'ENTRADA') {
+      apply(document, quantity);
+    } else if (document.type === 'TRANSFERENCIA') {
+      apply(
+        { aisle: document.fromAisle, shelf: document.fromShelf, level: document.fromLevel },
+        -quantity
+      );
+      apply(document, quantity);
+    } else if (document.type === 'SALIDA') {
+      apply(currentLocation ? { aisle: currentLocation } : document, -quantity);
+    } else if (document.type === 'AJUSTE') {
+      apply(currentLocation ? { aisle: currentLocation } : document, movementStockDelta(document));
+    }
+  }
+
+  return balances;
 }
 
 export function getCategories(entities = loadEntities()) {
@@ -563,32 +1077,22 @@ export function searchEntities(term = '', category = '') {
   });
 }
 
-export function getReorderAlerts(category = '') {
-  const entities = searchEntities('', category);
-  return entities
-    .filter((entity) => {
-      const reorderPoint = entity.reorderPoint;
-      if (reorderPoint === null || reorderPoint === undefined) return false;
-      if (typeof reorderPoint !== 'number' || !Number.isFinite(reorderPoint)) return false;
-      return (Number(entity.stockBalance) || 0) < reorderPoint;
-    })
-    .map((entity) => {
-      const stock = Number(entity.stockBalance) || 0;
-      const reorderPoint = Number(entity.reorderPoint) || 0;
-      return {
-        entity_id: entity.entity_id,
-        code: entity.code ?? '',
-        name: entity.name ?? '',
-        category: entity.category ?? '',
-        stock,
-        reorderPoint,
-        shortage: reorderPoint - stock
-      };
-    })
-    .sort((a, b) => {
-      if (b.shortage !== a.shortage) return b.shortage - a.shortage;
-      return String(a.name).localeCompare(String(b.name), 'es');
-    });
+function daysSince(dateValue) {
+  const d = dateValue ? new Date(dateValue) : null;
+  if (!d || Number.isNaN(d.getTime())) return Infinity;
+  return (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
+}
+
+function getLastMovementDate(entityId, documents) {
+  let last = null;
+  for (const doc of documents) {
+    if (doc.entity_id !== entityId) continue;
+    if (doc.state === 'draft') continue;
+    const t = doc.createdAt || doc.confirmedAt;
+    if (!t) continue;
+    if (!last || new Date(t) > new Date(last)) last = t;
+  }
+  return last;
 }
 
 export function getDashboardStats(category = '') {
@@ -603,24 +1107,311 @@ export function getDashboardStats(category = '') {
     ? documents.filter((document) => entityIds.has(document.entity_id))
     : documents;
 
+  const activeEntities = entities.filter((e) => e.status !== 'inactive');
   const valuation = entities.reduce(
     (sum, entity) => sum + (Number(entity.stockBalance) || 0) * (Number(entity.unitCost) || 0),
     0
   );
-  const critical = getReorderAlerts(category).length;
+
+  const alerts = entities.filter((entity) => {
+    const rp = Number(entity.reorderPoint);
+    return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) <= rp;
+  });
+  const critical = entities.filter((entity) => {
+    const rp = Number(entity.reorderPoint);
+    return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) < rp;
+  }).length;
+
+  let noMovement90Days = 0;
+  for (const entity of entities) {
+    const last = getLastMovementDate(entity.entity_id, documents);
+    if (!last) {
+      // no movement history: if entity is older than 90 days treat as no movement in 90 days, else insufficient history context
+      const age = daysSince(entity.createdAt);
+      if (age >= 90) noMovement90Days += 1;
+      continue;
+    }
+    if (daysSince(last) >= 90) noMovement90Days += 1;
+  }
 
   return {
     totalEntities: entities.length,
+    activeEntities: activeEntities.length,
     totalDocuments: scopedDocuments.length,
     valuation,
     critical,
+    alerts: alerts.length,
+    noMovement90Days,
     categories: getCategories(allEntities)
   };
+}
+
+export function getReplenishmentSuggestions(filters = {}) {
+  const category = typeof filters?.category === 'string' ? filters.category : '';
+  const allEntities = loadEntities();
+  const filtered = category
+    ? allEntities.filter(
+        (e) => String(e.category ?? '').toLowerCase() === category.trim().toLowerCase()
+      )
+    : allEntities;
+
+  return filtered
+    .filter((entity) => {
+      const rp = Number(entity.reorderPoint);
+      return Number.isFinite(rp) && (Number(entity.stockBalance) || 0) <= rp;
+    })
+    .map((entity) => {
+      const stock = Number(entity.stockBalance) || 0;
+      const reorderPoint = Number(entity.reorderPoint) || 0;
+      const maxStock = Number(
+        entity.maxStock ?? entity.stockMaximo ?? entity.customFields?.stock_maximo
+      );
+      const suggestedQty = Number.isFinite(maxStock)
+        ? Math.max(0, maxStock - stock)
+        : Math.max(0, reorderPoint - stock);
+      const provider =
+        entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+      const historyDays = daysSince(entity.createdAt);
+      return {
+        entity_id: entity.entity_id,
+        name: entity.name,
+        code: entity.code,
+        category: entity.category,
+        provider,
+        stockBalance: stock,
+        reorderPoint,
+        suggestedQty,
+        alertLevel: stock <= 0 ? 'red' : 'yellow',
+        rotationLabel: historyDays < 30 ? 'Datos insuficientes' : null
+      };
+    });
+}
+
+export function createReplenishmentRequest({
+  lines = [],
+  actorPerson = '',
+  actorLabel = 'local'
+} = {}) {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new ValidationError(
+      { _form: 'Seleccione al menos un producto para generar la solicitud.' },
+      'Solicitud vacía.'
+    );
+  }
+  const entities = loadEntities();
+  const normalizedLines = lines.map((line) => {
+    const entity = entities.find((e) => e.entity_id === line.entity_id);
+    if (!entity)
+      throw new ValidationError(
+        { _form: 'Una entidad seleccionada ya no existe.' },
+        'Entidad inválida.'
+      );
+    const qty = Number(line.suggestedQty ?? line.quantity);
+    if (!Number.isFinite(qty) || qty < 0) {
+      throw new ValidationError(
+        { suggestedQty: 'La cantidad sugerida debe ser un número mayor o igual a 0.' },
+        'Cantidad inválida.'
+      );
+    }
+    const provider =
+      line.provider ||
+      entity.provider ||
+      entity.supplier ||
+      entity.customFields?.proveedor ||
+      'Sin proveedor';
+    return {
+      entity_id: entity.entity_id,
+      name: entity.name,
+      code: entity.code,
+      provider,
+      suggestedQty: qty
+    };
+  });
+
+  const grouped = normalizedLines.reduce((acc, line) => {
+    acc[line.provider] = acc[line.provider] || [];
+    acc[line.provider].push(line);
+    return acc;
+  }, {});
+
+  const actor = resolveActor({ actorPerson, actorLabel });
+  const request = {
+    request_id: generateId('req'),
+    status: 'created',
+    actorPerson: actor,
+    actorLabel: actor,
+    createdAt: nowIso(),
+    lines: normalizedLines,
+    groupedByProvider: grouped
+  };
+  const requests = loadReplenishmentRequests();
+  requests.push(request);
+  saveReplenishmentRequests(requests);
+  return clone(request);
 }
 
 export function resetStore() {
   const storage = getStorage();
   if (!storage) return;
-  storage.removeItem(STORAGE_KEYS.entities);
-  storage.removeItem(STORAGE_KEYS.documents);
+  Object.values(STORAGE_KEYS).forEach((key) => storage.removeItem(key));
+}
+
+export function isBelowReorderPoint(entity) {
+  if (!entity) return false;
+  const reorderPoint = Number(entity.reorderPoint);
+  if (!Number.isFinite(reorderPoint)) return false;
+  return (Number(entity.stockBalance) || 0) <= reorderPoint;
+}
+
+export function createPhysicalCount({ actorPerson = '', actorLabel = 'local', notes = '' } = {}) {
+  const counts = loadCounts();
+  const actor = resolveActor({ actorPerson, actorLabel });
+  const count = {
+    count_id: generateId('cnt'),
+    state: 'open',
+    actorPerson: actor,
+    actorLabel: actor,
+    notes: trimString(notes),
+    details: [],
+    createdAt: nowIso(),
+    closedAt: '',
+    approvedAt: '',
+    approvedBy: ''
+  };
+  counts.push(count);
+  saveCounts(counts);
+  return clone(count);
+}
+
+export function recordBlindCountDetail(countId, { entity_id, countedQuantity }) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'open')
+    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  const entity = getEntity(entity_id);
+  if (!entity) throw new NotFoundError('La entidad ya no existe.');
+  const qty = Number(countedQuantity);
+  if (!Number.isInteger(qty) || qty < 0) {
+    throw new ValidationError(
+      { countedQuantity: 'La cantidad contada debe ser un entero mayor o igual a 0.' },
+      'Cantidad inv�lida.'
+    );
+  }
+  count.details = Array.isArray(count.details) ? count.details : [];
+  const existing = count.details.find((d) => d.entity_id === entity_id);
+  const detail = {
+    detail_id: existing?.detail_id || generateId('cdt'),
+    entity_id,
+    countedQuantity: qty
+    // systemQuantity intentionally not exposed during blind capture
+  };
+  if (existing) Object.assign(existing, detail);
+  else count.details.push(detail);
+  saveCounts(counts);
+  return clone(detail);
+}
+
+export function closePhysicalCount(countId) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'open')
+    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+  const entities = loadEntities();
+  count.details = (count.details || []).map((d) => {
+    const entity = entities.find((e) => e.entity_id === d.entity_id);
+    const systemQuantity = Number(entity?.stockBalance) || 0;
+    const countedQuantity = Number(d.countedQuantity) || 0;
+    return {
+      ...d,
+      systemQuantity,
+      difference: countedQuantity - systemQuantity
+    };
+  });
+  count.state = 'closed';
+  count.closedAt = nowIso();
+  saveCounts(counts);
+  return clone(count);
+}
+
+export function approveCountAdjustment(
+  countId,
+  { approvedByPerson = '', approverLabel = '', reason = '' } = {}
+) {
+  const counts = loadCounts();
+  const count = counts.find((c) => c.count_id === countId);
+  if (!count) throw new NotFoundError('El conteo no existe.');
+  if (count.state !== 'closed') {
+    throw new ValidationError(
+      { _form: 'El conteo debe estar cerrado antes de aprobar ajustes.' },
+      'Conteo no cerrado.'
+    );
+  }
+  const approver = resolveActor(
+    { actorPerson: approvedByPerson, actorLabel: approverLabel },
+    'supervisor'
+  );
+  const countedBy = resolveActor(count, count.actorLabel || 'operador');
+  if (approver.toLocaleLowerCase('es') === countedBy.toLocaleLowerCase('es')) {
+    throw new ValidationError(
+      { approverLabel: 'La aprobaci�n debe registrarse con un actor distinto al del conteo.' },
+      'Actor inv�lido.'
+    );
+  }
+  const adjustmentReason = trimString(reason);
+  if (!adjustmentReason) {
+    throw new ValidationError(
+      { reason: 'El motivo del ajuste es obligatorio.' },
+      'Motivo requerido.'
+    );
+  }
+
+  const documents = loadDocuments();
+  const entities = loadEntities();
+  const now = nowIso();
+  const adjustments = [];
+
+  for (const detail of count.details || []) {
+    const diff = Number(detail.difference) || 0;
+    if (diff === 0) continue;
+    const entity = entities.find((e) => e.entity_id === detail.entity_id);
+    if (!entity) continue;
+    const movement = {
+      document_id: generateId('doc'),
+      entity_id: detail.entity_id,
+      type: 'AJUSTE',
+      quantity: Math.abs(diff),
+      delta: diff,
+      state: 'confirmed',
+      reason: adjustmentReason,
+      notes: `Ajuste por conteo ${count.count_id}`,
+      actorPerson: approver,
+      actorLabel: approver,
+      approvedByPerson: approver,
+      approvedBy: approver,
+      countId: count.count_id,
+      createdAt: now,
+      confirmedAt: now
+    };
+    applyStockEffect(entity, movement, 1);
+    entity.updatedAt = now;
+    documents.push(movement);
+    adjustments.push(clone(movement));
+  }
+
+  count.state = 'approved';
+  count.approvedAt = now;
+  count.approvedByPerson = approver;
+  count.approvedBy = approver;
+  count.adjustmentReason = adjustmentReason;
+
+  saveEntities(entities);
+  saveDocuments(documents);
+  saveCounts(counts);
+  return { count: clone(count), adjustments };
+}
+
+export function getCount(countId) {
+  return loadCounts().find((c) => c.count_id === countId) || null;
 }

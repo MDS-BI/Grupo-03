@@ -1,13 +1,40 @@
 import { formatDateTime, h } from './dom.js';
 
 function locationText(document) {
-  if (!document || document.type !== 'ENTRADA') return '—';
-  const parts = [
-    document.aisle ? `Pasillo ${document.aisle}` : '',
-    document.shelf ? `Estante ${document.shelf}` : '',
-    document.level ? `Nivel ${document.level}` : ''
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : '—';
+  if (!document) return '—';
+  if (document.type === 'ENTRADA') {
+    const parts = [
+      document.aisle ? `Pasillo ${document.aisle}` : '',
+      document.shelf ? `Estante ${document.shelf}` : '',
+      document.level ? `Nivel ${document.level}` : ''
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : '—';
+  }
+  if (document.type === 'TRANSFERENCIA') {
+    const from = [document.fromAisle, document.fromShelf, document.fromLevel]
+      .filter(Boolean)
+      .join('-');
+    const to = [
+      document.toAisle || document.aisle,
+      document.toShelf || document.shelf,
+      document.toLevel || document.level
+    ]
+      .filter(Boolean)
+      .join('-');
+    if (from || to) return `${from || '—'} → ${to || '—'}`;
+  }
+  if (document.aisle || document.shelf || document.level) {
+    return [document.aisle, document.shelf, document.level].filter(Boolean).join('-');
+  }
+  return '—';
+}
+
+function typeLabel(type) {
+  if (type === 'ENTRADA') return 'Entrada';
+  if (type === 'SALIDA') return 'Salida';
+  if (type === 'TRANSFERENCIA') return 'Transferencia';
+  if (type === 'AJUSTE') return 'Ajuste';
+  return type || '—';
 }
 
 export function renderDocumentList(
@@ -18,19 +45,25 @@ export function renderDocumentList(
     entities = [],
     onEdit,
     onDelete,
+    onVoid,
     onCreate,
     showActions = true,
-    limit = null
+    showSaldo = false,
+    limit = null,
+    emptyMessage = null
   }
 ) {
   const labels = config.labels.document;
   const customDefinitions = config.customFields?.document ?? [];
   const entityMap = new Map(entities.map((entity) => [entity.entity_id, entity]));
   const actionsEnabled =
-    showActions && (typeof onEdit === 'function' || typeof onDelete === 'function');
+    showActions &&
+    (typeof onEdit === 'function' ||
+      typeof onDelete === 'function' ||
+      typeof onVoid === 'function');
 
   const ordered = [...documents].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
   const visible = typeof limit === 'number' ? ordered.slice(0, limit) : ordered;
 
@@ -43,7 +76,8 @@ export function renderDocumentList(
         h(
           'p',
           {},
-          `Registre ${labels.article} ${labels.singular.toLowerCase()} para actualizar el stock.`
+          emptyMessage ||
+            `Registre ${labels.article} ${labels.singular.toLowerCase()} para actualizar el stock.`
         ),
         onCreate
           ? h(
@@ -64,20 +98,20 @@ export function renderDocumentList(
     h('th', { scope: 'col' }, 'Cantidad'),
     h('th', { scope: 'col' }, 'Ubicación'),
     h('th', { scope: 'col' }, 'Estado'),
+    h('th', { scope: 'col' }, 'Persona local'),
     h('th', { scope: 'col' }, 'Notas')
   ];
-
+  if (showSaldo) headerCells.splice(5, 0, h('th', { scope: 'col' }, 'Saldo'));
   customDefinitions.forEach((definition) => {
     headerCells.push(h('th', { scope: 'col' }, definition.label));
   });
-
-  if (actionsEnabled) {
-    headerCells.push(h('th', { scope: 'col' }, 'Acciones'));
-  }
+  if (actionsEnabled) headerCells.push(h('th', { scope: 'col' }, 'Acciones'));
 
   const rows = visible.map((document) => {
     const entity = entityMap.get(document.entity_id);
-    const typeLabel = document.type === 'ENTRADA' ? 'Entrada' : 'Salida';
+    const state = document.state || document.status || '—';
+    const isImmutable =
+      state === 'confirmed' || state === 'voided' || Boolean(document.voidsMovementId);
     const cells = [
       h('td', {}, formatDateTime(document.createdAt)),
       h('td', {}, entity?.name ?? '—'),
@@ -87,14 +121,18 @@ export function renderDocumentList(
         h(
           'span',
           { class: `badge ${document.type === 'ENTRADA' ? 'badge-entry' : 'badge-exit'}` },
-          typeLabel
+          typeLabel(document.type)
         )
       ),
       h('td', {}, String(document.quantity ?? '—')),
       h('td', {}, locationText(document)),
-      h('td', {}, document.status || '—'),
-      h('td', {}, document.notes || '—')
+      h('td', {}, state),
+      h('td', {}, document.actorPerson || document.actorLabel || '—'),
+      h('td', {}, document.notes || document.reason || '—')
     ];
+    if (showSaldo) {
+      cells.splice(5, 0, h('td', {}, document.saldo !== undefined ? String(document.saldo) : '—'));
+    }
 
     customDefinitions.forEach((definition) => {
       const value = document.customFields?.[definition.key];
@@ -104,6 +142,13 @@ export function renderDocumentList(
     });
 
     if (actionsEnabled) {
+      const canVoid =
+        isImmutable &&
+        state !== 'voided' &&
+        !document.voidsMovementId &&
+        typeof onVoid === 'function';
+      const canEdit = !isImmutable && typeof onEdit === 'function';
+      const canDelete = !isImmutable && typeof onDelete === 'function';
       cells.push(
         h(
           'td',
@@ -111,30 +156,47 @@ export function renderDocumentList(
           h(
             'div',
             { class: 'actions' },
-            onEdit
+            canEdit
               ? h(
                   'button',
                   {
                     type: 'button',
                     class: 'button button-small',
                     'data-testid': `document-edit-${document.document_id}`,
-                    'aria-label': `Editar ${labels.singular}`,
                     onclick: () => onEdit(document)
                   },
                   'Editar'
                 )
               : null,
-            onDelete
+            canVoid
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'button button-small button-warning',
+                    'data-testid': `document-void-${document.document_id}`,
+                    onclick: () => onVoid(document)
+                  },
+                  'Anular'
+                )
+              : null,
+            canDelete
               ? h(
                   'button',
                   {
                     type: 'button',
                     class: 'button button-small button-danger',
                     'data-testid': `document-delete-row-${document.document_id}`,
-                    'aria-label': `Eliminar ${labels.singular}`,
                     onclick: () => onDelete(document)
                   },
                   'Eliminar'
+                )
+              : null,
+            isImmutable && !canVoid
+              ? h(
+                  'span',
+                  { class: 'muted', 'data-testid': `document-immutable-${document.document_id}` },
+                  'Inmutable'
                 )
               : null
           )
