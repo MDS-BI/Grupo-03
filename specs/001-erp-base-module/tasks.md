@@ -9,12 +9,12 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 **Tests**: Included because Constitution Principle II requires automated tests for user-visible behavior and business logic. Write tests before or alongside implementation.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing. HP6 (integración con Compras/Ventas) está diferida (FR-046) y no genera fase.
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing. Esta iteración actualiza HU4 (kardex e historial de movimientos) e incorpora HU9 (roles, datos sensibles y auditoría). HU6 (integración con Compras/Ventas) está diferida (FR-046) y no genera fase.
 
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
-- **[Story]**: User story label (`[US1]`..`[US5]`) for story-phase tasks only
+- **[Story]**: User story label (`[US1]`..`[US9]`) for story-phase tasks only
 - Every task includes an exact file path
 
 ## Phase 1: Setup (Shared Infrastructure)
@@ -51,9 +51,9 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ## Phase 3: User Story 1 - Catálogo maestro (Priority: P1) 🎯 MVP
 
-**Goal**: Gestionar entidades maestras con campos obligatorios, SKU único, eliminación/desactivación por historial y auditoría con persona local; sin roles operativos ni visibilidad por rol.
+**Goal**: Gestionar entidades maestras con campos obligatorios, SKU único, eliminación/desactivación por historial y auditoría con persona local; la visibilidad de datos sensibles queda gobernada por rol en HU9.
 
-**Independent Test**: Crear una entidad válida (nombre, SKU, categoría, unidad, punto de reorden) con stock 0 y ver auditoría con la persona elegida; rechazar SKU duplicado y valores negativos; bloquear eliminación con historial y permitir solo desactivación; verificar que no existe selector de rol ni ocultación de costos/contactos (FR-047).
+**Independent Test**: Crear una entidad válida (nombre, SKU, categoría, unidad, punto de reorden) con stock 0 y ver auditoría con la persona elegida; rechazar SKU duplicado y valores negativos; bloquear eliminación con historial y permitir solo desactivación.
 
 ### Tests for User Story 1
 
@@ -67,7 +67,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T019 [P] [US1] Implement entity list/detail rendering with safe output, empty states and history-aware actions in `src/components/entity-list.js`
 - [X] T020 [US1] Implement entity create/edit/deactivate form with custom fields and inline validation in `src/components/entity-form.js`
 - [X] T021 [US1] Wire entity CRUD/deactivate flows, audit entries and current local person into app state/views in `src/app.js`
-- [X] T022 [US1] Keep `costo_unitario` editable only in entity/catalog contexts with no role-based hiding in `src/components/entity-form.js`, `src/components/entity-list.js` and `src/app.js`
+- [X] T022 [US1] Keep `costo_unitario` editable only in entity/catalog contexts and prepare visibility hooks for the role policy defined in HU9 in `src/components/entity-form.js`, `src/components/entity-list.js` and `src/app.js`
 
 **Checkpoint**: US1 independently functional and testable.
 
@@ -116,23 +116,23 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ---
 
-## Phase 6: User Story 4 - Kardex, conteo físico y ajustes (Priority: P1)
+## Phase 6: User Story 4 - Kardex e historial de movimientos (Priority: P1)
 
-**Goal**: Proveer trazabilidad completa, inmutabilidad de confirmados con anulación/contramovimiento, conteos ciegos y ajustes aprobados por persona distinta a la que contó.
+**Goal**: Proveer trazabilidad completa del producto con kardex cronológico filtrable, saldo inicial del período, inmutabilidad de documentos confirmados y corrección mediante anulación con contramovimiento enlazado.
 
-**Independent Test**: Ver kardex cronológico filtrable con persona local; impedir edición/eliminación directa de confirmados y corregir por anulación con contramovimiento; cerrar conteo ciego con diferencias y aprobar ajuste con motivo y persona local distinta.
+**Independent Test**: Después de HU2 y HU3, abrir el kardex de `PAP-CAR-075` y ver `ENT-000123 +50` (saldo 50) y `SAL-000045 −30` (saldo 20); filtrar por fecha/tipo y verificar que la lista y el saldo inicial se recalculan; anular un documento con error y verificar el contramovimiento enlazado sin borrado; intentar editar un confirmado y comprobar el bloqueo.
 
 ### Tests for User Story 4
 
-- [X] T034 [P] [US4] Add unit tests for confirmed-movement immutability, void/contramovement linkage and adjustment application in `tests/unit/stock.test.js` and `tests/unit/storage.test.js`
-- [X] T035 [P] [US4] Add integration test for kardex filters, void flow, blind count closure and approved adjustment recording in `tests/integration/inventory-movements.test.js`
+- [ ] T034 [P] [US4] Add unit tests for chronological kardex ordering, accumulated balance, date/type filters and period opening balance in `tests/unit/storage.test.js`
+- [ ] T035 [P] [US4] Add unit tests for confirmed-document immutability, void rejection and countermovement linkage with reason and stock reversal in `tests/unit/stock.test.js`
+- [ ] T036 [P] [US4] Add integration test for `PAP-CAR-075` kardex rows, filter recalculation, void flow and blocked edit in `tests/integration/inventory-movements.test.js`
 
 ### Implementation for User Story 4
 
-- [X] T036 [P] [US4] Implement void/contramovement operations and immutable confirmed-movement guards in `src/storage.js`
-- [X] T037 [P] [US4] Implement count/adjustment structures with `actorPerson`, `approvedByPerson` and the distinct-person rule in `src/storage.js`
-- [X] T038 [US4] Implement kardex UI with chronological list, date/type filters, saldo, ubicación y persona local in `src/components/document-list.js`
-- [X] T039 [US4] Implement count/adjustment flows and void controls with clear immutability feedback in `src/components/document-form.js` and `src/app.js`
+- [ ] T037 [US4] Implement deterministic kardex ordering and period opening balance calculation for date/type filters in `src/storage.js`
+- [ ] T038 [US4] Enforce immutability of confirmed documents in update/delete paths and complete linked void/countermovement behavior with motive in `src/storage.js`
+- [ ] T039 [US4] Render kardex with document, type, quantity, balance, location and user columns plus opening balance, date/type filters and void feedback in `src/components/document-list.js` and `src/app.js`
 
 **Checkpoint**: US4 independently functional for traceability and controlled corrections.
 
@@ -160,17 +160,42 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 8: User Story 9 - Roles, datos sensibles y auditoría (Priority: P3)
+
+**Goal**: Simular roles de usuario que controlan la visibilidad y las operaciones sensibles, y registrar auditoría completa con usuario, acción, fecha, valores anterior/nuevo y contexto.
+
+**Independent Test**: Cambiar el selector de rol a Operador y comprobar que no aparecen costos, valorización ni contactos de proveedores; cambiar a Analista y verificar que consulta toda la información, pero no registra entradas, salidas ni ajustes; revisar la auditoría tras crear y anular documentos y aprobar ajustes, con usuario, fecha y hora, y valores anterior/nuevo.
+
+### Tests for User Story 9
+
+- [ ] T046 [P] [US9] Add unit tests for the role permission matrix, sensitive-field redaction and audit payload construction in `tests/unit/roles-audit.test.js`
+- [ ] T047 [P] [US9] Add integration test for role switching, Operador redaction, Analista read-only actions and audit entries in `tests/integration/roles-audit.test.js`
+
+### Implementation for User Story 9
+
+- [ ] T048 [P] [US9] Implement `Usuario`/`Rol` definitions, permission helpers and selected-role persistence in `src/roles.js`
+- [ ] T049 [P] [US9] Implement a simulated role selector with accessible labels and wire the current user/role into the shell topbar in `src/components/role-selector.js` and `src/components/shell.js`
+- [ ] T050 [US9] Extend audit recording with `usuario_id`, `accion`, `entidad`, `entidad_id`, `fecha`, `anterior`, `nuevo` and `detalle` for entity/document creation, void and adjustment approval in `src/storage.js`
+- [ ] T051 [P] [US9] Apply role-aware redaction of costs, valuation and provider contacts in lists, forms, dashboards, search, tooltips and export paths in `src/components/entity-list.js`, `src/components/entity-form.js`, `src/components/dashboard.js`, `src/components/search-bar.js` and `src/components/document-list.js`
+- [ ] T052 [US9] Gate entry, exit and adjustment registration actions for Analista while keeping kardex and dashboard read access in `src/app.js` and `src/components/document-form.js`
+- [ ] T053 [US9] Implement an audit log view with user/action/entity/date filters and before/after values in `src/components/audit-log.js`, `src/components/shell.js` and `src/app.js`
+- [ ] T054 [US9] Document the simulated-role limitation and required backend permission validation in `README.md` and `specs/001-erp-base-module/quickstart.md`
+
+**Checkpoint**: US9 independently functional for role-based visibility, operation gating and audit review.
+
+---
+
+## Phase 9: Polish & Cross-Cutting Concerns
 
 **Purpose**: Hardening, consistency, accessibility, performance and validation across stories.
 
-- [X] T046 [P] Apply consistent config-driven relabeling and safe fallbacks across all screens in `src/module-config.js`, `src/components/shell.js`, `src/components/dashboard.js`, `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js` and `src/components/search-bar.js`
-- [X] T047 [P] Verify XSS-safe rendering and escaping for all user-provided data in `src/components/` and `src/components/dom.js`
-- [X] T048 [P] Verify accessibility and responsive behavior (labels, focus, keyboard nav, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
-- [X] T049 [P] Validate list/search performance with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
-- [X] T050 [P] Verify no role selector or role-based visibility remains and that local person/audit/approval behavior is consistent in `src/components/shell.js`, `src/components/person-selector.js`, `src/app.js` and `src/storage.js`
-- [X] T051 Run quickstart validation scenarios and record results in `specs/001-erp-base-module/quickstart.md`
-- [X] T052 [P] Update developer documentation for setup, configuration and extension points in `README.md` (if present) or `specs/001-erp-base-module/quickstart.md`
+- [X] T055 [P] Apply consistent config-driven relabeling and safe fallbacks across all screens in `src/module-config.js`, `src/components/shell.js`, `src/components/dashboard.js`, `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js` and `src/components/search-bar.js`
+- [X] T056 [P] Verify XSS-safe rendering and escaping for all user-provided data in `src/components/` and `src/components/dom.js`
+- [X] T057 [P] Verify accessibility and responsive behavior (labels, focus, keyboard nav, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
+- [X] T058 [P] Validate list/search performance with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
+- [ ] T059 [P] Verify role permissions and audit consistency across all screens and persisted flows in `src/roles.js`, `src/components/role-selector.js`, `src/components/audit-log.js`, `src/app.js` and `src/storage.js`
+- [ ] T060 Run quickstart validation scenarios (HU1–HU5 and HU9) and record results in `specs/001-erp-base-module/quickstart.md`
+- [ ] T061 [P] Update developer documentation for setup, configuration, roles and extension points in `README.md` and `specs/001-erp-base-module/quickstart.md`
 
 ---
 
@@ -180,18 +205,20 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - **Phase 1 (Setup)**: No dependencies — start immediately
 - **Phase 2 (Foundational)**: Depends on Phase 1 — **blocks all user stories**
-- **Phases 3–7 (User Stories)**: Depend on Phase 2 completion
-  - Recommended priority order: **US1 → US2 → US3 → US4 → US5**
+- **Phases 3–8 (User Stories)**: Depend on Phase 2 completion
+  - Recommended priority order: **US1 → US2 → US3 → US4 → US5 → US9**
   - US5 depends functionally on reliable inventory data from US1–US4 but must remain independently testable with seeded fixtures
-- **Phase 8 (Polish)**: Depends on completion of the desired user stories
+  - US9 depends functionally on entity/movement/audit hooks but must remain independently testable with seeded fixtures
+- **Phase 9 (Polish)**: Depends on completion of the desired user stories
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Starts after Foundational; no dependency on other stories
 - **US2 (P1)**: Starts after Foundational; uses entities from US1 flows/data
 - **US3 (P1)**: Starts after Foundational; extends the movement/stock domain from US2
-- **US4 (P1)**: Starts after Foundational; builds on the movement history/confirmation model
+- **US4 (P1)**: Starts after Foundational; builds on the movement history/confirmation model from US2–US3
 - **US5 (P2)**: Starts after Foundational; consumes stock/movement/alert data for KPIs and replenishment
+- **US9 (P3)**: Starts after Foundational; consumes user, entity, movement and audit data for role gating and audit review
 - **HU6 (P3)**: Diferida (FR-046); no genera tareas en esta versión
 
 ### Within Each User Story
@@ -208,9 +235,10 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - US1: `T015`, `T016`, `T017`, `T018`, `T019` can run in parallel; `T020` follows the form/data contracts
 - US2: `T023`, `T024`, `T025`, `T026` can run in parallel
 - US3: `T029`, `T030`, `T031` can run in parallel
-- US4: `T034`, `T035`, `T036`, `T037` can run in parallel
+- US4: `T034`, `T035`, `T036` can run in parallel; `T037` and `T038` touch `src/storage.js` and must run sequentially; `T039` follows both
 - US5: `T040`, `T041`, `T042` can run in parallel
-- Polish: `T046`, `T047`, `T048`, `T049`, `T050`, `T052` can run in parallel
+- US9: `T046`, `T047`, `T048`, `T049`, `T051` and `T054` can run in parallel; `T050` follows `T048`; `T052` follows `T048` and `T049`; `T053` follows `T050`
+- Polish: `T055`, `T056`, `T057`, `T058`, `T059` and `T061` can run in parallel; `T060` runs after all stories complete
 
 ## Parallel Example: User Story 1
 
@@ -219,6 +247,23 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T016 [P] [US1] Add integration test for entity create/edit flows, validation feedback and audit trail in tests/integration/create-entity.test.js
 - [X] T017 [P] [US1] Add integration test for delete/deactivate behavior with and without history in tests/integration/edit-delete-entity.test.js
 - [X] T019 [P] [US1] Implement entity list/detail rendering with safe output, empty states and history-aware actions in src/components/entity-list.js
+```
+
+## Parallel Example: User Story 4
+
+```text
+- [ ] T034 [P] [US4] Add unit tests for chronological kardex ordering, accumulated balance, date/type filters and period opening balance in tests/unit/storage.test.js
+- [ ] T035 [P] [US4] Add unit tests for confirmed-document immutability, void rejection and countermovement linkage with reason and stock reversal in tests/unit/stock.test.js
+- [ ] T036 [P] [US4] Add integration test for PAP-CAR-075 kardex rows, filter recalculation, void flow and blocked edit in tests/integration/inventory-movements.test.js
+```
+
+## Parallel Example: User Story 9
+
+```text
+- [ ] T046 [P] [US9] Add unit tests for the role permission matrix, sensitive-field redaction and audit payload construction in tests/unit/roles-audit.test.js
+- [ ] T047 [P] [US9] Add integration test for role switching, Operador redaction, Analista read-only actions and audit entries in tests/integration/roles-audit.test.js
+- [ ] T048 [P] [US9] Implement Usuario/Rol definitions, permission helpers and selected-role persistence in src/roles.js
+- [ ] T049 [P] [US9] Implement a simulated role selector with accessible labels and wire the current user/role into the shell topbar in src/components/role-selector.js and src/components/shell.js
 ```
 
 ## Implementation Strategy
@@ -237,9 +282,10 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 2. Add US1 → validate independently (MVP)
 3. Add US2 → validate entries/transfers
 4. Add US3 → validate outbound controls
-5. Add US4 → validate traceability, counts and adjustments
+5. Add US4 → validate kardex, opening balance, immutability and void corrections
 6. Add US5 → validate KPIs, alerts and replenishment
-7. Finish with Phase 8 polish and full quickstart validation
+7. Add US9 → validate role visibility, operation gating and audit review
+8. Finish with Phase 9 polish and full quickstart validation
 
 ### Parallel Team Strategy
 
@@ -255,6 +301,8 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - `[P]` tasks must touch different files and have no dependency on incomplete work
 - `[US#]` labels provide traceability from tasks to spec user stories
 - Keep domain rules (uniqueness, stock effects, immutability, history preservation, audit) centralized in `src/storage.js`
-- `costo_unitario` must never be an input in movement forms; visibility is not role-dependent (FR-044, FR-047)
-- Identity comes from the local person selector, not from roles (FR-049)
+- Keep role permissions and sensitive-field policy centralized in `src/roles.js`
+- `costo_unitario` must never be an input in movement forms; costs, valuation and provider contacts are hidden for the Operador role in every screen, tooltip and export
+- The selected local person identifies the user in audit records; the simulated role selector controls permissions
+- The MVP applies role restrictions only in the frontend; production must revalidate permissions in the backend
 - Stop at each checkpoint to validate the story independently before proceeding

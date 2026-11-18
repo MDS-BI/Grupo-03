@@ -97,23 +97,22 @@ Como Operador de Despacho, quiero registrar salidas viendo el stock disponible p
 **Decisión de diseño**: La validación se hace contra el stock de la ubicación, no solo contra el total, porque físicamente se retira de un lugar concreto.
 ---
 
-### Historia de Usuario 4 – Kardex, conteo físico y ajustes (Prioridad: P1)
+### Historia de Usuario 4 – Kardex e historial de movimientos (Prioridad: P1)
 
-Como Jefe de Bodega, quiero consultar el historial completo de movimientos de cada producto, y corregir las diferencias detectadas en un conteo físico mediante ajustes aprobados, para explicar cualquier diferencia de stock, saber quién hizo qué y mantener el inventario fiel a la realidad.
+Como Jefe de Bodega, quiero consultar el kardex de un producto (todas sus entradas, salidas y ajustes con fecha, usuario, documento y saldo resultante), para explicar cualquier diferencia de stock y saber quién hizo qué.
 
-**Por qué esta prioridad**: Sin trazabilidad no se puede auditar ni corregir. Sin un ajuste controlado, la gente "arregla" el stock por fuera del sistema.
+**Por qué esta prioridad**: Es la trazabilidad mínima de cualquier sistema de inventario. Sin kardex no se puede auditar ni corregir un error.
 
-**Prueba Independiente**: Abrir el kardex de `PAP-CAR-075` y ver `ENT +50`, `SAL −30`, con su saldo. Registrar un conteo de 18 cuando el sistema dice 20, aprobar un ajuste de `−2` con el motivo "Daño" y ver el ajuste en el kardex.
+**Prueba Independiente**: Después de HU2 y HU3, abrir el kardex de `PAP-CAR-075` y ver: `ENT-000123 +50` (saldo 50), `SAL-000045 −30` (saldo 20).
 
 **Escenarios de Aceptación**:
 
-1. **Dado** un producto, **cuando** se abre su kardex, **entonces** se listan sus movimientos en orden cronológico (tipo, documento, cantidad, saldo, ubicación y usuario), filtrables por fecha y tipo.
-2. **Dado** un documento confirmado, **entonces** no se puede editar; para corregirlo se anula, lo que genera un contramovimiento enlazado al original con su motivo.
-3. **Dado** un conteo físico, **entonces** quien cuenta no ve la cantidad del sistema (conteo ciego); al cerrar el conteo se muestra la diferencia por producto.
-4. **Dado** una diferencia, **cuando** se genera el ajuste, **entonces** el motivo es obligatorio y el ajuste no puede aprobarlo la misma persona que contó.
-5. **Dado** un ajuste aprobado, **entonces** el stock se corrige y aparece en el kardex como `AJUSTE`.
+1. **Dado** un producto con movimientos, **cuando** se abre su kardex, **entonces** se listan en orden cronológico con tipo, documento, cantidad, saldo, ubicación y usuario.
+2. **Dado** que se filtra por rango de fechas o tipo de movimiento, **entonces** la lista y el saldo inicial del período se recalculan.
+3. **Dado** un documento con un error, **cuando** el Jefe de Bodega lo anula, **entonces** no se borra: se crea un contramovimiento que revierte el stock y queda enlazado al original con su motivo.
+4. **Dado** cualquier documento confirmado, **cuando** un usuario intenta editarlo, **entonces** el sistema no lo permite (los documentos son inmutables).
 
-**Datos involucrados**: `MovimientoInventario` (tipo `AJUSTE`, estado, `anula_a_id`, `aprobado_por`), `ConteoFisico`, `DetalleConteo`.
+**Datos involucrados**: `MovimientoInventario` (tipo, `numero`, fecha, `usuario_id`, `doc_respaldo`, estado, `anula_a_id`, motivo), `DetalleMovimiento` (producto_id, ubicacion_id, cantidad), `StockUbicacion`.
 
 **Decisión de diseño**: Los documentos son inmutables y se corrigen con contramovimientos, el mismo principio de la contabilidad, así que el saldo siempre se puede reconstruir.
 
@@ -192,7 +191,26 @@ Como Operador de Recepción o de Despacho, quiero mover stock de una ubicación 
 
 **Datos involucrados**: MovimientoInventario (tipo = TRANSFERENCIA), DetalleMovimiento (ubicacion_origen_id, ubicacion_destino_id). 
 
+---
 
+### Historia de Usuario 9 – Roles, datos sensibles y auditoría (Prioridad: P3)
+
+Como Administrador del módulo, quiero asignar un rol a cada usuario y que el sistema muestre u oculte funciones y datos según ese rol, para proteger la información sensible (costos, proveedores) y poder auditar las acciones.
+
+**Por qué esta prioridad**: El módulo puede operar sin autenticación real, pero la protección de datos sensibles y la auditoría son necesarias para un uso responsable. Es P3 porque en el MVP los roles son una simulación y la seguridad efectiva depende del backend.
+
+**Prueba Independiente**: Cambiar el selector de rol a Operador y comprobar que no aparecen costos, valorización ni contactos de proveedores; cambiar a Analista y verificar que puede consultar toda la información, pero no registrar entradas, salidas ni ajustes; revisar la auditoría y ver la acción registrada con usuario, fecha y hora, valor anterior y nuevo.
+
+**Escenarios de Aceptación**:
+
+1. **Dado** un usuario con rol Operador, **entonces** no ve costos, valorización ni datos de contacto de proveedores en ninguna pantalla, exportación o tooltip.
+2. **Dado** un usuario con rol Analista, **entonces** puede ver toda la información, pero no registrar entradas, salidas ni ajustes.
+3. **Dado** cualquier creación, anulación o aprobación, **entonces** queda en un registro de auditoría (usuario, acción, fecha y hora, valor anterior y nuevo).
+4. **Dado** el MVP (solo frontend), **entonces** el rol se elige con un selector de rol simulado, y queda documentado que en producción debe validarse en el backend.
+
+**Datos involucrados**: `Usuario` (nombre, rol), `Rol` (permisos), `Auditoria` (`usuario_id`, `accion`, `entidad`, `entidad_id`, `fecha`, `detalle`).
+
+**Decisión de diseño**: En el MVP (solo frontend) el rol se elige con un selector simulado y las restricciones se aplican en la interfaz; en producción los permisos deben validarse en el backend para que no puedan eludirse desde el cliente.
 
 ## Requisitos *(obligatorio)*
 
@@ -278,7 +296,7 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 ## Suposiciones
 
 - El módulo base gestiona datos para un único espacio de trabajo en lugar de una base de datos multiinquilino compartida.
-- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) son etiquetas descriptivas; el módulo base no implementa autenticación, inicio de sesión ni permisos.
+- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) se eligen con un selector simulado que controla la visibilidad de funciones y datos sensibles en la interfaz; el módulo base no implementa autenticación ni inicio de sesión, y en producción los permisos deben validarse en el backend.
 - La valoración del stock usa un `costo_unitario` opcional por producto y se muestra solo en el panel y el catálogo; los formularios de Entrada y Salida de Inventario no incluyen campos de costo.
 - La adaptación a un módulo específico se realiza mediante un archivo de configuración del módulo en lugar de editando archivos fuente centrales.
 - Cada entidad incluye información básica suficiente para identificación y seguimiento; los módulos personalizados aportan los campos específicos del dominio.
