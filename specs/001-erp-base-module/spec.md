@@ -161,8 +161,6 @@ Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las 
 ---
 
 
-
----
 ### Historia de Usuario 7 - Panel de indicadores de inventario (Prioridad: P2)
 
 Como Analista de Inventario, quiero un panel con los KPIs principales, filtrable por categoría y período, para detectar quiebres, sobrestock y capital inmovilizado.
