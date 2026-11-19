@@ -118,45 +118,46 @@ Como Jefe de Bodega, quiero consultar el kardex de un producto (todas sus entrad
 
 ---
 
-### Historia de Usuario 5 – Panel de inventario y alertas de reposición (Prioridad: P2)
+### Historia de Usuario 6 – Conteo físico y ajuste de inventario (Prioridad: P2)
 
-Como Analista de Inventario, quiero un panel con los KPIs del inventario y la lista de productos bajo su punto de reorden con una cantidad sugerida a pedir, para reponer a tiempo, evitar quiebres y detectar capital inmovilizado.
+Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las diferencias con el sistema y aprobar los ajustes con un motivo, para corregir el inventario sin permitir que cualquiera modifique el stock libremente.
 
-**Por qué esta prioridad**: Convierte al módulo de un registro pasivo en una herramienta de decisión. Depende de que HU1–HU4 generen datos confiables.
+**Por qué esta prioridad**: Toda bodega puede presentar diferencias por mermas, daños o errores de registro. Esta historia permite corregirlas mediante un proceso controlado y trazable, una vez que las entradas, salidas y el kardex están operativos.
 
-**Prueba Independiente**: Con `PAP-CAR-075` en 15 unidades (punto de reorden 20), el producto aparece en alerta con una cantidad sugerida. Filtrar por "Papelería" y verificar que los KPIs se recalculan; "Limpiar filtros" vuelve a los valores globales.
+**Prueba Independiente**: Con un stock de 15 unidades de `PAP-CAR-075` en `A-03-2`, registrar un conteo físico de 13 unidades sin mostrar previamente la cantidad del sistema. Al cerrar el conteo, verificar que aparece una diferencia de −2 y generar un ajuste en estado "Pendiente". Una persona distinta de quien realizó el conteo lo aprueba con el motivo "Daño por humedad". Comprobar que el stock queda en 13 y que el ajuste aparece en el kardex.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el Analista entra al panel, **entonces** ve: N° de productos activos, valor del inventario (costo promedio ponderado), N° de productos en alerta y productos sin movimiento en 90 días.
-2. **Dado** un producto con stock ≤ su punto de reorden, **entonces** aparece en alerta (rojo si tiene stock 0, amarillo si está bajo el punto de reorden) con la cantidad sugerida `stock_maximo − stock_actual`, que el Analista puede editar.
-3. **Dado** que el Analista selecciona productos en alerta, **cuando** presiona "Generar solicitud", **entonces** se crea una solicitud de reposición agrupada por proveedor (en el futuro se enviará al módulo de Compras).
-4. **Dado** un filtro de categoría o fecha, **entonces** todos los KPIs y la tabla se recalculan, y el filtro activo queda visible.
-5. **Dado** un producto con menos de 30 días de historial, **entonces** su rotación se muestra como "Datos insuficientes" en vez de un número engañoso.
+1. **Dado** que se inicia un conteo físico de una ubicación, **cuando** se muestran los productos esperados, **entonces** el sistema oculta las cantidades registradas para permitir un conteo ciego y evitar sesgar a quien cuenta.
+2. **Dado** que se ingresan las cantidades contadas, **cuando** se cierra el conteo, **entonces** el sistema muestra la diferencia por producto en cantidad y porcentaje, y su valor monetario únicamente al Jefe de Bodega y al Analista.
+3. **Dado** que existe una diferencia entre el conteo y el sistema, **cuando** se genera un ajuste, **entonces** el motivo es obligatorio —Merma, Error de registro, Daño, Robo u Otro— y el ajuste queda pendiente de aprobación, sin modificar todavía el stock.
+4. **Dado** que quien realizó el conteo intenta aprobar su propio ajuste, **cuando** solicita la aprobación, **entonces** el sistema bloquea la acción e indica que debe aprobarlo otra persona.
+5. **Dado** un ajuste pendiente con motivo registrado, **cuando** una persona autorizada distinta de quien contó lo aprueba, **entonces** el stock de la ubicación se corrige según la diferencia y se registra un movimiento de tipo `AJUSTE` en el kardex.
 
-**Datos involucrados**: `SolicitudReposicion`, `DetalleSolicitud`, y lectura de `Producto`, `StockUbicacion` y `MovimientoInventario`.
+**Datos involucrados**: `ConteoFisico` (`ubicacion_id`, fecha, `contado_por`, estado), `DetalleConteo` (`producto_id`, `cantidad_sistema`, `cantidad_contada`), `MovimientoInventario` (tipo `AJUSTE`, `aprobado_por`, motivo), `StockUbicacion`.
+
+**Decisión de diseño**: El conteo no modifica directamente las existencias. Las diferencias se corrigen mediante movimientos de ajuste aprobados y vinculados al conteo original. Se conserva la identidad de quien contó y de quien aprobó para asegurar la separación de funciones y la trazabilidad.
+
 
 ---
 
-### Historia de Usuario 6 – Integración con Compras y Ventas (Prioridad: P3)
+### Historia de Usuario 6 – Conteo físico y ajuste de inventario (Prioridad: P2)
 
-Como Operador de Bodega, quiero que las órdenes de compra del módulo de Compras y los pedidos del módulo de Ventas aparezcan en Inventario como recepciones y despachos pendientes, para no digitar dos veces la misma información y cerrar el ciclo entre lo que se pide, lo que llega y lo que sale.
+Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las diferencias con el sistema y aprobar los ajustes con un motivo, para corregir el inventario sin permitir que cualquiera modifique el stock libremente.
 
-**Por qué esta prioridad**: El objetivo del trabajo es un módulo ERP que se conecte con los demás módulos del template. Esta historia une la solicitud de reposición (HU5) con la recepción (HU2) y el pedido de venta con el despacho (HU3). Es P3 porque el módulo funciona sin ella.
+Por qué esta prioridad: Toda bodega puede presentar diferencias por mermas, daños o errores de registro. Esta historia permite corregirlas mediante un proceso controlado y trazable, una vez que las entradas, salidas y el kardex están operativos.
 
-**Prueba Independiente**: La solicitud de reposición de `PAP-CAR-075` (HU5) se envía a Compras, que emite la `OC-0098` por 50 paquetes. En Inventario, `OC-0098` aparece en "Recepciones pendientes". Al recibir 30, la OC queda "Parcial" con 20 pendientes. Luego, un pedido de Ventas por 10 aparece en "Despachos pendientes" y, al despacharlo, pasa a "Despachado".
+Prueba Independiente: Con un stock de 15 unidades de PAP-CAR-075 en A-03-2, registrar un conteo físico de 13 unidades sin mostrar previamente la cantidad del sistema. Al cerrar el conteo, verificar que aparece una diferencia de −2 y generar un ajuste en estado “Pendiente”. Una persona distinta de quien realizó el conteo lo aprueba con el motivo “Daño por humedad”. Comprobar que el stock queda en 13 y que el ajuste aparece en el kardex.
 
-**Escenarios de Aceptación**:
+Escenarios de Aceptación:
+1.	Dado que se inicia un conteo físico de una ubicación, cuando se muestran los productos esperados, entonces el sistema oculta las cantidades registradas para permitir un conteo ciego y evitar sesgar a quien cuenta.
+2.	Dado que se ingresan las cantidades contadas, cuando se cierra el conteo, entonces el sistema muestra la diferencia por producto en cantidad y porcentaje, y su valor monetario únicamente al Jefe de Bodega y al Analista.
+3.	Dado que existe una diferencia entre el conteo y el sistema, cuando se genera un ajuste, entonces el motivo es obligatorio —Merma, Error de registro, Daño, Robo u Otro— y el ajuste queda pendiente de aprobación, sin modificar todavía el stock.
+4.	Dado que quien realizó el conteo intenta aprobar su propio ajuste, cuando solicita la aprobación, entonces el sistema bloquea la acción e indica que debe aprobarlo otra persona.
+5.	Dado un ajuste pendiente con motivo registrado, cuando una persona autorizada distinta de quien contó lo aprueba, entonces el stock de la ubicación se corrige según la diferencia y se registra un movimiento de tipo AJUSTE en el kardex.
+Datos involucrados: ConteoFisico (ubicacion_id, fecha, contado_por, estado), DetalleConteo (producto_id, cantidad_sistema, cantidad_contada), MovimientoInventario (tipo AJUSTE, aprobado_por, motivo), StockUbicacion.
+Decisión de diseño: El conteo no modifica directamente las existencias. Las diferencias se corrigen mediante movimientos de ajuste aprobados y vinculados al conteo original. Se conserva la identidad de quien contó y de quien aprobó para asegurar la separación de funciones y la trazabilidad.
 
-1. **Dado** una solicitud de reposición generada en HU5, **cuando** el Analista la envía, **entonces** queda disponible para Compras con el estado "Enviada".
-2. **Dado** una orden de compra emitida por Compras, **cuando** el operador registra la recepción, **entonces** puede seleccionar la OC y las líneas (producto, cantidad pedida, proveedor) se cargan automáticamente.
-3. **Dado** que se recibe menos de lo pedido, **entonces** la OC queda "Parcial" con el saldo pendiente; si se intenta recibir más de lo pedido, el sistema pide confirmación al Jefe de Bodega.
-4. **Dado** un pedido de Ventas, **entonces** aparece en "Despachos pendientes" con su prioridad y fecha comprometida, y al despacharlo (HU3) su estado cambia a "Despachado" o "Parcial".
-5. **Dado** que no hay stock suficiente para un pedido, **entonces** se registra como demanda no atendida (dato que se usa en la sección de sesgos).
-
-**Datos involucrados**: `OrdenCompra` y `PedidoVenta` (vienen de los otros módulos), claves foráneas `orden_compra_id` y `pedido_venta_id` en `MovimientoInventario`, y `DemandaNoAtendida` (`producto_id`, `pedido_venta_id`, `cantidad`, `fecha`).
-
-**Decisión de diseño**: Inventario no crea ni edita OC ni pedidos, solo los lee y actualiza su estado de recepción o despacho. Así cada módulo es dueño de sus datos. En el MVP (solo frontend) las OC y los pedidos se simulan con datos de ejemplo.
 
 ---
 ### Historia de Usuario 7 - Panel de indicadores de inventario (Prioridad: P2)
@@ -226,6 +227,26 @@ Como Analista de Inventario, quiero que las solicitudes de reposición lleguen a
 3. **Dado** un pedido de Ventas, **entonces** aparece en "Despachos pendientes" y, al despacharlo (HU3), su estado cambia a "Despachado".
 
 **Datos involucrados**: Claves foráneas `orden_compra_id` y `pedido_venta_id` en `MovimientoInventario`.
+
+---
+
+### Historia de Usuario 11 – Terminología configurable del módulo (Prioridad: P3, técnica)
+
+Como equipo de desarrollo del ERP, queremos que los nombres del módulo, las etiquetas y los campos personalizados se definan en la configuración del módulo, para reutilizar el template y que la interfaz hable el lenguaje de bodega sin modificar el código de las pantallas.
+
+**Por qué esta prioridad**: Facilita la reutilización y adaptación del módulo base a distintos contextos. Es P3 porque no agrega una operación de inventario, pero permite mantener una terminología consistente y evita modificar múltiples pantallas al personalizar el sistema.
+
+**Prueba Independiente**: Configurar el nombre "Logística e Inventario" y el mapeo Entidad → "Producto" y Documento → "Movimiento de Inventario". Verificar que los botones, formularios, tablas y mensajes utilizan esos términos. Cambiar una etiqueta y comprobar que los registros existentes y la navegación siguen funcionando. Retirar el mapeo y verificar que se recuperan los términos base del template.
+
+**Escenarios de Aceptación**:
+
+1. **Dado** el mapeo Entidad → "Producto" y Documento → "Movimiento de Inventario", **cuando** se utiliza la aplicación, **entonces** todos los botones, tablas, formularios y mensajes correspondientes emplean esos términos.
+2. **Dado** que existen registros almacenados, **cuando** se cambia una etiqueta en la configuración y se vuelve a cargar la aplicación, **entonces** la interfaz muestra la nueva terminología sin alterar los datos ni el funcionamiento de la navegación.
+3. **Dado** que no se ha definido un mapeo de terminología, **cuando** se carga la aplicación, **entonces** se utilizan los términos base del template.
+
+**Datos involucrados**: Configuración del módulo: nombre, etiquetas y definiciones de campos personalizados. No requiere nuevas entidades transaccionales.
+
+**Decisión de diseño**: Las etiquetas visibles se obtienen de una configuración central, conservando los identificadores internos de los datos. El detalle de `module-config.js` y `userConfig.customFields` se documenta en `plan.md` y `tasks.md`.
 
 ## Requisitos *(obligatorio)*
 
