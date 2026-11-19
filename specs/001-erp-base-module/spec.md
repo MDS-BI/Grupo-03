@@ -118,6 +118,26 @@ Como Jefe de Bodega, quiero consultar el kardex de un producto (todas sus entrad
 
 ---
 
+### Historia de Usuario 5 – Panel de inventario y alertas de reposición (Prioridad: P2)
+
+Como Analista de Inventario, quiero un panel con los KPIs del inventario y la lista de productos bajo su punto de reorden con una cantidad sugerida a pedir, para reponer a tiempo, evitar quiebres y detectar capital inmovilizado.
+
+**Por qué esta prioridad**: Convierte al módulo de un registro pasivo en una herramienta de decisión. Depende de que HU1–HU4 generen datos confiables.
+
+**Prueba Independiente**: Con `PAP-CAR-075` en 15 unidades (punto de reorden 20), el producto aparece en alerta con una cantidad sugerida. Filtrar por "Papelería" y verificar que los KPIs se recalculan; "Limpiar filtros" vuelve a los valores globales.
+
+**Escenarios de Aceptación**:
+
+1. **Dado** que el Analista entra al panel, **entonces** ve: N° de productos activos, valor del inventario (costo promedio ponderado), N° de productos en alerta y productos sin movimiento en 90 días.
+2. **Dado** un producto con stock ≤ su punto de reorden, **entonces** aparece en alerta (rojo si tiene stock 0, amarillo si está bajo el punto de reorden) con la cantidad sugerida `stock_maximo − stock_actual`, que el Analista puede editar.
+3. **Dado** que el Analista selecciona productos en alerta, **cuando** presiona "Generar solicitud", **entonces** se crea una solicitud de reposición agrupada por proveedor (en el futuro se enviará al módulo de Compras).
+4. **Dado** un filtro de categoría o fecha, **entonces** todos los KPIs y la tabla se recalculan, y el filtro activo queda visible.
+5. **Dado** un producto con menos de 30 días de historial, **entonces** su rotación se muestra como "Datos insuficientes" en vez de un número engañoso.
+
+**Datos involucrados**: `SolicitudReposicion`, `DetalleSolicitud`, y lectura de `Producto`, `StockUbicacion` y `MovimientoInventario`.
+
+---
+
 ### Historia de Usuario 6 – Conteo físico y ajuste de inventario (Prioridad: P2)
 
 Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las diferencias con el sistema y aprobar los ajustes con un motivo, para corregir el inventario sin permitir que cualquiera modifique el stock libremente.
@@ -138,25 +158,8 @@ Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las 
 
 **Decisión de diseño**: El conteo no modifica directamente las existencias. Las diferencias se corrigen mediante movimientos de ajuste aprobados y vinculados al conteo original. Se conserva la identidad de quien contó y de quien aprobó para asegurar la separación de funciones y la trazabilidad.
 
-
 ---
 
-### Historia de Usuario 6 – Conteo físico y ajuste de inventario (Prioridad: P2)
-
-Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las diferencias con el sistema y aprobar los ajustes con un motivo, para corregir el inventario sin permitir que cualquiera modifique el stock libremente.
-
-Por qué esta prioridad: Toda bodega puede presentar diferencias por mermas, daños o errores de registro. Esta historia permite corregirlas mediante un proceso controlado y trazable, una vez que las entradas, salidas y el kardex están operativos.
-
-Prueba Independiente: Con un stock de 15 unidades de PAP-CAR-075 en A-03-2, registrar un conteo físico de 13 unidades sin mostrar previamente la cantidad del sistema. Al cerrar el conteo, verificar que aparece una diferencia de −2 y generar un ajuste en estado “Pendiente”. Una persona distinta de quien realizó el conteo lo aprueba con el motivo “Daño por humedad”. Comprobar que el stock queda en 13 y que el ajuste aparece en el kardex.
-
-Escenarios de Aceptación:
-1.	Dado que se inicia un conteo físico de una ubicación, cuando se muestran los productos esperados, entonces el sistema oculta las cantidades registradas para permitir un conteo ciego y evitar sesgar a quien cuenta.
-2.	Dado que se ingresan las cantidades contadas, cuando se cierra el conteo, entonces el sistema muestra la diferencia por producto en cantidad y porcentaje, y su valor monetario únicamente al Jefe de Bodega y al Analista.
-3.	Dado que existe una diferencia entre el conteo y el sistema, cuando se genera un ajuste, entonces el motivo es obligatorio —Merma, Error de registro, Daño, Robo u Otro— y el ajuste queda pendiente de aprobación, sin modificar todavía el stock.
-4.	Dado que quien realizó el conteo intenta aprobar su propio ajuste, cuando solicita la aprobación, entonces el sistema bloquea la acción e indica que debe aprobarlo otra persona.
-5.	Dado un ajuste pendiente con motivo registrado, cuando una persona autorizada distinta de quien contó lo aprueba, entonces el stock de la ubicación se corrige según la diferencia y se registra un movimiento de tipo AJUSTE en el kardex.
-Datos involucrados: ConteoFisico (ubicacion_id, fecha, contado_por, estado), DetalleConteo (producto_id, cantidad_sistema, cantidad_contada), MovimientoInventario (tipo AJUSTE, aprobado_por, motivo), StockUbicacion.
-Decisión de diseño: El conteo no modifica directamente las existencias. Las diferencias se corrigen mediante movimientos de ajuste aprobados y vinculados al conteo original. Se conserva la identidad de quien contó y de quien aprobó para asegurar la separación de funciones y la trazabilidad.
 
 
 ---
