@@ -120,21 +120,35 @@ Como Jefe de Bodega, quiero consultar el kardex de un producto (todas sus entrad
 
 ### Historia de Usuario 5 – Panel de inventario y alertas de reposición (Prioridad: P2)
 
-Como Analista de Inventario, quiero un panel con los KPIs del inventario y la lista de productos bajo su punto de reorden con una cantidad sugerida a pedir, para reponer a tiempo, evitar quiebres y detectar capital inmovilizado.
+Historia de Usuario 5 — Categorización y Dashboard de Métricas (Prioridad: P1)
 
-**Por qué esta prioridad**: Convierte al módulo de un registro pasivo en una herramienta de decisión. Depende de que HU1–HU4 generen datos confiables.
+ Estudiante asignado: Estudiante 5
 
-**Prueba Independiente**: Con `PAP-CAR-075` en 15 unidades (punto de reorden 20), el producto aparece en alerta con una cantidad sugerida. Filtrar por "Papelería" y verificar que los KPIs se recalculan; "Limpiar filtros" vuelve a los valores globales.
+ Rol: Analista
 
-**Escenarios de Aceptación**:
+ Tipo de registro: Entidades (Métricas / Resumen)
 
-1. **Dado** que el Analista entra al panel, **entonces** ve: N° de productos activos, valor del inventario (costo promedio ponderado), N° de productos en alerta y productos sin movimiento en 90 días.
-2. **Dado** un producto con stock ≤ su punto de reorden, **entonces** aparece en alerta (rojo si tiene stock 0, amarillo si está bajo el punto de reorden) con la cantidad sugerida `stock_maximo − stock_actual`, que el Analista puede editar.
-3. **Dado** que el Analista selecciona productos en alerta, **cuando** presiona "Generar solicitud", **entonces** se crea una solicitud de reposición agrupada por proveedor (en el futuro se enviará al módulo de Compras).
-4. **Dado** un filtro de categoría o fecha, **entonces** todos los KPIs y la tabla se recalculan, y el filtro activo queda visible.
-5. **Dado** un producto con menos de 30 días de historial, **entonces** su rotación se muestra como "Datos insuficientes" en vez de un número engañoso.
+ Como Analista de Inventario, quiero consultar un dashboard con métricas resumidas y filtrar los productos por categoría, para conocer el estado del stock, detectar productos que requieren reposición y apoyar la toma de decisiones logísticas.
 
-**Datos involucrados**: `SolicitudReposicion`, `DetalleSolicitud`, y lectura de `Producto`, `StockUbicacion` y `MovimientoInventario`.
+ Por qué esta prioridad
+
+ El dashboard permite revisar rápidamente el estado general del inventario sin consultar cada producto por separado. La categorización facilita comparar los productos y las alertas de stock ayudan a identificar oportunamente cuáles necesitan reposición.
+
+ Prueba Independiente
+
+ Ingresar al Panel como Analista y verificar que se muestren métricas de inventario, como el stock disponible y los productos bajo el punto de reorden. Seleccionar una categoría y confirmar que el resumen se actualice según los productos asociados. Comprobar que no se muestren costos ni otros datos financieros.
+
+ Escenarios de Aceptación
+
+ Dado que el Analista abre el dashboard, cuando se carga la información, entonces el sistema muestra el stock disponible y la cantidad de productos bajo el punto de reorden.
+
+ Dado que existen productos asociados a distintas categorías, cuando el Analista selecciona una categoría, entonces el sistema filtra los productos y actualiza las métricas correspondientes.
+
+ Dado que un producto tiene stock menor o igual a su punto de reorden, cuando el Analista consulta el dashboard, entonces el producto aparece identificado como crítico o pendiente de reposición.
+
+ Dado que no existen productos o movimientos registrados, cuando el Analista abre el dashboard, entonces el sistema muestra valores en cero o un mensaje informativo, sin generar errores.
+
+ Dado que el Analista consulta el dashboard, entonces el sistema muestra información operativa y no presenta costos, precios ni otros datos financieros.
 
 ---
 
