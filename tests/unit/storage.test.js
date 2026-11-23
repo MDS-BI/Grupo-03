@@ -287,6 +287,7 @@ describe('storage: entidades', () => {
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 5,
         aisle: 'A',
         shelf: '1',
@@ -313,6 +314,7 @@ describe('storage: US4 kardex y conteos', () => {
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 50,
         aisle: 'A',
         shelf: '1',
@@ -355,6 +357,7 @@ describe('storage: US4 kardex y conteos', () => {
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 10,
         aisle: 'A',
         shelf: '1',
@@ -414,6 +417,7 @@ describe('storage: US5 KPIs, alertas y reposici�n', () => {
       {
         entity_id: active.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 3,
         aisle: 'A',
         shelf: '1',
@@ -447,6 +451,7 @@ describe('storage: US5 KPIs, alertas y reposici�n', () => {
       {
         entity_id: e.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 15,
         aisle: 'A',
         shelf: '1',
@@ -483,5 +488,202 @@ describe('storage: US5 KPIs, alertas y reposici�n', () => {
       expect.arrayContaining(['Prov A', 'Prov B'])
     );
     expect(loadReplenishmentRequests()).toHaveLength(1);
+  });
+});
+
+describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('normaliza y valida el RUT chileno con d�gito verificador', async () => {
+    const { isValidRut, normalizeRut, computeRutCheckDigit } = await import('../../src/storage.js');
+    expect(normalizeRut('76.123.456-7')).toBe('76123456-7');
+    expect(normalizeRut('123456785')).toBe('12345678-5');
+    expect(computeRutCheckDigit('12345678')).toBe('5');
+    expect(isValidRut('12.345.678-5')).toBe(true);
+    expect(isValidRut('12.345.678-9')).toBe(false);
+    expect(isValidRut('abc')).toBe(false);
+  });
+
+  it('crea proveedores y rechaza RUT inv�lido o duplicado', async () => {
+    const { addProvider, loadProviders } = await import('../../src/storage.js');
+    const provider = addProvider({
+      rut: '12.345.678-5',
+      razon_social: 'Distribuidora Sur',
+      contacto: 'Juan P�rez'
+    });
+    expect(provider.provider_id).toMatch(/^prov_/);
+    expect(provider.rut).toBe('12345678-5');
+    expect(loadProviders()).toHaveLength(1);
+
+    expect(() => addProvider({ rut: '12.345.678-5', razon_social: 'Otra empresa' })).toThrow(
+      ValidationError
+    );
+    expect(() => addProvider({ rut: '12.345.678-9', razon_social: 'Otra empresa' })).toThrow(
+      ValidationError
+    );
+    expect(() => addProvider({ rut: '12.345.678-5', razon_social: '' })).toThrow(ValidationError);
+  });
+
+  it('vincula un proveedor existente a la entidad y rechaza proveedores inexistentes', async () => {
+    const { addProvider } = await import('../../src/storage.js');
+    const provider = addProvider({
+      rut: '12.345.678-5',
+      razon_social: 'Distribuidora Sur'
+    });
+    const entity = addEntity(
+      {
+        name: 'Resma papel carta',
+        code: 'PAP-CAR-075',
+        category: 'Papeler�a',
+        unit: 'Paquete',
+        reorderPoint: 20,
+        providerId: provider.provider_id
+      },
+      baseConfig
+    );
+    expect(entity.providerId).toBe(provider.provider_id);
+
+    expect(() =>
+      addEntity(
+        {
+          name: 'Otro',
+          code: 'OTRO-1',
+          category: 'C',
+          unit: 'u',
+          reorderPoint: 0,
+          providerId: 'prov_missing'
+        },
+        baseConfig
+      )
+    ).toThrow(ValidationError);
+  });
+
+  it('registra una solicitud de alta sin crear la entidad', async () => {
+    const { createProductRequest, loadProductRequests } = await import('../../src/storage.js');
+    const request = createProductRequest({
+      name: 'Producto faltante',
+      code: 'pf-1',
+      category: 'Papeler�a',
+      actorPerson: 'Ana'
+    });
+    expect(request.request_id).toMatch(/^preq_/);
+    expect(request.status).toBe('pending');
+    expect(loadProductRequests()).toHaveLength(1);
+    expect(loadEntities()).toHaveLength(0);
+    expect(() => createProductRequest({ name: '' })).toThrow(ValidationError);
+  });
+});
+
+describe('storage: US4 saldo inicial de per�odo', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('calcula el saldo inicial al aplicar filtros de fecha y tipo', async () => {
+    const { getKardex, getKardexOpeningBalance, loadDocuments, saveDocuments } =
+      await import('../../src/storage.js');
+    const entity = seedEntity();
+    const entry = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 50,
+        doc_respaldo: 'Gu�a 1',
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    const exit = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'SALIDA',
+        quantity: 20,
+        reason: 'Venta',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+
+    const docs = loadDocuments();
+    docs.find((document) => document.document_id === entry.document_id).createdAt =
+      '2026-01-01T10:00:00.000Z';
+    docs.find((document) => document.document_id === exit.document_id).createdAt =
+      '2026-02-01T10:00:00.000Z';
+    saveDocuments(docs);
+
+    expect(getKardexOpeningBalance(entity.entity_id, {})).toBe(0);
+    expect(getKardexOpeningBalance(entity.entity_id, { fromDate: '2026-02-01' })).toBe(50);
+    expect(
+      getKardexOpeningBalance(entity.entity_id, { fromDate: '2026-02-01', type: 'SALIDA' })
+    ).toBe(0);
+
+    const rows = getKardex(entity.entity_id, { fromDate: '2026-02-01' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].saldo).toBe(30);
+  });
+});
+
+describe('storage: US7 cobertura de inventario', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('calcula d�as de cobertura como stock / consumo diario promedio', async () => {
+    const { getDaysOfCoverage, getInventoryCoverage, loadDocuments, saveDocuments } =
+      await import('../../src/storage.js');
+    const entity = seedEntity({ category: 'Ferreter�a' });
+    const entry = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 100,
+        doc_respaldo: 'Gu�a 1',
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    const exit = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'SALIDA',
+        quantity: 30,
+        reason: 'Venta',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+
+    const docs = loadDocuments();
+    docs.find((document) => document.document_id === entry.document_id).createdAt =
+      '2026-01-01T10:00:00.000Z';
+    docs.find((document) => document.document_id === exit.document_id).createdAt =
+      '2026-01-31T10:00:00.000Z';
+    saveDocuments(docs);
+
+    const coverage = getDaysOfCoverage(entity.entity_id, {
+      fromDate: '2026-01-01',
+      toDate: '2026-01-31'
+    });
+    expect(coverage.totalConsumed).toBe(30);
+    expect(coverage.averageDailyConsumption).toBeCloseTo(1, 5);
+    expect(coverage.coverageDays).toBeCloseTo(70, 5);
+    expect(coverage.sufficientHistory).toBe(true);
+
+    const inventory = getInventoryCoverage({
+      category: 'Ferreter�a',
+      fromDate: '2026-01-01',
+      toDate: '2026-01-31'
+    });
+    expect(inventory.rows).toHaveLength(1);
+    expect(inventory.rows[0].coverageDays).toBeCloseTo(70, 5);
+    expect(inventory.averageCoverageDays).toBeCloseTo(70, 5);
   });
 });

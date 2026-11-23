@@ -36,6 +36,7 @@ describe('integración: entradas y salidas de inventario', () => {
     setValue(aisle, 'A');
     setValue(form.querySelector('[data-testid="document-shelf"]'), '3');
     setValue(form.querySelector('[data-testid="document-level"]'), '2');
+    setValue(form.querySelector('[data-testid="document-doc-respaldo"]'), 'Guía 4521');
     submit(form);
 
     expect(getEntity(entity.entity_id).stockBalance).toBe(100);
@@ -210,6 +211,7 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 50,
         aisle: 'A',
         shelf: '1',
@@ -254,6 +256,7 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
+        doc_respaldo: 'Guía de prueba',
         quantity: 20,
         aisle: 'A',
         shelf: '1',

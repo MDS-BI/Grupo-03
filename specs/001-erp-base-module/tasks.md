@@ -16,21 +16,21 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
 - **[Story]**: User story label (`[US1]`..`[US11]`) for story-phase tasks only
 - Every task includes an exact file path
-- `[X]` = already implemented and covered by passing tests (82 tests green at generation time); `[ ]` = pending
+- `[X]` = implemented and covered by passing tests (99 tests green; `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` pass); `[ ]` = pending
 
 ## Story Traceability
 
 | Spec story | Phase | Priority | Status |
 |------------|-------|----------|--------|
-| US1 Catálogo maestro | Phase 3 | P1 | Implemented; provider/RUT pending |
-| US2 Recepción con ubicación | Phase 4 | P1 | Implemented; doc_respaldo/solicitud de alta pending |
-| US3 Despacho con validación | Phase 5 | P1 | Implemented; FIFO suggestion pending |
-| US4 Kardex e historial | Phase 6 | P1 | Implemented; period opening balance pending |
+| US1 Catálogo maestro | Phase 3 | P1 | Implemented |
+| US2 Recepción con ubicación | Phase 4 | P1 | Implemented |
+| US3 Despacho con validación | Phase 5 | P1 | Implemented |
+| US4 Kardex e historial | Phase 6 | P1 | Implemented |
 | US5 Panel y alertas de reposición | Phase 7 | P2 | Implemented |
 | US6 Conteo físico y ajuste | Phase 8 | P2 | Implemented |
-| US7 Panel de indicadores | Phase 9 | P2 | Partially implemented; coverage/period filter pending |
+| US7 Panel de indicadores | Phase 9 | P2 | Implemented |
 | US8 Transferencia entre ubicaciones | Phase 10 | P2 | Implemented |
-| US9 Roles, datos sensibles y auditoría | Phase 11 | P3 | Roles retracted; audit view pending |
+| US9 Roles, datos sensibles y auditoría | Phase 11 | P3 | Implemented; roles descriptive only |
 | US10 Integración Compras/Ventas | Deferred | P3 | Out of scope (FR-046) |
 | US11 Terminología configurable | Phase 13 | P3 | Implemented |
 
@@ -79,7 +79,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T015 [P] [US1] Add unit tests for entity validation, SKU normalization/uniqueness, delete-vs-deactivate and audit recording in `tests/unit/storage.test.js`
 - [X] T016 [P] [US1] Add integration test for entity create/edit flows, validation feedback and audit trail in `tests/integration/create-entity.test.js`
 - [X] T017 [P] [US1] Add integration test for delete/deactivate behavior with and without history in `tests/integration/edit-delete-entity.test.js`
-- [ ] T018 [P] [US1] Add unit tests for provider master data and Chilean RUT format/check-digit validation in `tests/unit/storage.test.js`
+- [X] T018 [P] [US1] Add unit tests for provider master data and Chilean RUT format/check-digit validation in `tests/unit/storage.test.js`
 
 ### Implementation for User Story 1
 
@@ -88,7 +88,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T021 [US1] Implement entity create/edit/deactivate form with custom fields and inline validation in `src/components/entity-form.js`
 - [X] T022 [US1] Wire entity CRUD/deactivate flows, audit entries and the current local person into app state/views in `src/app.js`
 - [X] T023 [US1] Keep `costo_unitario` editable only in entity/catalog contexts and render valuation only in panel/catalog in `src/components/entity-form.js` and `src/components/entity-list.js`
-- [ ] T024 [US1] Implement `Proveedor` master record (`rut`, `razon_social`, `contacto`) with RUT validation and product linkage in `src/storage.js` and `src/components/entity-form.js`
+- [X] T024 [US1] Implement `Proveedor` master record (`rut`, `razon_social`, `contacto`) with RUT validation and product linkage in `src/storage.js` and `src/components/entity-form.js`
 
 **Checkpoint**: US1 independently functional and testable.
 
@@ -104,7 +104,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - [X] T025 [P] [US2] Add unit tests for `ENTRADA` validation, location requirements, stock effects and latest-location derivation in `tests/unit/stock.test.js`
 - [X] T026 [P] [US2] Add integration test for entry registration, location capture and cancel-without-persist in `tests/integration/inventory-movements.test.js`
-- [ ] T027 [P] [US2] Add unit tests for backing-document and provider validation on entry in `tests/unit/stock.test.js`
+- [X] T027 [P] [US2] Add unit tests for backing-document and provider validation on entry in `tests/unit/stock.test.js`
 
 ### Implementation for User Story 2
 
@@ -112,8 +112,8 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T029 [P] [US2] Implement entry form UI with product search, quantity and aisle/shelf/level location in `src/components/document-form.js`
 - [X] T030 [US2] Implement movement list rendering for entity movements in `src/components/document-list.js`
 - [X] T031 [US2] Integrate entry confirmation, atomic stock updates, latest-location derivation (FR-041) and cancel handling in `src/app.js` and `src/storage.js`
-- [ ] T032 [US2] Add backing-document (`doc_respaldo`) and provider fields to the entry form and persistence in `src/components/document-form.js` and `src/storage.js`
-- [ ] T033 [US2] Implement the "solicitud de alta" flow so an operator can request creation of a missing product without creating it in `src/components/document-form.js` and `src/storage.js`
+- [X] T032 [US2] Add backing-document (`doc_respaldo`) and provider fields to the entry form and persistence in `src/components/document-form.js` and `src/storage.js`
+- [X] T033 [US2] Implement the "solicitud de alta" flow so an operator can request creation of a missing product without creating it in `src/components/document-form.js` and `src/storage.js`
 
 **Checkpoint**: US2 independently functional (with foundational + US1 entity data available).
 
@@ -129,14 +129,14 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - [X] T034 [P] [US3] Add unit tests for `SALIDA` stock validation, insufficient-stock rejection and reorder-threshold signals in `tests/unit/stock.test.js`
 - [X] T035 [P] [US3] Add integration test for outbound flow, insufficient-stock blocking, merma-note rule and valid confirmation in `tests/integration/inventory-movements.test.js`
-- [ ] T036 [P] [US3] Add unit tests for FIFO location suggestion based on the oldest confirmed entry in `tests/unit/stock.test.js`
+- [X] T036 [P] [US3] Add unit tests for FIFO location suggestion based on the oldest confirmed entry in `tests/unit/stock.test.js`
 
 ### Implementation for User Story 3
 
 - [X] T037 [P] [US3] Extend the movement model with `SALIDA` reasons, merma note requirement and confirm-time stock checks in `src/storage.js`
 - [X] T038 [US3] Extend the movement form UI for `SALIDA` with available stock/location info, reason/notes and disabled confirm on invalid input in `src/components/document-form.js`
 - [X] T039 [US3] Integrate outbound confirmation and low-stock alert signaling for downstream dashboard use in `src/app.js` and `src/storage.js`
-- [ ] T040 [US3] Implement FIFO location suggestion (oldest confirmed entry) in the movement form and storage query in `src/storage.js` and `src/components/document-form.js`
+- [X] T040 [US3] Implement FIFO location suggestion (oldest confirmed entry) in the movement form and storage query in `src/storage.js` and `src/components/document-form.js`
 
 **Checkpoint**: US3 independently functional for outbound scenarios.
 
@@ -153,14 +153,14 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T041 [P] [US4] Add unit tests for chronological kardex ordering, accumulated balance and date/type filters in `tests/unit/storage.test.js`
 - [X] T042 [P] [US4] Add unit tests for confirmed-document immutability, void rejection and countermovement linkage with reason and stock reversal in `tests/unit/stock.test.js`
 - [X] T043 [P] [US4] Add integration test for `PAP-CAR-075` kardex rows, filter recalculation, void flow and blocked edit in `tests/integration/inventory-movements.test.js`
-- [ ] T044 [P] [US4] Add unit tests for period opening balance calculation in `tests/unit/storage.test.js`
+- [X] T044 [P] [US4] Add unit tests for period opening balance calculation in `tests/unit/storage.test.js`
 
 ### Implementation for User Story 4
 
 - [X] T045 [US4] Implement deterministic kardex ordering and accumulated balance calculation in `src/storage.js`
 - [X] T046 [US4] Enforce immutability of confirmed documents and complete linked void/countermovement behavior with motive in `src/storage.js`
 - [X] T047 [US4] Render kardex with document, type, quantity, balance, location and person columns plus date/type filters and void feedback in `src/components/document-list.js` and `src/app.js`
-- [ ] T048 [US4] Calculate and display the period opening balance when date/type filters are applied in `src/storage.js` and `src/components/document-list.js`
+- [X] T048 [US4] Calculate and display the period opening balance when date/type filters are applied in `src/storage.js` and `src/components/document-list.js`
 
 **Checkpoint**: US4 independently functional for traceability and controlled corrections.
 
@@ -221,14 +221,14 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - [X] T062 [P] [US7] Add unit tests for valuation, rotation label and insufficient-history handling in `tests/unit/storage.test.js`
 - [X] T063 [P] [US7] Add integration test for panel KPIs and category filter recalculation in `tests/integration/dashboard.test.js`
-- [ ] T064 [P] [US7] Add unit tests for days-of-coverage calculation and period filter in `tests/unit/storage.test.js`
+- [X] T064 [P] [US7] Add unit tests for days-of-coverage calculation and period filter in `tests/unit/storage.test.js`
 
 ### Implementation for User Story 7
 
 - [X] T065 [P] [US7] Implement KPI calculations: active products, valuation `Σ(stock × unitCost)`, alerts and products without movement in 90 days in `src/storage.js`
 - [X] T066 [US7] Implement rotation label and "Datos insuficientes" for products with less than 30 days of history in `src/storage.js` and `src/components/dashboard.js`
-- [ ] T067 [US7] Implement days-of-coverage calculation (stock / average daily consumption) and display per product in `src/storage.js` and `src/components/dashboard.js`
-- [ ] T068 [US7] Add a period (date range) filter that recalculates all KPI cards and the table, keeping the active filter visible in `src/components/dashboard.js` and `src/storage.js`
+- [X] T067 [US7] Implement days-of-coverage calculation (stock / average daily consumption) and display per product in `src/storage.js` and `src/components/dashboard.js`
+- [X] T068 [US7] Add a period (date range) filter that recalculates all KPI cards and the table, keeping the active filter visible in `src/components/dashboard.js` and `src/storage.js`
 
 **Checkpoint**: US7 independently functional for consolidated indicators.
 
@@ -264,15 +264,15 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 ### Tests for User Story 9
 
 - [X] T074 [P] [US9] Add unit tests for audit payload construction (person, action, entity, timestamp and details) in `tests/unit/storage.test.js`
-- [ ] T075 [P] [US9] Add integration test for audit trail recording and retrieval across entity and document operations in `tests/integration/security-persistence.test.js`
+- [X] T075 [P] [US9] Add integration test for audit trail recording and retrieval across entity and document operations in `tests/integration/security-persistence.test.js`
 
 ### Implementation for User Story 9
 
 - [X] T076 [P] [US9] Implement audit recording for entity create/update/deactivate/delete operations in `src/storage.js`
 - [X] T077 [P] [US9] Implement the local-person selector used for audit, movement actor and adjustment approval without granting permissions in `src/components/person-selector.js` and `src/app.js`
-- [ ] T078 [US9] Document that roles are descriptive only (no login, permissions, role selector or role-based visibility) per FR-047 and remove contradictory role-simulation text in `README.md` and `specs/001-erp-base-module/quickstart.md`
-- [ ] T079 [US9] Implement an audit log view with user/action/entity/date filters and before/after details in `src/components/audit-log.js`, `src/components/shell.js` and `src/app.js`
-- [ ] T080 [US9] Extend audit records to document void and adjustment approval with before/after values in `src/storage.js`
+- [X] T078 [US9] Document that roles are descriptive only (no login, permissions, role selector or role-based visibility) per FR-047 and remove contradictory role-simulation text in `README.md` and `specs/001-erp-base-module/quickstart.md`
+- [X] T079 [US9] Implement an audit log view with user/action/entity/date filters and before/after details in `src/components/audit-log.js`, `src/components/shell.js` and `src/app.js`
+- [X] T080 [US9] Extend audit records to document void and adjustment approval with before/after values in `src/storage.js`
 
 **Checkpoint**: US9 independently functional for audit review and local identity.
 
@@ -317,11 +317,11 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T089 [P] Verify XSS-safe rendering and escaping for all user-provided data in `src/components/` and `src/components/dom.js`
 - [X] T090 [P] Verify accessibility and responsive behavior (labels, focus, keyboard navigation, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
 - [X] T091 [P] Validate list/search performance with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
-- [ ] T092 [P] Reconcile documentation with the no-role decision and the implemented scope in `README.md` and `specs/001-erp-base-module/quickstart.md`
+- [X] T092 [P] Reconcile documentation with the no-role decision and the implemented scope in `README.md` and `specs/001-erp-base-module/quickstart.md`
 - [X] T093 Run quickstart validation scenarios (HU1–HU5) and record results in `specs/001-erp-base-module/quickstart.md`
 - [X] T094 [P] Update developer documentation for setup, configuration and extension points in `README.md` and `specs/001-erp-base-module/quickstart.md`
-- [ ] T095 [P] Add the pending tests for provider RUT, `doc_respaldo`, FIFO, opening balance, coverage and audit view in `tests/unit/` and `tests/integration/`
-- [ ] T096 Run `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` after the pending tasks and record the results in `specs/001-erp-base-module/quickstart.md`
+- [X] T095 [P] Add the pending tests for provider RUT, `doc_respaldo`, FIFO, opening balance, coverage and audit view in `tests/unit/` and `tests/integration/`
+- [X] T096 Run `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` after the pending tasks and record the results in `specs/001-erp-base-module/quickstart.md`
 
 ---
 
@@ -391,7 +391,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T041 [P] [US4] Add unit tests for chronological kardex ordering, accumulated balance and date/type filters in `tests/unit/storage.test.js`
 - [X] T042 [P] [US4] Add unit tests for confirmed-document immutability, void rejection and countermovement linkage with reason and stock reversal in `tests/unit/stock.test.js`
 - [X] T043 [P] [US4] Add integration test for PAP-CAR-075 kardex rows, filter recalculation, void flow and blocked edit in `tests/integration/inventory-movements.test.js`
-- [ ] T044 [P] [US4] Add unit tests for period opening balance calculation in `tests/unit/storage.test.js`
+- [X] T044 [P] [US4] Add unit tests for period opening balance calculation in `tests/unit/storage.test.js`
 ```
 
 ## Parallel Example: User Story 8

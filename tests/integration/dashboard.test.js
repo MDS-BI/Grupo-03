@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatCurrency } from '../../src/components/dom.js';
-import { mountApp, seedEntity, seedEntry, setValue } from '../helpers.js';
+import { baseConfig, mountApp, seedEntity, seedEntry, setValue } from '../helpers.js';
 
 function kpiValue(testId) {
   return document.querySelector(`[data-testid="${testId}"] .kpi-value`).textContent;
@@ -132,5 +132,61 @@ describe('integraci�n: panel US5 reposici�n', () => {
     expect(document.querySelector('[data-testid="active-filter"]')).toBeTruthy();
     document.querySelector('[data-testid="clear-filters"]').click();
     expect(document.querySelector('[data-testid="dashboard-category"]').value).toBe('');
+  });
+});
+
+describe('integraci�n: panel US7 per�odo y cobertura', () => {
+  it('recalcula KPIs y cobertura al aplicar un rango de fechas', async () => {
+    const { addDocument, loadDocuments, saveDocuments } = await import('../../src/storage.js');
+    const entity = seedEntity({ name: 'A', code: 'PA', category: 'Cat', reorderPoint: 1 });
+    const entry = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 100,
+        doc_respaldo: 'Gu�a 1',
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    const exit = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'SALIDA',
+        quantity: 30,
+        reason: 'Venta',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    const docs = loadDocuments();
+    docs.find((document) => document.document_id === entry.document_id).createdAt =
+      '2026-01-01T10:00:00.000Z';
+    docs.find((document) => document.document_id === exit.document_id).createdAt =
+      '2026-01-31T10:00:00.000Z';
+    saveDocuments(docs);
+
+    mountApp();
+    expect(kpiValue('kpi-documents')).toBe('2');
+
+    setValue(document.querySelector('[data-testid="dashboard-from"]'), '2026-01-01');
+    setValue(document.querySelector('[data-testid="dashboard-to"]'), '2026-01-31');
+    expect(kpiValue('kpi-documents')).toBe('2');
+    const coverageDays = document.querySelector(
+      `[data-testid="coverage-days-${entity.entity_id}"]`
+    );
+    expect(coverageDays.textContent).toBe('70.0');
+    expect(document.querySelector('[data-testid="active-filter"]').textContent).toContain(
+      'Desde: 2026-01-01'
+    );
+
+    setValue(document.querySelector('[data-testid="dashboard-from"]'), '2026-02-01');
+    expect(kpiValue('kpi-documents')).toBe('0');
+    expect(
+      document.querySelector(`[data-testid="coverage-days-${entity.entity_id}"]`).textContent
+    ).toBe('\u2014');
   });
 });

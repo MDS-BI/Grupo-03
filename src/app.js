@@ -7,9 +7,11 @@ import { renderEntityForm } from './components/entity-form.js';
 import { renderDocumentForm } from './components/document-form.js';
 import { renderDocumentList } from './components/document-list.js';
 import { renderSearch } from './components/search-bar.js';
+import { renderAuditLog } from './components/audit-log.js';
 import {
   addDocument,
   addEntity,
+  addProvider,
   approveCountAdjustment,
   closePhysicalCount,
   createPhysicalCount,
@@ -19,9 +21,11 @@ import {
   getDocument,
   getEntity,
   getKardex,
+  getKardexOpeningBalance,
   getPersons,
   loadDocuments,
   loadEntities,
+  loadProviders,
   recordBlindCountDetail,
   updateDocument,
   updateEntity,
@@ -36,11 +40,13 @@ function parseHash(hash) {
   if (value === 'search') return { view: 'search', section: 'entities' };
   if (value === 'entities') return { view: 'manage', section: 'entities' };
   if (value === 'documents') return { view: 'manage', section: 'documents' };
+  if (value === 'audit') return { view: 'audit', section: 'audit' };
   return { view: 'dashboard', section: 'entities' };
 }
 
 function routeHash(view, section = 'entities') {
   if (view === 'search') return '#/search';
+  if (view === 'audit') return '#/audit';
   if (view === 'manage') return section === 'documents' ? '#/documents' : '#/entities';
   return '#/dashboard';
 }
@@ -138,6 +144,8 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       navigate('search', { pendingFocus: 'search' });
     } else if (id === 'documents') {
       navigate('manage', { section: 'documents' });
+    } else if (id === 'audit') {
+      navigate('audit', { section: 'audit' });
     } else {
       navigate('manage', { section: 'entities' });
     }
@@ -159,10 +167,17 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function handleEntitySubmit(values) {
     try {
+      const payload = { ...values };
+      if (payload.newProvider) {
+        const provider = addProvider(payload.newProvider);
+        payload.providerId = provider.provider_id;
+        payload.provider = provider.razon_social;
+      }
+      delete payload.newProvider;
       if (state.editingEntityId) {
-        updateEntity(state.editingEntityId, values, config, { actorPerson: state.selectedPerson });
+        updateEntity(state.editingEntityId, payload, config, { actorPerson: state.selectedPerson });
       } else {
-        addEntity(values, config, { actorPerson: state.selectedPerson });
+        addEntity(payload, config, { actorPerson: state.selectedPerson });
       }
       state.editingEntityId = null;
       state.formApis.entity?.markClean();
@@ -174,8 +189,21 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         render();
         return;
       }
+      const mapped = { ...(error?.errors ?? {}) };
+      if (mapped.rut) {
+        mapped.providerRut = mapped.rut;
+        delete mapped.rut;
+      }
+      if (mapped.razon_social) {
+        mapped.providerRazonSocial = mapped.razon_social;
+        delete mapped.razon_social;
+      }
+      if (mapped.contacto) {
+        mapped.providerContacto = mapped.contacto;
+        delete mapped.contacto;
+      }
       state.formApis.entity?.setErrors(
-        error?.errors ?? { _form: error?.message ?? 'No se pudo guardar.' }
+        Object.keys(mapped).length > 0 ? mapped : { _form: error?.message ?? 'No se pudo guardar.' }
       );
     }
   }
@@ -349,6 +377,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       config,
       entity: editingEntity,
       categories,
+      providers: loadProviders(),
       onSubmit: handleEntitySubmit,
       onCancel: handleEntityCancel,
       onDelete: handleEntityDelete
@@ -442,17 +471,20 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         );
         return;
       }
-      const rows = getKardex(entityId, {
+      const filters = {
         fromDate: state.kardexFrom || '',
         toDate: state.kardexTo || '',
         type: state.kardexType || ''
-      });
+      };
+      const rows = getKardex(entityId, filters);
+      const openingBalance = getKardexOpeningBalance(entityId, filters);
       renderDocumentList(kardexListContainer, {
         config,
         documents: rows,
         entities,
         showActions: true,
         showSaldo: true,
+        openingBalance,
         onEdit: (doc) => {
           if (doc.state === 'confirmed' || doc.state === 'voided' || doc.voidsMovementId) {
             state.notice = 'Movimiento confirmado: use anulación para corregir.';
@@ -704,7 +736,9 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     const documentFormApi = renderDocumentForm(documentFormContainer, {
       config,
       entities,
+      providers: loadProviders(),
       document: editingDocument,
+      actorPerson: state.selectedPerson,
       onSubmit: handleDocumentSubmit,
       onCancel: handleDocumentCancel,
       onDelete: handleDocumentDelete
@@ -765,6 +799,8 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     let searchApi = null;
     if (state.view === 'manage') {
       renderManage(shell.view);
+    } else if (state.view === 'audit') {
+      renderAuditLog(shell.view, { config });
     } else if (state.view === 'search') {
       searchApi = renderSearch(shell.view, {
         config,

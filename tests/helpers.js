@@ -73,6 +73,7 @@ export function seedEntry(entityId, overrides = {}, config = baseConfig) {
       entity_id: entityId,
       type: 'ENTRADA',
       quantity: 10,
+      doc_respaldo: 'Guía de despacho de prueba',
       aisle: 'A',
       shelf: '1',
       level: '1',

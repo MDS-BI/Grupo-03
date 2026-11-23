@@ -34,8 +34,8 @@ npm run preview
 4. **Esperado**: guardado bloqueado con mensaje descriptivo.
 5. Intentar eliminar un producto con movimientos/historial.
 6. **Esperado**: eliminación bloqueada y solo se permite desactivación conservando historial. Si no tiene historial, la eliminación física es posible.
-7. Buscar una vista que permita ocultar costos por "rol Operador".
-8. **Esperado**: no existe tal selector ni visibilidad condicionada por rol; costos y valorización se muestran solo en panel/catálogo (FR-044, FR-047).
+7. Revisar la interfaz en busca de un selector de rol o de una vista que oculte costos/contactos por rol.
+8. **Esperado**: no existe selector de rol ni visibilidad condicionada por rol; la persona local solo identifica al actor y los costos/valorización se muestran solo en panel/catálogo (FR-044, FR-047, FR-049).
 
 ### HU2 — Recepción (entrada) y transferencia con ubicación
 1. Registrar Entrada confirmada con cantidad y ubicación (pasillo-estante-nivel).
@@ -99,13 +99,15 @@ npm run preview
 - HU6 (Compras/Ventas) está fuera de esta versión.
 
 
-## Resultados de validación (2026-11-17; tras las clarificaciones)
+## Resultados de validación (2026-11-22; tareas pendientes completadas)
 
-- `npm run test:run`: **PASS** (10 archivos, 82 pruebas).
-- `npm run build`: **PASS** (Vite 8.2.1; 17 módulos transformados; salida en `dist/`).
+- `npm run test:run`: **PASS** (12 archivos, 99 pruebas).
+- `npm run build`: **PASS** (Vite 8.2.1; 18 módulos transformados; salida en `dist/`).
 - `npm run lint`: **PASS** (ESLint sin errores ni advertencias).
 - `npm run format:check`: **PASS** (Prettier: todos los archivos cumplen el estilo).
 - HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
+- Nuevas coberturas verificadas: proveedor con RUT chileno y vínculo producto-proveedor, `doc_respaldo` y proveedor obligatorios en entradas, solicitud de alta sin crear el producto, sugerencia FIFO, saldo inicial de período en kardex, días de cobertura y filtro de período del panel, y vista de auditoría con filtros y valores antes/después.
+- Corrección de fechas: los filtros por rango de fechas usan límites de día en UTC, evitando desfases en zonas horarias con offset negativo (p. ej. `America/Santiago`).
 - Clarificaciones aplicadas y verificadas: sin selector de rol ni visibilidad por rol; `TRANSFERENCIA` como tercer tipo de documento con ubicación derivada; persona local para auditoría/aprobaciones con `actorPerson`/`approvedByPerson`; entidades con historial se desactivan conservando documentos; clave canónica `erp.movements` con migración desde `erp.documents`.
 - Búsqueda: filtrado por término y categoría con estados vacíos seguros; renderizado sin `innerHTML` con datos de usuario.
 - Seguridad XSS: componentes usan creación de nodos/`textContent`; se eliminó el uso de inserción HTML sin sanitizar en utilidades compartidas.

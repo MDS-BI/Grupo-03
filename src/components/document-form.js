@@ -1,5 +1,9 @@
 import { applyErrors, clearErrors, formField, h, option } from './dom.js';
-import { computeAvailableStock } from '../storage.js';
+import {
+  computeAvailableStock,
+  createProductRequest,
+  getFifoLocationSuggestion
+} from '../storage.js';
 
 function customControl(definition, value) {
   const name = `custom_${definition.key}`;
@@ -37,13 +41,23 @@ function customControl(definition, value) {
 
 export function renderDocumentForm(
   container,
-  { config, entities = [], document = null, onSubmit, onCancel, onDelete }
+  {
+    config,
+    entities = [],
+    providers = [],
+    document = null,
+    actorPerson = 'local',
+    onSubmit,
+    onCancel,
+    onDelete
+  }
 ) {
   const labels = config.labels.document;
   const entityLabels = config.labels.entity;
   const lifecycle = config.statusLifecycle;
   const isEditing = Boolean(document);
   let dirty = false;
+  let fifoLocation = null;
 
   const entitySelect = h(
     'select',
@@ -187,6 +201,28 @@ export function renderDocumentForm(
     option('Devolución', 'Devolución', document?.reason === 'Devolución')
   );
 
+  const docRespaldoInput = h('input', {
+    type: 'text',
+    name: 'doc_respaldo',
+    value: document?.doc_respaldo ?? '',
+    autocomplete: 'off',
+    placeholder: 'Ej. Guía de despacho N° 4521',
+    'data-testid': 'document-doc-respaldo'
+  });
+
+  const providerSelect = h(
+    'select',
+    { name: 'providerId', 'data-testid': 'document-provider' },
+    option('', 'Sin proveedor', !document?.providerId),
+    ...providers.map((provider) =>
+      option(
+        provider.provider_id,
+        `${provider.razon_social} (${provider.rut})`,
+        provider.provider_id === document?.providerId
+      )
+    )
+  );
+
   const notesInput = h('textarea', { name: 'notes', 'data-testid': 'document-notes' });
   notesInput.value = document?.notes ?? '';
 
@@ -200,6 +236,12 @@ export function renderDocumentForm(
     class: 'alert alert-danger',
     'data-testid': 'stock-error',
     role: 'alert',
+    hidden: true
+  });
+  const fifoInfo = h('p', {
+    class: 'hint',
+    'data-testid': 'fifo-suggestion',
+    role: 'status',
     hidden: true
   });
 
@@ -260,6 +302,92 @@ export function renderDocumentForm(
       }),
       formField({ label: 'Nivel destino', name: 'toLevel', control: toLevelInput, required: true })
     )
+  );
+
+  const requestNameInput = h('input', {
+    type: 'text',
+    name: 'requestName',
+    autocomplete: 'off',
+    placeholder: 'Nombre del producto faltante',
+    'data-testid': 'product-request-name'
+  });
+  const requestCodeInput = h('input', {
+    type: 'text',
+    name: 'requestCode',
+    autocomplete: 'off',
+    placeholder: 'Código/SKU tentativo',
+    'data-testid': 'product-request-code'
+  });
+  const requestCategoryInput = h('input', {
+    type: 'text',
+    name: 'requestCategory',
+    autocomplete: 'off',
+    placeholder: 'Categoría',
+    'data-testid': 'product-request-category'
+  });
+  const requestNotice = h('p', {
+    class: 'hint',
+    'data-testid': 'product-request-notice',
+    role: 'status',
+    'aria-live': 'polite'
+  });
+
+  const productRequestSection = h(
+    'section',
+    { class: 'panel', 'data-testid': 'product-request-section' },
+    h(
+      'div',
+      { class: 'panel-header' },
+      h('h3', {}, '¿Producto no existe?'),
+      h(
+        'p',
+        { class: 'panel-subtitle' },
+        'Envíe una solicitud de alta al administrador. El operador no crea el producto directamente.'
+      )
+    ),
+    h(
+      'div',
+      { class: 'form-grid' },
+      formField({
+        label: 'Nombre',
+        name: 'requestName',
+        control: requestNameInput,
+        required: true
+      }),
+      formField({ label: 'Código/SKU', name: 'requestCode', control: requestCodeInput }),
+      formField({ label: 'Categoría', name: 'requestCategory', control: requestCategoryInput })
+    ),
+    h(
+      'div',
+      { class: 'actions' },
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'button',
+          'data-testid': 'product-request-submit',
+          onclick: () => {
+            try {
+              const request = createProductRequest({
+                name: requestNameInput.value,
+                code: requestCodeInput.value,
+                category: requestCategoryInput.value,
+                actorPerson
+              });
+              requestNotice.textContent = `Solicitud enviada: ${request.request_id}`;
+              requestNameInput.value = '';
+              requestCodeInput.value = '';
+              requestCategoryInput.value = '';
+            } catch (error) {
+              requestNotice.textContent =
+                error?.errors?.name ?? error?.message ?? 'No se pudo enviar la solicitud.';
+            }
+          }
+        },
+        'Enviar solicitud de alta'
+      )
+    ),
+    requestNotice
   );
 
   const customFields = (config.customFields?.document ?? []).map((definition) => {
@@ -333,6 +461,11 @@ export function renderDocumentForm(
           reason: reasonSelect.value,
           status: statusControl.value,
           notes: notesInput.value,
+          doc_respaldo: docRespaldoInput.value,
+          providerId: providerSelect.value,
+          fifoAisle: fifoLocation?.aisle ?? '',
+          fifoShelf: fifoLocation?.shelf ?? '',
+          fifoLevel: fifoLocation?.level ?? '',
           aisle: isTransfer ? toAisleInput.value : aisleInput.value,
           shelf: isTransfer ? toShelfInput.value : shelfInput.value,
           level: isTransfer ? toLevelInput.value : levelInput.value,
@@ -390,12 +523,26 @@ export function renderDocumentForm(
         control: reasonSelect,
         hint: 'Requerido como observación obligatoria cuando el motivo es Merma.'
       }),
+      formField({
+        label: 'Documento de respaldo',
+        name: 'doc_respaldo',
+        control: docRespaldoInput,
+        hint: 'Obligatorio para entradas (guía, factura o documento equivalente).'
+      }),
+      formField({
+        label: 'Proveedor',
+        name: 'providerId',
+        control: providerSelect,
+        hint: 'Proveedor asociado a la entrada, si aplica.'
+      }),
       ...customFields
     ),
     stockInfo,
+    fifoInfo,
     locationSection,
     transferSection,
     formField({ label: 'Notas', name: 'notes', control: notesInput }),
+    productRequestSection,
     h('div', { class: 'form-actions' }, saveButton, cancelButton, deleteButton)
   );
 
@@ -446,6 +593,24 @@ export function renderDocumentForm(
     } else {
       const available = computeAvailableStock(entity, document);
       stockInfo.textContent = `Stock disponible: ${available}`;
+    }
+
+    if (type === 'SALIDA' && entity) {
+      fifoLocation = getFifoLocationSuggestion(entity.entity_id);
+      if (fifoLocation) {
+        const location = [fifoLocation.aisle, fifoLocation.shelf, fifoLocation.level]
+          .filter(Boolean)
+          .join('-');
+        fifoInfo.textContent = `Sugerencia FIFO (entrada más antigua): ${location}`;
+        fifoInfo.hidden = false;
+      } else {
+        fifoInfo.textContent = '';
+        fifoInfo.hidden = true;
+      }
+    } else {
+      fifoLocation = null;
+      fifoInfo.textContent = '';
+      fifoInfo.hidden = true;
     }
 
     const available = entity ? computeAvailableStock(entity, document) : 0;

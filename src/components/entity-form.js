@@ -38,7 +38,7 @@ function customControl(definition, value) {
 
 export function renderEntityForm(
   container,
-  { config, entity = null, categories = [], onSubmit, onCancel, onDelete }
+  { config, entity = null, categories = [], providers = [], onSubmit, onCancel, onDelete }
 ) {
   const labels = config.labels.entity;
   const isEditing = Boolean(entity);
@@ -101,6 +101,57 @@ export function renderEntityForm(
     step: '0.01',
     'data-testid': 'entity-unit-cost'
   });
+
+  const providerSelect = h(
+    'select',
+    { name: 'providerId', 'data-testid': 'entity-provider' },
+    option('', 'Sin proveedor', !entity?.providerId),
+    ...providers.map((provider) =>
+      option(
+        provider.provider_id,
+        `${provider.razon_social} (${provider.rut})`,
+        provider.provider_id === entity?.providerId
+      )
+    ),
+    option('__new__', '+ Nuevo proveedor')
+  );
+  const providerRutInput = h('input', {
+    type: 'text',
+    name: 'providerRut',
+    autocomplete: 'off',
+    placeholder: 'Ej. 76.123.456-7',
+    'data-testid': 'entity-provider-rut'
+  });
+  const providerRazonSocialInput = h('input', {
+    type: 'text',
+    name: 'providerRazonSocial',
+    autocomplete: 'off',
+    placeholder: 'Razón social',
+    'data-testid': 'entity-provider-razon-social'
+  });
+  const providerContactoInput = h('input', {
+    type: 'text',
+    name: 'providerContacto',
+    autocomplete: 'off',
+    placeholder: 'Contacto',
+    'data-testid': 'entity-provider-contacto'
+  });
+  const providerFields = h(
+    'div',
+    { class: 'form-grid', 'data-testid': 'entity-new-provider', hidden: true },
+    formField({ label: 'RUT proveedor', name: 'providerRut', control: providerRutInput }),
+    formField({
+      label: 'Razón social',
+      name: 'providerRazonSocial',
+      control: providerRazonSocialInput
+    }),
+    formField({ label: 'Contacto', name: 'providerContacto', control: providerContactoInput })
+  );
+  const syncProviderFields = () => {
+    providerFields.hidden = providerSelect.value !== '__new__';
+  };
+  providerSelect.addEventListener('change', syncProviderFields);
+  syncProviderFields();
 
   const customFields = (config.customFields?.entity ?? []).map((definition) => {
     const value = entity?.customFields?.[definition.key] ?? '';
@@ -184,6 +235,15 @@ export function renderEntityForm(
           unitOfMeasure: unitOfMeasureInput.value,
           reorderPoint: reorderPointInput.value,
           unitCost: unitCostInput.value,
+          providerId: providerSelect.value === '__new__' ? '' : providerSelect.value,
+          newProvider:
+            providerSelect.value === '__new__'
+              ? {
+                  rut: providerRutInput.value,
+                  razon_social: providerRazonSocialInput.value,
+                  contacto: providerContactoInput.value
+                }
+              : null,
           customFields: {}
         };
         (config.customFields?.entity ?? []).forEach((definition) => {
@@ -242,8 +302,15 @@ export function renderEntityForm(
         control: unitCostInput,
         hint: 'Solo se usa para la valoración del catálogo y del panel.'
       }),
+      formField({
+        label: 'Proveedor principal',
+        name: 'providerId',
+        control: providerSelect,
+        hint: 'Registro maestro de proveedor vinculado al producto.'
+      }),
       ...customFields
     ),
+    providerFields,
     datalist,
     h('div', { class: 'form-actions' }, submitButton, cancelButton, deleteButton)
   );

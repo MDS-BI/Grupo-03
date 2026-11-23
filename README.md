@@ -16,7 +16,7 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 - **Gestión de Entidades (Productos y Proveedores):** Administración del maestro de productos, SKU, ubicaciones y datos de proveedores.
 - **Gestión de Documentos (Movimientos de Inventario):** Registro de guías de recepción, despachos y transferencias de stock.
 - **Persistencia Local:** Los datos se guardan en el almacenamiento local del navegador (`localStorage`).
-- **Integridad Referencial:** Eliminación en cascada y trazabilidad completa entre productos y movimientos.
+- **Integridad Referencial:** Eliminación física solo sin historial; con historial se desactiva conservando documentos y trazabilidad.
 
 ---
 
@@ -24,12 +24,14 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 
 ## 2.1 Funcionalidades implementadas (feature 001-erp-base-module)
 
-- **US1 Catálogo maestro**: campos obligatorios (nombre, código/SKU, categoría, unidad, punto de reorden), unicidad global de SKU normalizado, eliminación solo sin historial o desactivación con historial, simulación visual de rol (Administrador/Operador) sin autenticación real.
-- **US2 Recepción y transferencias**: entradas con ubicación, transferencias entre ubicaciones con validación de stock, borradores/cancelación sin persistir efectos.
-- **US3 Salidas**: validación de stock al confirmar, motivos (incluye Merma con observación), bloqueo ante insuficiencia y señales de punto de reorden.
-- **US4 Trazabilidad y control**: kardex filtrable, inmutabilidad de movimientos confirmados/anulados con corrección por contramovimiento, conteos físicos ciegos y ajustes aprobados.
-- **US5 Panel y reposición**: KPIs (activos, valoración, alertas, sin movimiento 90 días), alertas con cantidad sugerida editable y generación de solicitudes de reposición agrupadas por proveedor.
+- **US1 Catálogo maestro**: campos obligatorios (nombre, código/SKU, categoría, unidad, punto de reorden), unicidad global de SKU normalizado, eliminación solo sin historial o desactivación con historial, maestro de proveedores con validación de RUT chileno (formato y dígito verificador) y vínculo producto-proveedor.
+- **US2 Recepción y transferencias**: entradas con ubicación y documento de respaldo obligatorio, proveedor asociado, transferencias entre ubicaciones con validación de stock, borradores/cancelación sin persistir efectos y solicitud de alta de productos faltantes sin crearlos.
+- **US3 Salidas**: validación de stock al confirmar, sugerencia FIFO basada en la entrada confirmada más antigua, motivos (incluye Merma con observación), bloqueo ante insuficiencia y señales de punto de reorden.
+- **US4 Trazabilidad y control**: kardex filtrable con saldo inicial del período, inmutabilidad de movimientos confirmados/anulados con corrección por contramovimiento, conteos físicos ciegos, ajustes aprobados y vista de auditoría con filtros y valores antes/después.
+- **US5 Panel y reposición**: KPIs (activos, valoración, alertas, sin movimiento 90 días, cobertura), filtros por categoría y período que recalculan tarjetas y tablas, alertas con cantidad sugerida editable y generación de solicitudes de reposición agrupadas por proveedor.
 - **Búsqueda y UX**: búsqueda por nombre/código/categoría/descripción/fecha/campos personalizados, estados vacíos, renderizado seguro (sin innerHTML con datos de usuario), etiquetas y mensajes de validación accesibles.
+
+> No existen roles operativos ni selector de rol: la identidad se elige en un selector local de persona, sin contraseña, y solo identifica al responsable en auditoría, movimientos y aprobaciones (FR-047, FR-049). Costos y valorización se muestran solo en panel y catálogo (FR-044).
 
 > Nota: la configuración declarativa en src/module-config.js permite adaptar etiquetas, campos personalizados, ciclo de vida y tema. Las capacidades nativas de inventario descritas arriba forman parte del módulo base implementado.
 

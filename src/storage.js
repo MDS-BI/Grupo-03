@@ -5,6 +5,8 @@ export const STORAGE_KEYS = {
   legacyDocuments: 'erp.documents',
   counts: 'erp.counts',
   replenishmentRequests: 'erp.replenishmentRequests',
+  productRequests: 'erp.productRequests',
+  providers: 'erp.providers',
   persons: 'erp.persons',
   audit: 'erp.audit'
 };
@@ -16,6 +18,43 @@ function normalizeCode(value) {
     .trim()
     .replace(/\s+/g, '')
     .toUpperCase();
+}
+
+export function normalizeRut(value) {
+  const cleaned = String(value ?? '')
+    .trim()
+    .replace(/\./g, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+  if (!cleaned) return '';
+  if (cleaned.includes('-')) {
+    const [body, ...rest] = cleaned.split('-');
+    return `${body}-${rest.join('')}`;
+  }
+  if (cleaned.length > 1) return `${cleaned.slice(0, -1)}-${cleaned.slice(-1)}`;
+  return cleaned;
+}
+
+export function computeRutCheckDigit(body) {
+  const digits = String(body ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  let sum = 0;
+  let multiplier = 2;
+  for (let index = digits.length - 1; index >= 0; index -= 1) {
+    sum += Number(digits[index]) * multiplier;
+    multiplier = multiplier === 7 ? 2 : multiplier + 1;
+  }
+  const remainder = 11 - (sum % 11);
+  if (remainder === 11) return '0';
+  if (remainder === 10) return 'K';
+  return String(remainder);
+}
+
+export function isValidRut(value) {
+  const normalized = normalizeRut(value);
+  if (!/^\d{1,8}-[\dK]$/.test(normalized)) return false;
+  const [body, checkDigit] = normalized.split('-');
+  return computeRutCheckDigit(body) === checkDigit;
 }
 
 function ensureEntityDefaults(entity) {
@@ -202,14 +241,25 @@ export function addPerson(label) {
   return { persons, person };
 }
 
-function appendAudit({ entityId = null, action = '', person = '', details = '' } = {}) {
+function appendAudit({
+  entityId = null,
+  entityType = 'entity',
+  action = '',
+  person = '',
+  details = '',
+  before = null,
+  after = null
+} = {}) {
   const entry = {
     audit_id: generateId('aud'),
     entityId: entityId || null,
+    entityType,
     action,
     person: resolveActor({ actorPerson: person }, 'local'),
     timestamp: nowIso(),
-    details: trimString(details)
+    details: trimString(details),
+    before: before ? clone(before) : null,
+    after: after ? clone(after) : null
   };
   const entries = readCollection(STORAGE_KEYS.audit);
   entries.push(entry);
@@ -349,6 +399,14 @@ export function normalizeEntityInput(input = {}, config = {}) {
   const unitCost = parseOptionalNumber(input.unitCost);
   if (unitCost !== undefined) normalized.unitCost = unitCost;
 
+  const providerId = trimString(
+    input.providerId ?? input.proveedor_id ?? customValues.proveedor_id
+  );
+  if (providerId) normalized.providerId = providerId;
+
+  const provider = trimString(input.provider ?? input.proveedor ?? customValues.proveedor);
+  if (provider) normalized.provider = provider;
+
   // Keep legacy field in sync for existing UI/data compatibility
   if (normalized.unit) normalized.unitOfMeasure = normalized.unit;
 
@@ -394,6 +452,11 @@ export function validateEntity(
     }
   }
 
+  if (!isBlank(input.providerId)) {
+    const provider = loadProviders().find((item) => item.provider_id === input.providerId);
+    if (!provider) errors.providerId = 'El proveedor seleccionado no existe.';
+  }
+
   const customValues =
     input.customFields && typeof input.customFields === 'object' ? input.customFields : {};
   validateCustomFields(customValues, config?.customFields?.entity ?? [], 'customFields', errors);
@@ -411,6 +474,88 @@ export function loadEntities() {
 
 export function saveEntities(entities) {
   writeCollection(STORAGE_KEYS.entities, Array.isArray(entities) ? entities : []);
+}
+
+export function loadProviders() {
+  return readCollection(STORAGE_KEYS.providers);
+}
+
+export function saveProviders(providers) {
+  writeCollection(STORAGE_KEYS.providers, Array.isArray(providers) ? providers : []);
+}
+
+export function getProvider(providerId) {
+  return loadProviders().find((provider) => provider.provider_id === providerId) ?? null;
+}
+
+export function normalizeProviderInput(input = {}) {
+  return {
+    rut: normalizeRut(input.rut),
+    razon_social: trimString(input.razon_social ?? input.razonSocial ?? input.name),
+    contacto: trimString(input.contacto ?? input.contact)
+  };
+}
+
+export function validateProvider(input, { providers = loadProviders(), providerId = null } = {}) {
+  const errors = {};
+  if (isBlank(input.rut)) {
+    errors.rut = 'El RUT del proveedor es obligatorio.';
+  } else if (!isValidRut(input.rut)) {
+    errors.rut = 'El RUT no es válido (formato o dígito verificador).';
+  }
+  if (isBlank(input.razon_social)) {
+    errors.razon_social = 'La razón social es obligatoria.';
+  }
+  if (!isBlank(input.rut)) {
+    const normalized = normalizeRut(input.rut);
+    const duplicate = providers.find(
+      (provider) => provider.provider_id !== providerId && normalizeRut(provider.rut) === normalized
+    );
+    if (duplicate) errors.rut = 'Ya existe un proveedor con este RUT.';
+  }
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+
+export function addProvider(input = {}) {
+  const normalized = normalizeProviderInput(input);
+  const providers = loadProviders();
+  const { valid, errors } = validateProvider(normalized, { providers });
+  if (!valid) throw new ValidationError(errors);
+  const timestamp = nowIso();
+  const provider = {
+    provider_id: generateId('prov'),
+    ...normalized,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+  providers.push(provider);
+  saveProviders(providers);
+  return clone(provider);
+}
+
+export function updateProvider(providerId, updates = {}) {
+  const providers = loadProviders();
+  const index = providers.findIndex((provider) => provider.provider_id === providerId);
+  if (index === -1) throw new NotFoundError('El proveedor ya no existe.');
+  const normalized = normalizeProviderInput({ ...providers[index], ...updates });
+  const { valid, errors } = validateProvider(normalized, { providers, providerId });
+  if (!valid) throw new ValidationError(errors);
+  providers[index] = {
+    ...providers[index],
+    ...normalized,
+    provider_id: providerId,
+    updatedAt: nowIso()
+  };
+  saveProviders(providers);
+  return clone(providers[index]);
+}
+
+export function deleteProvider(providerId) {
+  const providers = loadProviders();
+  const index = providers.findIndex((provider) => provider.provider_id === providerId);
+  if (index === -1) throw new NotFoundError('El proveedor ya no existe.');
+  providers.splice(index, 1);
+  saveProviders(providers);
 }
 
 export function getEntity(entityId) {
@@ -546,6 +691,9 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     quantity: parseQuantity(input.quantity),
     notes: trimString(input.notes),
     reason: trimString(input.reason ?? input.motivo),
+    doc_respaldo: trimString(input.doc_respaldo ?? input.docRespaldo),
+    providerId: trimString(input.providerId ?? input.proveedor_id),
+    provider: trimString(input.provider ?? input.proveedor),
     status: typeof input.status === 'string' ? input.status.trim() : '',
     customFields: normalizeCustomValues(input.customFields, config?.customFields?.document ?? [])
   };
@@ -569,6 +717,13 @@ export function normalizeDocumentInput(input = {}, config = {}) {
     normalized.aisle = '';
     normalized.shelf = '';
     normalized.level = '';
+    if (type === 'SALIDA') {
+      normalized.suggestedLocation = {
+        aisle: trimString(input.fifoAisle ?? input.suggestedAisle),
+        shelf: trimString(input.fifoShelf ?? input.suggestedShelf),
+        level: trimString(input.fifoLevel ?? input.suggestedLevel)
+      };
+    }
   }
 
   return normalized;
@@ -620,6 +775,13 @@ export function validateDocument(
     if (isBlank(input.aisle)) errors.aisle = 'El pasillo es obligatorio para una entrada.';
     if (isBlank(input.shelf)) errors.shelf = 'El estante es obligatorio para una entrada.';
     if (isBlank(input.level)) errors.level = 'El nivel es obligatorio para una entrada.';
+    if (isBlank(input.doc_respaldo)) {
+      errors.doc_respaldo = 'El documento de respaldo es obligatorio para una entrada.';
+    }
+    if (!isBlank(input.providerId)) {
+      const provider = loadProviders().find((item) => item.provider_id === input.providerId);
+      if (!provider) errors.providerId = 'El proveedor seleccionado no existe.';
+    }
   }
 
   if (input.type === 'TRANSFERENCIA') {
@@ -712,6 +874,45 @@ export function loadReplenishmentRequests() {
 
 export function saveReplenishmentRequests(requests) {
   writeCollection(STORAGE_KEYS.replenishmentRequests, Array.isArray(requests) ? requests : []);
+}
+
+export function loadProductRequests() {
+  return readCollection(STORAGE_KEYS.productRequests);
+}
+
+export function saveProductRequests(requests) {
+  writeCollection(STORAGE_KEYS.productRequests, Array.isArray(requests) ? requests : []);
+}
+
+export function createProductRequest({
+  name = '',
+  code = '',
+  category = '',
+  notes = '',
+  actorPerson = '',
+  actorLabel = ''
+} = {}) {
+  const normalizedName = trimString(name);
+  if (!normalizedName) {
+    throw new ValidationError(
+      { name: 'El nombre del producto solicitado es obligatorio.' },
+      'Solicitud de alta inválida.'
+    );
+  }
+  const request = {
+    request_id: generateId('preq'),
+    name: normalizedName,
+    code: normalizeCode(code) || trimString(code),
+    category: trimString(category),
+    notes: trimString(notes),
+    status: 'pending',
+    actorPerson: resolveActor({ actorPerson, actorLabel }),
+    createdAt: nowIso()
+  };
+  const requests = loadProductRequests();
+  requests.push(request);
+  saveProductRequests(requests);
+  return clone(request);
 }
 
 export function getDocument(documentId) {
@@ -937,6 +1138,19 @@ export function voidDocument(documentId, { reason = '', actorPerson = '', actorL
 
   documents.push(contramovement);
   saveDocuments(documents);
+  appendAudit({
+    entityId: original.entity_id,
+    entityType: 'document',
+    action: 'void',
+    person: actor,
+    details: `${original.type} ${original.document_id}`,
+    before: { state: original.state, quantity: original.quantity },
+    after: {
+      state: 'voided',
+      reason: voidReason,
+      contramovementId: contramovement.document_id
+    }
+  });
   return { voided: clone(documents[index]), contramovement: clone(contramovement) };
 }
 
@@ -954,17 +1168,13 @@ export function getKardex(entityId, filters = {}) {
     const delta = movementStockDelta(movement);
     running += delta;
     const created = movement.createdAt ? new Date(movement.createdAt) : null;
-    if (fromDate && created && created < new Date(fromDate)) {
+    if (fromDate && created && created.getTime() < parseDayStart(fromDate)) {
       rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
       continue;
     }
-    if (toDate) {
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-      if (created && created > end) {
-        rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
-        continue;
-      }
+    if (toDate && created && created.getTime() > parseDayEnd(toDate)) {
+      rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
+      continue;
     }
     if (type && movement.type !== type) {
       rows.push({ ...clone(movement), saldo: running, _filteredOut: true });
@@ -973,6 +1183,137 @@ export function getKardex(entityId, filters = {}) {
     rows.push({ ...clone(movement), saldo: running, _filteredOut: false });
   }
   return rows.filter((r) => !r._filteredOut).map(({ _filteredOut, ...rest }) => rest);
+}
+
+export function getKardexOpeningBalance(entityId, filters = {}) {
+  const { fromDate = '', type = '' } = filters ?? {};
+  if (!fromDate) return 0;
+  const start = parseDayStart(fromDate);
+  let opening = 0;
+  for (const movement of loadDocuments()) {
+    if (movement.entity_id !== entityId) continue;
+    if (movement.state === 'draft') continue;
+    if (type && movement.type !== type) continue;
+    const created = movement.createdAt ? new Date(movement.createdAt) : null;
+    if (created && created.getTime() < start) opening += movementStockDelta(movement);
+  }
+  return opening;
+}
+
+export function getFifoLocationSuggestion(entityId) {
+  const entries = loadDocuments()
+    .filter(
+      (document) =>
+        document.entity_id === entityId &&
+        document.type === 'ENTRADA' &&
+        document.state !== 'draft' &&
+        document.state !== 'voided' &&
+        !document.voidsMovementId &&
+        (document.aisle || document.shelf || document.level)
+    )
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  if (entries.length === 0) return null;
+  const oldest = entries[0];
+  return {
+    documentId: oldest.document_id,
+    createdAt: oldest.createdAt,
+    aisle: oldest.aisle ?? '',
+    shelf: oldest.shelf ?? '',
+    level: oldest.level ?? ''
+  };
+}
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+function parseDayStart(value) {
+  return new Date(`${String(value)}T00:00:00.000Z`).getTime();
+}
+
+function parseDayEnd(value) {
+  return new Date(`${String(value)}T23:59:59.999Z`).getTime();
+}
+
+function withinDateRange(dateValue, fromDate, toDate) {
+  if (!dateValue) return !fromDate && !toDate;
+  const time = new Date(dateValue).getTime();
+  if (Number.isNaN(time)) return false;
+  if (fromDate && time < parseDayStart(fromDate)) return false;
+  if (toDate && time > parseDayEnd(toDate)) return false;
+  return true;
+}
+
+function consumptionStats(entity, documents, { fromDate = '', toDate = '' } = {}) {
+  const history = documents
+    .filter(
+      (document) =>
+        document.entity_id === entity.entity_id &&
+        document.state !== 'draft' &&
+        document.state !== 'voided' &&
+        !document.voidsMovementId
+    )
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const historyStart = history.length > 0 ? history[0].createdAt : entity.createdAt;
+  const historyDays = Math.max(
+    1,
+    (Date.now() - new Date(historyStart || Date.now()).getTime()) / DAY_MS || 1
+  );
+  const periodDays =
+    fromDate || toDate
+      ? Math.max(
+          1,
+          ((toDate ? new Date(toDate).getTime() : Date.now()) -
+            (fromDate
+              ? new Date(fromDate).getTime()
+              : new Date(historyStart || Date.now()).getTime())) /
+            DAY_MS || 1
+        )
+      : historyDays;
+  const totalConsumed = history
+    .filter((document) => document.type === 'SALIDA')
+    .filter((document) => withinDateRange(document.createdAt, fromDate, toDate))
+    .reduce((sum, document) => sum + (Number(document.quantity) || 0), 0);
+  const averageDailyConsumption = totalConsumed / periodDays;
+  const stock = Number(entity.stockBalance) || 0;
+  const coverageDays = averageDailyConsumption > 0 ? stock / averageDailyConsumption : null;
+  return {
+    totalConsumed,
+    averageDailyConsumption,
+    coverageDays,
+    historyDays,
+    sufficientHistory: historyDays >= 30
+  };
+}
+
+export function getDaysOfCoverage(entityId, filters = {}) {
+  const entity = getEntity(entityId);
+  if (!entity) return null;
+  return consumptionStats(entity, loadDocuments(), filters);
+}
+
+export function getInventoryCoverage(filters = {}) {
+  const { category = '', fromDate = '', toDate = '' } = filters ?? {};
+  const categoryFilter = typeof category === 'string' ? category.trim().toLowerCase() : '';
+  const entities = loadEntities().filter(
+    (entity) => !categoryFilter || String(entity.category ?? '').toLowerCase() === categoryFilter
+  );
+  const documents = loadDocuments();
+  const rows = entities.map((entity) => {
+    const stats = consumptionStats(entity, documents, { fromDate, toDate });
+    return {
+      entity_id: entity.entity_id,
+      name: entity.name,
+      code: entity.code,
+      category: entity.category,
+      stockBalance: Number(entity.stockBalance) || 0,
+      ...stats
+    };
+  });
+  const withCoverage = rows.filter((row) => row.coverageDays !== null);
+  const averageCoverageDays =
+    withCoverage.length > 0
+      ? withCoverage.reduce((sum, row) => sum + row.coverageDays, 0) / withCoverage.length
+      : null;
+  return { rows, averageCoverageDays };
 }
 
 export function getLatestLocation(entityId) {
@@ -1095,7 +1436,12 @@ function getLastMovementDate(entityId, documents) {
   return last;
 }
 
-export function getDashboardStats(category = '') {
+export function getDashboardStats(category = '', filters = {}) {
+  if (category && typeof category === 'object') {
+    filters = category;
+    category = filters.category ?? '';
+  }
+  const { fromDate = '', toDate = '' } = filters ?? {};
   const allEntities = loadEntities();
   const categoryFilter = typeof category === 'string' ? category.trim().toLowerCase() : '';
   const entities = categoryFilter
@@ -1103,9 +1449,9 @@ export function getDashboardStats(category = '') {
     : allEntities;
   const entityIds = new Set(entities.map((entity) => entity.entity_id));
   const documents = loadDocuments();
-  const scopedDocuments = categoryFilter
-    ? documents.filter((document) => entityIds.has(document.entity_id))
-    : documents;
+  const scopedDocuments = (
+    categoryFilter ? documents.filter((document) => entityIds.has(document.entity_id)) : documents
+  ).filter((document) => withinDateRange(document.createdAt, fromDate, toDate));
 
   const activeEntities = entities.filter((e) => e.status !== 'inactive');
   const valuation = entities.reduce(
@@ -1124,7 +1470,7 @@ export function getDashboardStats(category = '') {
 
   let noMovement90Days = 0;
   for (const entity of entities) {
-    const last = getLastMovementDate(entity.entity_id, documents);
+    const last = getLastMovementDate(entity.entity_id, scopedDocuments);
     if (!last) {
       // no movement history: if entity is older than 90 days treat as no movement in 90 days, else insufficient history context
       const age = daysSince(entity.createdAt);
@@ -1134,6 +1480,8 @@ export function getDashboardStats(category = '') {
     if (daysSince(last) >= 90) noMovement90Days += 1;
   }
 
+  const coverage = getInventoryCoverage({ category, fromDate, toDate });
+
   return {
     totalEntities: entities.length,
     activeEntities: activeEntities.length,
@@ -1142,13 +1490,17 @@ export function getDashboardStats(category = '') {
     critical,
     alerts: alerts.length,
     noMovement90Days,
+    averageCoverageDays: coverage.averageCoverageDays,
     categories: getCategories(allEntities)
   };
 }
 
 export function getReplenishmentSuggestions(filters = {}) {
   const category = typeof filters?.category === 'string' ? filters.category : '';
+  const fromDate = typeof filters?.fromDate === 'string' ? filters.fromDate : '';
+  const toDate = typeof filters?.toDate === 'string' ? filters.toDate : '';
   const allEntities = loadEntities();
+  const documents = loadDocuments();
   const filtered = category
     ? allEntities.filter(
         (e) => String(e.category ?? '').toLowerCase() === category.trim().toLowerCase()
@@ -1169,9 +1521,15 @@ export function getReplenishmentSuggestions(filters = {}) {
       const suggestedQty = Number.isFinite(maxStock)
         ? Math.max(0, maxStock - stock)
         : Math.max(0, reorderPoint - stock);
+      const linkedProvider = entity.providerId ? getProvider(entity.providerId) : null;
       const provider =
-        entity.provider || entity.supplier || entity.customFields?.proveedor || 'Sin proveedor';
+        entity.provider ||
+        linkedProvider?.razon_social ||
+        entity.supplier ||
+        entity.customFields?.proveedor ||
+        'Sin proveedor';
       const historyDays = daysSince(entity.createdAt);
+      const coverage = consumptionStats(entity, documents, { fromDate, toDate });
       return {
         entity_id: entity.entity_id,
         name: entity.name,
@@ -1182,7 +1540,9 @@ export function getReplenishmentSuggestions(filters = {}) {
         reorderPoint,
         suggestedQty,
         alertLevel: stock <= 0 ? 'red' : 'yellow',
-        rotationLabel: historyDays < 30 ? 'Datos insuficientes' : null
+        rotationLabel: historyDays < 30 ? 'Datos insuficientes' : null,
+        coverageDays: coverage.coverageDays,
+        sufficientHistory: coverage.sufficientHistory
       };
     });
 }
@@ -1371,12 +1731,14 @@ export function approveCountAdjustment(
   const entities = loadEntities();
   const now = nowIso();
   const adjustments = [];
+  const auditEvents = [];
 
   for (const detail of count.details || []) {
     const diff = Number(detail.difference) || 0;
     if (diff === 0) continue;
     const entity = entities.find((e) => e.entity_id === detail.entity_id);
     if (!entity) continue;
+    const beforeStock = Number(entity.stockBalance) || 0;
     const movement = {
       document_id: generateId('doc'),
       entity_id: detail.entity_id,
@@ -1398,6 +1760,11 @@ export function approveCountAdjustment(
     entity.updatedAt = now;
     documents.push(movement);
     adjustments.push(clone(movement));
+    auditEvents.push({
+      entityId: detail.entity_id,
+      before: { stockBalance: beforeStock },
+      after: { stockBalance: Number(entity.stockBalance) || 0, reason: adjustmentReason }
+    });
   }
 
   count.state = 'approved';
@@ -1409,6 +1776,17 @@ export function approveCountAdjustment(
   saveEntities(entities);
   saveDocuments(documents);
   saveCounts(counts);
+  auditEvents.forEach((event) => {
+    appendAudit({
+      entityId: event.entityId,
+      entityType: 'document',
+      action: 'approve-adjustment',
+      person: approver,
+      details: `Conteo ${count.count_id}`,
+      before: event.before,
+      after: event.after
+    });
+  });
   return { count: clone(count), adjustments };
 }
 

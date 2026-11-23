@@ -72,7 +72,8 @@ export function createDefaultConfig() {
       document: { singular: 'Documento', plural: 'Documentos', article: 'el' },
       dashboard: 'Panel',
       search: 'Buscar',
-      manage: 'Gestión'
+      manage: 'Gestión',
+      audit: 'Auditoría'
     },
     customFields: { entity: [], document: [] },
     statusLifecycle: null,
@@ -346,6 +347,7 @@ export function loadModuleConfig(rawConfig) {
         config.labels.manage,
         errors
       );
+      config.labels.audit = readLabel(labels.audit, 'labels.audit', config.labels.audit, errors);
     }
   }
 

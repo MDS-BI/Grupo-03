@@ -2,6 +2,7 @@
 import {
   createReplenishmentRequest,
   getDashboardStats,
+  getInventoryCoverage,
   getReplenishmentSuggestions,
   loadDocuments,
   loadEntities,
@@ -43,6 +44,8 @@ export function renderDashboard(
 ) {
   const labels = config.labels;
   let selectedCategory = initialCategory;
+  let selectedFrom = '';
+  let selectedTo = '';
   let replenishmentNotice = '';
 
   function render() {
@@ -50,13 +53,28 @@ export function renderDashboard(
 
     const allEntities = loadEntities();
     const allDocuments = loadDocuments();
-    const stats = getDashboardStats(selectedCategory);
-    const suggestions = getReplenishmentSuggestions({ category: selectedCategory });
+    const periodFilters = { fromDate: selectedFrom, toDate: selectedTo };
+    const stats = getDashboardStats(selectedCategory, periodFilters);
+    const suggestions = getReplenishmentSuggestions({
+      category: selectedCategory,
+      ...periodFilters
+    });
+    const coverage = getInventoryCoverage({
+      category: selectedCategory,
+      ...periodFilters
+    });
     const filteredEntities = searchEntities('', selectedCategory);
     const filteredEntityIds = new Set(filteredEntities.map((entity) => entity.entity_id));
-    const filteredDocuments = selectedCategory
-      ? allDocuments.filter((document) => filteredEntityIds.has(document.entity_id))
-      : allDocuments;
+    const filteredDocuments = (
+      selectedCategory
+        ? allDocuments.filter((document) => filteredEntityIds.has(document.entity_id))
+        : allDocuments
+    ).filter((document) => {
+      const date = String(document.createdAt ?? '').slice(0, 10);
+      if (selectedFrom && date < selectedFrom) return false;
+      if (selectedTo && date > selectedTo) return false;
+      return true;
+    });
 
     const quickActions = h(
       'section',
@@ -122,6 +140,16 @@ export function renderDashboard(
         { class: 'kpi-card', 'data-testid': 'kpi-no-movement' },
         h('p', { class: 'kpi-label' }, 'Sin movimiento (90 dias)'),
         h('p', { class: 'kpi-value' }, String(stats.noMovement90Days ?? 0))
+      ),
+      h(
+        'article',
+        { class: 'kpi-card', 'data-testid': 'kpi-coverage' },
+        h('p', { class: 'kpi-label' }, 'Cobertura promedio (dias)'),
+        h(
+          'p',
+          { class: 'kpi-value' },
+          coverage.averageCoverageDays === null ? '—' : coverage.averageCoverageDays.toFixed(1)
+        )
       )
     );
 
@@ -144,6 +172,32 @@ export function renderDashboard(
       )
     );
 
+    const fromDateInput = h('input', {
+      type: 'date',
+      id: 'dashboard-from',
+      'data-testid': 'dashboard-from',
+      value: selectedFrom,
+      onchange: (event) => {
+        selectedFrom = event.target.value;
+        render();
+      }
+    });
+    const toDateInput = h('input', {
+      type: 'date',
+      id: 'dashboard-to',
+      'data-testid': 'dashboard-to',
+      value: selectedTo,
+      onchange: (event) => {
+        selectedTo = event.target.value;
+        render();
+      }
+    });
+
+    const activeFilters = [];
+    if (selectedCategory) activeFilters.push(`Categoria: ${selectedCategory}`);
+    if (selectedFrom) activeFilters.push(`Desde: ${selectedFrom}`);
+    if (selectedTo) activeFilters.push(`Hasta: ${selectedTo}`);
+
     const filterBar = h(
       'div',
       { class: 'toolbar', 'data-testid': 'dashboard-filters' },
@@ -153,11 +207,13 @@ export function renderDashboard(
         h('label', { for: 'dashboard-category' }, 'Categoria'),
         categorySelect
       ),
-      selectedCategory
+      h('div', { class: 'field' }, h('label', { for: 'dashboard-from' }, 'Desde'), fromDateInput),
+      h('div', { class: 'field' }, h('label', { for: 'dashboard-to' }, 'Hasta'), toDateInput),
+      activeFilters.length > 0
         ? h(
             'span',
             { class: 'badge', 'data-testid': 'active-filter' },
-            `Filtro: ${selectedCategory}`
+            `Filtros: ${activeFilters.join(' · ')}`
           )
         : null,
       h(
@@ -166,9 +222,11 @@ export function renderDashboard(
           type: 'button',
           class: 'button button-ghost',
           'data-testid': 'clear-filters',
-          disabled: !selectedCategory,
+          disabled: activeFilters.length === 0,
           onclick: () => {
             selectedCategory = '';
+            selectedFrom = '';
+            selectedTo = '';
             onCategoryChange?.('');
             render();
           }
@@ -282,6 +340,56 @@ export function renderDashboard(
             )
           );
 
+    const coverageRows = coverage.rows.map((row) =>
+      h(
+        'tr',
+        { 'data-testid': `coverage-row-${row.entity_id}` },
+        h('td', {}, row.name || '-'),
+        h('td', {}, row.code || '-'),
+        h('td', {}, String(row.stockBalance ?? 0)),
+        h('td', {}, String(row.totalConsumed ?? 0)),
+        h('td', {}, row.averageDailyConsumption.toFixed(2)),
+        h(
+          'td',
+          { 'data-testid': `coverage-days-${row.entity_id}` },
+          row.coverageDays === null ? '—' : row.coverageDays.toFixed(1)
+        ),
+        h('td', {}, row.sufficientHistory ? 'Suficiente' : 'Datos insuficientes')
+      )
+    );
+
+    const coverageTable =
+      coverage.rows.length === 0
+        ? h(
+            'div',
+            { class: 'empty-state', 'data-testid': 'coverage-empty' },
+            h('p', {}, 'No hay productos para calcular cobertura.')
+          )
+        : h(
+            'div',
+            { class: 'table-wrap' },
+            h(
+              'table',
+              { class: 'data-table', 'data-testid': 'coverage-table' },
+              h(
+                'thead',
+                {},
+                h(
+                  'tr',
+                  {},
+                  h('th', {}, 'Producto'),
+                  h('th', {}, 'Codigo'),
+                  h('th', {}, 'Stock'),
+                  h('th', {}, 'Consumo periodo'),
+                  h('th', {}, 'Promedio diario'),
+                  h('th', {}, 'Cobertura (dias)'),
+                  h('th', {}, 'Historial')
+                )
+              ),
+              h('tbody', {}, ...coverageRows)
+            )
+          );
+
     const generateBtn = h(
       'button',
       {
@@ -370,6 +478,21 @@ export function renderDashboard(
         kpiCards,
         criticalAlert,
         alertsPanel,
+        h(
+          'section',
+          { class: 'panel', 'data-testid': 'dashboard-coverage' },
+          h(
+            'div',
+            { class: 'panel-header' },
+            h('div', {}, h('h3', {}, 'Cobertura de inventario')),
+            h(
+              'p',
+              { class: 'panel-subtitle' },
+              'Cobertura = stock / promedio diario de consumo del periodo.'
+            )
+          ),
+          coverageTable
+        ),
         h(
           'section',
           { class: 'panel', 'data-testid': 'dashboard-products' },

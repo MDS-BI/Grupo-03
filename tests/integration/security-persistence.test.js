@@ -68,3 +68,74 @@ describe('integración: seguridad, persistencia y volumen', () => {
     expect(searchEntities('', 'Oficina')).toHaveLength(250);
   });
 });
+
+describe('integraci�n: auditor�a y solicitudes de alta', () => {
+  it('registra auditor�a de anulaci�n y aprobaci�n de ajuste con valores antes/despu�s', async () => {
+    const {
+      addDocument,
+      approveCountAdjustment,
+      closePhysicalCount,
+      createPhysicalCount,
+      getAuditTrail,
+      recordBlindCountDetail,
+      voidDocument
+    } = await import('../../src/storage.js');
+
+    const entity = seedEntity();
+    const entry = addDocument(
+      {
+        entity_id: entity.entity_id,
+        type: 'ENTRADA',
+        quantity: 20,
+        doc_respaldo: 'Gu�a 1',
+        aisle: 'A',
+        shelf: '1',
+        level: '1',
+        state: 'confirmed'
+      },
+      baseConfig
+    );
+    voidDocument(entry.document_id, { reason: 'Error de captura', actorPerson: 'Ana' });
+
+    const count = createPhysicalCount({ actorPerson: 'Operador' });
+    recordBlindCountDetail(count.count_id, {
+      entity_id: entity.entity_id,
+      countedQuantity: 18
+    });
+    closePhysicalCount(count.count_id);
+    approveCountAdjustment(count.count_id, {
+      approvedByPerson: 'Supervisor',
+      reason: 'Da�o por humedad'
+    });
+
+    const trail = getAuditTrail({ entityId: entity.entity_id });
+    expect(trail.some((item) => item.action === 'create' && item.person === 'local')).toBe(true);
+    const voidEntry = trail.find((item) => item.action === 'void');
+    expect(voidEntry).toBeTruthy();
+    expect(voidEntry.before.state).toBe('confirmed');
+    expect(voidEntry.after.state).toBe('voided');
+    const adjustment = trail.find((item) => item.action === 'approve-adjustment');
+    expect(adjustment).toBeTruthy();
+    expect(adjustment.before.stockBalance).toBe(0);
+    expect(adjustment.after.stockBalance).toBe(18);
+  });
+
+  it('env�a una solicitud de alta sin crear el producto', async () => {
+    const { loadEntities, loadProductRequests } = await import('../../src/storage.js');
+    const app = mountApp();
+    await go(app, 'manage', 'documents');
+
+    setValue(
+      document.querySelector('[data-testid="product-request-name"]'),
+      'Producto inexistente'
+    );
+    setValue(document.querySelector('[data-testid="product-request-code"]'), 'NEW-1');
+    document.querySelector('[data-testid="product-request-submit"]').click();
+
+    expect(loadProductRequests()).toHaveLength(1);
+    expect(loadEntities()).toHaveLength(0);
+    expect(document.querySelector('[data-testid="product-request-notice"]').textContent).toContain(
+      'Solicitud enviada'
+    );
+  });
+});

@@ -71,6 +71,7 @@ describe('integración: etiquetas, ciclo de vida y tema', () => {
     setValue(form.querySelector('[data-testid="document-aisle"]'), 'A');
     setValue(form.querySelector('[data-testid="document-shelf"]'), '1');
     setValue(form.querySelector('[data-testid="document-level"]'), '1');
+    setValue(form.querySelector('[data-testid="document-doc-respaldo"]'), 'Guía 4521');
     submit(form);
 
     let documentRecord = loadDocuments()[0];

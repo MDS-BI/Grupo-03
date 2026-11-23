@@ -49,6 +49,7 @@ export function renderDocumentList(
     onCreate,
     showActions = true,
     showSaldo = false,
+    openingBalance = null,
     limit = null,
     emptyMessage = null
   }
@@ -89,6 +90,16 @@ export function renderDocumentList(
       )
     );
     return;
+  }
+
+  if (showSaldo && openingBalance !== null && openingBalance !== undefined) {
+    container.append(
+      h(
+        'p',
+        { class: 'hint', 'data-testid': 'kardex-opening' },
+        `Saldo inicial del período: ${openingBalance}`
+      )
+    );
   }
 
   const headerCells = [
