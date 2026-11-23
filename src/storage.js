@@ -11,8 +11,6 @@ export const STORAGE_KEYS = {
   audit: 'erp.audit'
 };
 
-const DEFAULT_PERSONS = ['Ana', 'Bruno', 'Carlos', 'Diana'];
-
 function normalizeCode(value) {
   return String(value ?? '')
     .trim()
@@ -197,7 +195,7 @@ export function getPersons() {
     seen.add(key);
     return true;
   });
-  return unique.length > 0 ? unique : [...DEFAULT_PERSONS];
+  return unique;
 }
 
 export function savePersons(persons = []) {

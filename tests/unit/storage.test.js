@@ -49,7 +49,7 @@ describe('storage: entidades', () => {
   });
 
   it('gestiona personas locales sin credenciales y deduplica etiquetas', () => {
-    expect(getPersons().length).toBeGreaterThan(0);
+    expect(getPersons()).toEqual([]);
     const saved = savePersons(['Ana', 'Bruno', '  Ana  ', 'Carlos']);
     expect(saved).toEqual(['Ana', 'Bruno', 'Carlos']);
     expect(getPersons()).toEqual(['Ana', 'Bruno', 'Carlos']);

@@ -39,10 +39,10 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 **Justificación**: Integridad referencial y trazabilidad/auditoría (FR-003, FR-008/FR-009/FR-018, HU4).
 **Alternativas consideradas**: Borrado en cascada siempre o edición directa de confirmados (rompen historial).
 
-## Decisión 8: Sin roles operativos; identidad local de persona
-**Decisión**: Los roles son solo etiquetas descriptivas. No hay login, cuentas, permisos, selector de rol ni visibilidad de costos/contactos condicionada por rol (FR-047). La identidad se toma de un selector local de persona sin contraseña, y esa etiqueta se registra en la auditoría y en `aprobado_por` (FR-049).
-**Justificación**: Aclaraciones de 2026-11-10 y 2026-11-17; evita una falsa sensación de seguridad y permite verificar que el aprobador de un ajuste no es quien contó (HU4#4).
-**Alternativas consideradas**: Selector de rol con ocultación visual (retirado), autenticación/permisos reales o usuario implícito sin separación de funciones (todos rechazados).
+## Decisión 8: Sin roles operativos; identidad local de persona y acceso de demostración
+**Decisión**: Los roles son solo etiquetas descriptivas. No hay permisos, selector de rol ni visibilidad de costos/contactos condicionada por rol (FR-047). Desde 2026-11-23 existe un acceso local de demostración: el primer uso crea un perfil en `erp.auth.users`, la sesión vive en `erp.auth.session` y ese usuario se registra como PERSONA_LOCAL activa para auditoría y `aprobado_por` (FR-049). No valida identidad en servidor.
+**Justificación**: Aclaraciones de 2026-11-10 y 2026-11-17; el acceso de 2026-11-23 se documenta explícitamente como barrera visible y no como seguridad, y permite verificar que el aprobador de un ajuste no es quien contó (HU4#4).
+**Alternativas consideradas**: Selector de rol con ocultación visual (retirado), autenticación/permisos reales (diferida al backend) y usuario implícito sin separación de funciones (rechazado).
 
 ## Decisión 9: Conteos, ajustes y solicitudes como registros nativos
 **Decisión**: Modelar conteos físicos (ciegos, con diferencias) y solicitudes de reposición (con detalle y cantidad sugerida) como registros nativos vinculados a entidades/movimientos, con ajustes aprobados representados como movimientos de tipo Ajuste y referencias de trazabilidad.

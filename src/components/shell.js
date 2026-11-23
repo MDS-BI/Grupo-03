@@ -88,7 +88,14 @@ function warningContent(errors) {
 
 export function mountShell(
   root,
-  { config, errors = [], onNavigate = () => {}, personControl = null, onLoadDemo = null }
+  {
+    config,
+    errors = [],
+    onNavigate = () => {},
+    personControl = null,
+    onLoadDemo = null,
+    onSignOut = null
+  }
 ) {
   const logo = monogram(config.moduleName);
   const brandName = h(
@@ -116,6 +123,19 @@ export function mountShell(
               onclick: () => onLoadDemo()
             },
             'Datos demo'
+          )
+        : null,
+      onSignOut
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: 'button button-ghost button-small',
+              'data-testid': 'sign-out',
+              title: 'Cerrar sesión',
+              onclick: () => onSignOut()
+            },
+            'Salir'
           )
         : null,
       personControl

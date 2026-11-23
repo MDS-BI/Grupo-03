@@ -1,7 +1,7 @@
 import { h, option } from './dom.js';
 import { getPersons, savePersons } from '../storage.js';
 
-export function renderPersonSelector(container, { selectedPerson = '', onChange = () => {} } = {}) {
+export function renderPersonSelector(container, { selectedPerson = '', onAdd = () => {} } = {}) {
   let persons = getPersons();
   let current = selectedPerson || persons[0] || 'local';
 
@@ -9,10 +9,10 @@ export function renderPersonSelector(container, { selectedPerson = '', onChange 
     class: 'person-select',
     id: 'local-person',
     'data-testid': 'person-selector',
-    'aria-label': 'Persona local',
+    'aria-label': 'Persona local de la sesión',
+    disabled: true,
     onchange: (event) => {
-      current = event.target.value;
-      onChange(current);
+      event.target.value = current;
     }
   });
 
@@ -29,8 +29,8 @@ export function renderPersonSelector(container, { selectedPerson = '', onChange 
       type: 'button',
       class: 'button button-small button-ghost',
       'data-testid': 'person-add',
-      'aria-label': 'Agregar persona local',
-      title: 'Agregar persona local',
+      'aria-label': 'Agregar persona para aprobaciones',
+      title: 'Agregar persona para aprobaciones',
       onclick: () => {
         const answer = window.prompt('Etiqueta de la persona local:', '');
         if (answer === null) return;
@@ -40,10 +40,9 @@ export function renderPersonSelector(container, { selectedPerson = '', onChange 
             (person) =>
               person.toLocaleLowerCase('es') === String(answer).trim().toLocaleLowerCase('es')
           );
-          current = added || persons[persons.length - 1];
           refreshOptions();
-          feedback.textContent = `Persona local agregada: ${current}`;
-          onChange(current);
+          feedback.textContent = `Persona local agregada: ${added}`;
+          onAdd(added);
         } catch (error) {
           feedback.textContent = error?.message ?? 'No se pudo agregar la persona local.';
         }

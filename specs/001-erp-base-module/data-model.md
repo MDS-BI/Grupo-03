@@ -16,6 +16,7 @@ erDiagram
     ENTIDAD ||--o{ SOLICITUD_REPOSICION_DET : "solicita"
     SOLICITUD_REPOSICION ||--o{ SOLICITUD_REPOSICION_DET : "agrupa"
     MOVIMIENTO ||--o| MOVIMIENTO : "anula_a / contramovimiento"
+    PERFIL_ACCESO ||--o| PERSONA_LOCAL : "se registra como"
     PERSONA_LOCAL ||--o{ MOVIMIENTO : "actor / aprobador"
     PERSONA_LOCAL ||--o{ AUDITORIA : "registra"
     ENTIDAD ||--o{ AUDITORIA : "afectada"
@@ -67,6 +68,12 @@ erDiagram
     PERSONA_LOCAL {
         string person_id PK
         string label "Etiqueta visible elegida en el selector local"
+    }
+
+    PERFIL_ACCESO {
+        string username PK "Usuario del acceso local de demostración"
+        string salt "Salt del hash de la contraseña"
+        string hash "SHA-256(salt:password); no es autenticación de backend"
     }
 
     AUDITORIA {
@@ -200,7 +207,8 @@ Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleN
 
 ### 2.6 PERSONA_LOCAL y AUDITORIA
 
-- **PERSONA_LOCAL**: etiqueta elegida en un selector local sin contraseña ni permisos (FR-049). No es un rol y no habilita ni oculta funcionalidad.
+- **PERSONA_LOCAL**: etiqueta del selector local, sin permisos (FR-049). No es un rol y no habilita ni oculta funcionalidad. El perfil que inicia sesión se registra como persona local activa y queda fijo como actor; se pueden agregar otras etiquetas solo como aprobadores.
+- **PERFIL_ACCESO**: acceso local de demostración guardado fuera de `STORAGE_KEYS` (`erp.auth.users`/`erp.auth.session`). No valida identidad en servidor ni protege datos sensibles (FR-047).
 - **AUDITORIA**: registro automático de cada creación, edición o desactivación de entidad (HU1#4) con `action`, `person` (PersonaLocal), `timestamp` y, si aplica, `entityId` y `details`. Las aprobaciones de ajustes guardan además `approvedByPerson` en el movimiento.
 
 La separación de funciones se valida comparando la persona del conteo con `approvedByPerson`; ambas deben ser distintas.

@@ -16,6 +16,8 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 - **Gestión de Entidades (Productos y Proveedores):** Administración del maestro de productos, SKU, ubicaciones y datos de proveedores.
 - **Gestión de Documentos (Movimientos de Inventario):** Registro de guías de recepción, despachos y transferencias de stock.
 - **Persistencia Local:** Los datos se guardan en el almacenamiento local del navegador (`localStorage`).
+- **Acceso Local:** Registro de perfil en el primer ingreso y sesión por navegador (`sessionStorage`), con cierre de sesión desde la barra superior. No sustituye autenticación de servidor.
+- **Datos Demo:** Botón “Datos demo” en la barra superior carga 2 productos, 1 proveedor, 4 movimientos y las etiquetas locales Ana/Bruno/Carlos/Diana como ejemplo.
 - **Integridad Referencial:** Eliminación física solo sin historial; con historial se desactiva conservando documentos y trazabilidad.
 
 ---
@@ -31,7 +33,7 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 - **US5 Panel y reposición**: KPIs (activos, valoración, alertas, sin movimiento 90 días, cobertura), filtros por categoría y período que recalculan tarjetas y tablas, alertas con cantidad sugerida editable y generación de solicitudes de reposición agrupadas por proveedor.
 - **Búsqueda y UX**: búsqueda por nombre/código/categoría/descripción/fecha/campos personalizados, estados vacíos, renderizado seguro (sin innerHTML con datos de usuario), etiquetas y mensajes de validación accesibles.
 
-> No existen roles operativos ni selector de rol: la identidad se elige en un selector local de persona, sin contraseña, y solo identifica al responsable en auditoría, movimientos y aprobaciones (FR-047, FR-049). Costos y valorización se muestran solo en panel y catálogo (FR-044).
+> No existen roles operativos ni selector de rol: la identidad queda fija en un selector local deshabilitado con el perfil que entró y solo identifica al responsable en auditoría y movimientos (FR-047, FR-049). El botón “+” agrega etiquetas para aprobaciones, sin cambiar al actor. El ingreso usa un perfil local (usuario/contraseña) creado en el primer acceso; es una barrera de demostración, no seguridad real: las credenciales y la sesión viven en el navegador y pueden borrarse o modificarse. Costos y valorización se muestran solo en panel y catálogo (FR-044).
 
 > Nota: la configuración declarativa en src/module-config.js permite adaptar etiquetas, campos personalizados, ciclo de vida y tema. Las capacidades nativas de inventario descritas arriba forman parte del módulo base implementado.
 

@@ -1,18 +1,12 @@
 import { userConfig } from './module-config.js';
-import {
-  addDocument,
-  addEntity,
-  addProvider,
-  getPersons,
-  resetStore,
-  savePersons
-} from './storage.js';
+import { addDocument, addEntity, addProvider, resetStore, savePersons } from './storage.js';
+
+export const DEMO_PERSONS = ['Ana', 'Bruno', 'Carlos', 'Diana'];
 
 export function loadDemoData() {
-  const persons = getPersons();
-  const actor = persons[0] || 'Ana';
   resetStore();
-  savePersons(persons);
+  const persons = savePersons(DEMO_PERSONS);
+  const actor = persons[0];
 
   const provider = addProvider({
     rut: '12.345.678-5',

@@ -8,7 +8,7 @@
 
 Construir un módulo base ERP frontend reutilizable para gestión de datos maestros (Entidades/Productos) y operaciones nativas de inventario (Entradas, Salidas, Transferencias, Ajustes, conteos físicos, anulaciones con contramovimiento y solicitudes de reposición), con saldo/ubicación por movimiento, validación de existencias, kardex, panel de KPIs y reetiquetado total desde configuración. El MVP se implementa como una SPA con Vite, HTML, CSS y JavaScript vanilla, persistencia en `localStorage` y pruebas con Vitest + jsdom.
 
-Alcance aclarado (2026-11-17): entran en esta versión las historias de catálogo, movimientos, kardex, conteos, indicadores y terminología configurable; la integración con Compras y Ventas (HU10) queda diferida. Los roles son solo etiquetas descriptivas, sin autenticación, permisos, selector de rol ni visibilidad condicionada por rol; la identidad de la persona se toma de un selector local sin contraseña y se registra en auditoría y aprobaciones. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
+Alcance aclarado (2026-11-17): entran en esta versión las historias de catálogo, movimientos, kardex, conteos, indicadores y terminología configurable; la integración con Compras y Ventas (HU10) queda diferida. Los roles son solo etiquetas descriptivas, sin permisos, selector de rol ni visibilidad condicionada por rol; desde 2026-11-23 existe un acceso local de demostración con perfil en primer uso, y la identidad de ese perfil se registra en el selector local para auditoría y aprobaciones. No es autenticación real. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
 
 ## Technical Context
 
@@ -26,7 +26,7 @@ Alcance aclarado (2026-11-17): entran en esta versión las historias de catálog
 
 **Performance Goals**: Listado y búsqueda correctos y responsivos con al menos 500 entidades (FR-032, SC-004); crear entidad y verla en la lista < 2 min (SC-001); búsqueda < 10 s (SC-002); navegación a gestión/búsqueda < 10 s (SC-005)
 
-**Constraints**: Sin backend, sin autenticación ni permisos; sin selector de rol ni visibilidad por rol (FR-047); selector local de persona para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
+**Constraints**: Sin backend ni autenticación real; acceso local de demostración con perfil y sesión en el navegador, sin permisos ni visibilidad por rol (FR-047); selector local de persona derivado del perfil para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
 
 **Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 10 historias en alcance (US1–US9 y US11; US10 —Compras/Ventas— diferida); 3 pantallas (Panel, Gestión, Búsqueda); 49 requisitos funcionales + 5 requisitos de extensibilidad
 
@@ -145,7 +145,7 @@ El MVP es una SPA sin backend: la persistencia es `localStorage` (`erp.entities`
 1. **Persistencia y concurrencia.** Sustituir `localStorage` por una API con base de datos relacional; las tablas `ENTIDAD`, `MOVIMIENTO`, `PROVEEDOR`, `CONTEO_FISICO`, `AUDITORIA` ya están modeladas en `data-model.md`.
 2. **Saldo por ubicación.** Crear la tabla `StockUbicacion` y derivar el saldo por pasillo/estante/nivel con vistas materializadas, conservando los movimientos como fuente de verdad.
 3. **Integración con Compras y Ventas (US10).** Añadir `orden_compra_id` y `pedido_venta_id` sin cambiar el contrato central de almacenamiento.
-4. **Identidad y permisos reales.** Autenticar en backend y aplicar control de acceso por rol validado en servidor; hoy los roles son solo etiquetas descriptivas (FR-047).
+4. **Identidad y permisos reales.** Autenticar en backend y aplicar control de acceso por rol validado en servidor; hoy los roles son solo etiquetas descriptivas y el acceso local de demostración no sustituye esta capacidad (FR-047).
 5. **Auditoría inmutable y observabilidad.** Registros solo de inserción, trazas de las operaciones de stock y panel de errores.
 
 ## Potenciales usuarios y mitigación de sesgos
@@ -160,7 +160,7 @@ El MVP es una SPA sin backend: la persistencia es `localStorage` (`erp.entities`
 | Jefe de bodega | Explicar diferencias de stock | Kardex cronológico, anulación con contramovimiento, conteos ciegos y ajustes aprobados |
 | Analista de inventario | Apoyar decisiones | KPIs, alertas de reposición, filtros por categoría/período y rotación/cobertura |
 
-En el MVP **no hay selector de rol**: estos perfiles son los usuarios potenciales descritos en las historias; la identidad real se elige en un selector local de persona que solo se usa para auditoría y aprobaciones.
+En el MVP **no hay selector de rol**: estos perfiles son los usuarios potenciales descritos en las historias; la identidad real queda fija desde el perfil que entró y solo se usa para auditoría y aprobaciones, mientras que el botón “+” agrega etiquetas para aprobador.
 
 ### Sesgos asociados a los datos y su uso
 

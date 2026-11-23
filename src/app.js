@@ -8,10 +8,20 @@ import { renderDocumentForm } from './components/document-form.js';
 import { renderDocumentList } from './components/document-list.js';
 import { renderSearch } from './components/search-bar.js';
 import { renderAuditLog } from './components/audit-log.js';
-import { loadDemoData } from './demo-data.js';
+import { renderLogin } from './components/login.js';
+import {
+  getCurrentUser,
+  hasUsers,
+  isAuthenticated,
+  registerUser,
+  signIn,
+  signOut
+} from './auth.js';
+import { DEMO_PERSONS, loadDemoData } from './demo-data.js';
 import {
   addDocument,
   addEntity,
+  addPerson,
   addProvider,
   approveCountAdjustment,
   closePhysicalCount,
@@ -28,6 +38,7 @@ import {
   loadEntities,
   loadProviders,
   recordBlindCountDetail,
+  savePersons,
   updateDocument,
   updateEntity,
   voidDocument
@@ -66,6 +77,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   const { config, errors } = loadModuleConfig(rawConfig);
   const initialRoute = parseHash(window.location.hash);
+  let authenticated = isAuthenticated();
 
   const state = {
     view: initialRoute.view,
@@ -85,9 +97,8 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   const personControlHost = h('div');
   const personSelector = renderPersonSelector(personControlHost, {
     selectedPerson: state.selectedPerson,
-    onChange: (person) => {
-      state.selectedPerson = person;
-      state.approverPerson = '';
+    onAdd: () => {
+      personSelector.refresh();
       render();
     }
   });
@@ -97,8 +108,12 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     errors,
     personControl: personControlHost,
     onNavigate: handleNavigation,
-    onLoadDemo: handleLoadDemo
+    onLoadDemo: handleLoadDemo,
+    onSignOut: handleSignOut
   });
+
+  const loginHost = h('div', { class: 'login-host' });
+  targetRoot.append(loginHost);
 
   function hasUnsavedChanges() {
     return Object.values(state.formApis).some((api) => api?.isDirty?.());
@@ -168,8 +183,12 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleLoadDemo() {
+    const currentUser = getCurrentUser();
     loadDemoData();
-    state.selectedPerson = getPersons()[0] || 'local';
+    const { person: localPerson } = addPerson(currentUser || getPersons()[0] || 'local');
+    state.selectedPerson = localPerson;
+    personSelector.refresh();
+    personSelector.setPerson(localPerson);
     state.approverPerson = '';
     state.editingEntityId = null;
     state.editingDocumentId = null;
@@ -185,6 +204,42 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         'Datos demo cargados: 2 productos, 1 proveedor y 4 movimientos.'
       )
     );
+  }
+
+  async function handleAuth({ mode, username, password, confirm }) {
+    const firstProfile = !hasUsers();
+    if (mode === 'register') {
+      if (password !== confirm) throw new Error('Las contraseñas no coinciden.');
+      await registerUser({ username, password });
+    }
+    const person = await signIn({ username, password });
+    const persons = getPersons();
+    const legacyOnly = persons.length > 0 && persons.every((name) => DEMO_PERSONS.includes(name));
+    const localPerson =
+      firstProfile || (legacyOnly && !DEMO_PERSONS.includes(person))
+        ? savePersons([person])[0]
+        : addPerson(person).person;
+    authenticated = true;
+    state.selectedPerson = localPerson;
+    personSelector.refresh();
+    personSelector.setPerson(localPerson);
+    state.approverPerson = '';
+    state.editingEntityId = null;
+    state.editingDocumentId = null;
+    state.kardexEntityId = null;
+    render();
+  }
+
+  function handleSignOut() {
+    const currentUser = getCurrentUser();
+    signOut();
+    authenticated = false;
+    state.selectedPerson = currentUser || getPersons()[0] || 'local';
+    personSelector.setPerson(state.selectedPerson);
+    state.approverPerson = '';
+    state.editingEntityId = null;
+    state.editingDocumentId = null;
+    render();
   }
 
   function handleEntitySubmit(values) {
@@ -812,6 +867,14 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function render() {
     if (state.destroyed) return;
+    if (!authenticated) {
+      targetRoot.classList.add('is-locked');
+      clear(loginHost);
+      renderLogin(loginHost, { config, onSubmit: handleAuth });
+      return;
+    }
+    targetRoot.classList.remove('is-locked');
+    clear(loginHost);
     shell.setActive(state.view, state.section);
     shell.setWarnings(errors);
     applyAccent(targetRoot, config);

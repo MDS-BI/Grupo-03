@@ -1,4 +1,5 @@
-import { addDocument, addEntity } from '../src/storage.js';
+import { AUTH_SESSION_KEY } from '../src/auth.js';
+import { addDocument, addEntity, savePersons } from '../src/storage.js';
 import { initApp } from '../src/app.js';
 import { userConfig } from '../src/module-config.js';
 
@@ -18,10 +19,14 @@ export const baseConfig = {
 
 export const configuredConfig = userConfig;
 
-export function mountApp(rawConfig = baseConfig) {
+export function mountApp(rawConfig = baseConfig, { authenticated = true } = {}) {
   const root = document.createElement('div');
   root.id = 'app';
   document.body.append(root);
+  if (authenticated) {
+    window.sessionStorage.setItem(AUTH_SESSION_KEY, 'Ana');
+    savePersons(['Ana', 'Bruno', 'Carlos', 'Diana']);
+  }
   return initApp({ root, rawConfig });
 }
 

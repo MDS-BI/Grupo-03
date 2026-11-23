@@ -16,6 +16,13 @@ npm run dev
 ```
 Abrir la URL de Vite (por defecto `http://localhost:5173`).
 
+## Primer acceso (demostración)
+
+1. En la pantalla inicial, crear un perfil con usuario y contraseña de al menos 4 caracteres.
+2. **Esperado**: el usuario creado queda como persona local activa y fija en el selector; “Salir” bloquea la interfaz y permite volver a entrar con el mismo perfil.
+3. **Esperado**: no hay roles ni permisos; este acceso es solo una barrera local en el navegador, no autenticación real.
+4. Opcional: pulsar “Datos demo” para cargar las etiquetas Ana/Bruno/Carlos/Diana y el dataset de logística.
+
 ## Pruebas automatizadas
 
 ```bash
@@ -35,7 +42,7 @@ npm run preview
 5. Intentar eliminar un producto con movimientos/historial.
 6. **Esperado**: eliminación bloqueada y solo se permite desactivación conservando historial. Si no tiene historial, la eliminación física es posible.
 7. Revisar la interfaz en busca de un selector de rol o de una vista que oculte costos/contactos por rol.
-8. **Esperado**: no existe selector de rol ni visibilidad condicionada por rol; la persona local solo identifica al actor y los costos/valorización se muestran solo en panel/catálogo (FR-044, FR-047, FR-049).
+8. **Esperado**: no existe selector de rol ni visibilidad condicionada por rol; la persona local, derivada del perfil que entró, solo identifica al actor y los costos/valorización se muestran solo en panel/catálogo (FR-044, FR-047, FR-049).
 
 ### HU2 — Recepción (entrada) y transferencia con ubicación
 1. Registrar Entrada confirmada con cantidad y ubicación (pasillo-estante-nivel).
@@ -74,7 +81,7 @@ npm run preview
 | Campos obligatorios entidad (nombre, SKU, categoría, unidad, punto de reorden) | Bloqueo y mensajes claros si faltan |
 | SKU único global (normalizado) | Bloqueo en alta/edición duplicada |
 | Eliminación con/sin historial | Sin historial: elimina; con historial: solo desactiva |
-| Visibilidad por rol | No existe: sin selector de rol ni ocultación de costos/contactos (FR-047) |
+| Acceso / visibilidad por rol | Acceso local de demostración con perfil en primer uso; sin roles, permisos ni ocultación de costos/contactos (FR-047) |
 | Persona local en auditoría | Toda creación/edición/desactivación registra persona y fecha (FR-049) |
 | Aprobación de ajustes | Requiere persona distinta de la del conteo (HU4#4) |
 | Movimientos confirmados | Inmutables; corrección por contramovimiento |
@@ -92,8 +99,8 @@ npm run preview
 
 ## Notas de alineación
 
-- Los roles son etiquetas descriptivas: no hay login, permisos, selector de rol ni visibilidad por rol.
-- La identidad se elige en un selector local de persona sin contraseña; se registra en auditoría y aprobaciones.
+- Los roles son etiquetas descriptivas: no hay permisos, selector de rol ni visibilidad por rol; el acceso local de demostración no es autenticación real.
+- La identidad del perfil que entra queda fija en el selector local de persona y se usa en auditoría; el botón “+” solo agrega etiquetas para aprobaciones/separación de funciones.
 - `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
 - Ubicación actual del producto: derivada del último documento de entrada o transferencia confirmado.
 - La integración con Compras y Ventas (HU10) está fuera de esta versión.

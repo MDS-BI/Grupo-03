@@ -4,15 +4,22 @@
 
 ## Propósito
 
-Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). No hay roles operativos: la identidad se elige en un selector local de persona solo para auditoría y aprobaciones (FR-049). La integración con Compras y Ventas (HU10) queda fuera de este contrato (FR-046).
+Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). No hay roles operativos ni permisos: un acceso local de demostración crea un perfil en el primer uso y ese usuario pasa a ser la persona local activa para auditoría y aprobaciones (FR-047, FR-049). La integración con Compras y Ventas (HU10) queda fuera de este contrato (FR-046).
+
+## Acceso local (demostración)
+
+- Pantalla inicial con formulario de registro en el primer uso y de ingreso después; usuario y contraseña (mínimo 4 caracteres) se guardan en `erp.auth.users`, sesión en `erp.auth.session`.
+- Usuario/contraseña incorrectos muestran error accesible; “Salir” cierra la sesión y vuelve al formulario.
+- El perfil que entra se registra como **persona local** y queda fijo en el marco; el botón “+” solo agrega etiquetas locales para aprobaciones/separación de funciones, sin cambiar al actor de la sesión.
+- No hay roles, permisos ni visibilidad condicionada; es una barrera del navegador, no autenticación de servidor (FR-047).
 
 ## Marco persistente (workspace shell)
 
 - Barra superior con logotipo monograma SVG derivado de `moduleName` y nombre del módulo.
-- Selector de **persona local** disponible en el marco; su etiqueta se usa en auditoría, movimientos y aprobaciones. No es un rol, no da permisos y no oculta costos ni contactos (FR-047/FR-049).
+- Selector de **persona local** disponible en el marco pero deshabilitado: muestra al perfil de la sesión y su etiqueta se usa en auditoría y movimientos. No es un rol, no da permisos y no oculta costos ni contactos (FR-047/FR-049).
 - Barra lateral con botones de módulo: Panel, Entidades, Documentos y Buscar; el activo se resalta (`aria-current`).
 - En anchos reducidos la barra lateral se contrae a iconos manteniéndose operable.
-- El marco permanece visible en todas las pantallas.
+- El marco permanece visible en todas las pantallas una vez superado el acceso local.
 
 ## Pantallas
 
@@ -59,8 +66,8 @@ Definir pantallas, navegación y comportamiento observable de la SPA. Las etique
 ## Etiquetado e identidad local
 
 - Todas las etiquetas visibles derivan de `labels` (FR-029); fallback a términos base (FR-024).
-- No existe selector de rol ni ocultación de costos/contactos por rol (FR-047): la visibilidad de costos y valorización se rige por FR-044 (panel y catálogo).
-- El selector de persona local solo identifica al responsable de movimientos, conteos, aprobaciones y auditoría (FR-049).
+- No existe selector de rol, permisos ni ocultación de costos/contactos por rol (FR-047): la visibilidad de costos y valorización se rige por FR-044 (panel y catálogo).
+- El selector de persona local, fijado al perfil que entró, identifica al responsable de movimientos, conteos y auditoría; el aprobador se elige por separado entre las etiquetas agregadas (FR-049).
 
 ## Estados de retroalimentación
 

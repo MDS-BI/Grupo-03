@@ -4,6 +4,7 @@ import { loadDemoData } from '../../src/demo-data.js';
 import {
   getDashboardStats,
   getKardex,
+  getPersons,
   getReplenishmentSuggestions,
   loadDocuments,
   loadEntities,
@@ -20,6 +21,7 @@ describe('prueba de datos: dataset simulado de logística', () => {
     const { provider, tornillos, cinta } = loadDemoData();
     const entities = loadEntities();
 
+    expect(getPersons()).toEqual(['Ana', 'Bruno', 'Carlos', 'Diana']);
     expect(entities).toHaveLength(2);
     expect(entities[0].customFields).toMatchObject({
       sku: 'TOR-M6',
@@ -99,5 +101,6 @@ describe('prueba de datos: dataset simulado de logística', () => {
     expect(document.querySelector('[data-testid="demo-notice"]').textContent).toContain(
       'Datos demo cargados'
     );
+    expect(document.querySelector('[data-testid="person-selector"]').value).toBe('Ana');
   });
 });

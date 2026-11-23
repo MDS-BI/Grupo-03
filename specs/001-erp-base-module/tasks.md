@@ -9,14 +9,14 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 **Tests**: Included because Constitution Principle II requires automated tests for user-visible behavior and business logic. Write tests before or alongside implementation.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing. The plan of 2026-11-17 keeps HU1–HU5 as native scope, folds transfer into the inventory model, retracts role-based permissions (FR-047) and defers the Compras/Ventas integration (FR-046). This list maps every spec story to a phase: US1–US9 and US11 are actionable; US10 is deferred and generates no phase.
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing. The plan of 2026-11-17 keeps HU1–HU5 as native scope, folds transfer into the inventory model, retracts role-based permissions (FR-047) and defers the Compras/Ventas integration (FR-046). On 2026-11-23 a local demo access gate was added without roles or permissions (FR-047), deriving the active PERSONA_LOCAL from the registered profile (FR-049). This list maps every spec story to a phase: US1–US9 and US11 are actionable; US10 is deferred and generates no phase.
 
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
 - **[Story]**: User story label (`[US1]`..`[US11]`) for story-phase tasks only
 - Every task includes an exact file path
-- `[X]` = implemented and covered by passing tests (103 tests green; `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` pass); `[ ]` = pending
+- `[X]` = implemented and covered by passing tests (107 tests green; `npm run lint`, `npm run test:run` and `npm run build` pass); `[ ]` = pending
 
 ## Story Traceability
 
@@ -257,9 +257,9 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ## Phase 11: User Story 9 - Roles, datos sensibles y auditoría (Priority: P3)
 
-**Goal**: Mantener auditoría completa con persona local y documentar que los roles son etiquetas descriptivas sin autenticación, permisos ni visibilidad condicionada (FR-047).
+**Goal**: Mantener auditoría completa con persona local, incorporar el acceso local de demostración sin roles ni permisos y documentar que los roles son etiquetas descriptivas sin visibilidad condicionada (FR-047).
 
-**Independent Test**: Revisar la auditoría tras crear, editar, desactivar y anular, comprobando persona, acción, fecha y detalle; verificar que no existe selector de rol ni ocultación de costos/contactos por rol; comprobar que la persona del selector local queda registrada en movimientos y aprobaciones.
+**Independent Test**: Crear un perfil en el primer ingreso, confirmar que ese usuario queda como persona local activa y que la sesión persiste al remontar; revisar la auditoría tras crear, editar, desactivar y anular, comprobando persona, acción, fecha y detalle; verificar que no existe selector de rol ni ocultación de costos/contactos por rol; comprobar que la persona del selector local queda registrada en movimientos y aprobaciones.
 
 ### Tests for User Story 9
 
@@ -270,9 +270,11 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - [X] T076 [P] [US9] Implement audit recording for entity create/update/deactivate/delete operations in `src/storage.js`
 - [X] T077 [P] [US9] Implement the local-person selector used for audit, movement actor and adjustment approval without granting permissions in `src/components/person-selector.js` and `src/app.js`
-- [X] T078 [US9] Document that roles are descriptive only (no login, permissions, role selector or role-based visibility) per FR-047 and remove contradictory role-simulation text in `README.md` and `specs/001-erp-base-module/quickstart.md`
+- [X] T078 [US9] Document that roles are descriptive only (no permissions, role selector or role-based visibility) and that local demo access is not backend authentication per FR-047; remove contradictory role-simulation text in `README.md` and `specs/001-erp-base-module/quickstart.md`
 - [X] T079 [US9] Implement an audit log view with user/action/entity/date filters and before/after details in `src/components/audit-log.js`, `src/components/shell.js` and `src/app.js`
 - [X] T080 [US9] Extend audit records to document void and adjustment approval with before/after values in `src/storage.js`
+- [X] T081 [US9] Implement local demo access with first-use profile registration, browser session, sign-out, the authenticated user seeded as PERSONA_LOCAL and the actor selector fixed to that user in `src/auth.js`, `src/components/login.js`, `src/components/person-selector.js`, `src/app.js`, `src/storage.js` and `src/styles.css`
+- [X] T082 [P] [US9] Add integration tests for access, session persistence and non-demo profile handling in `tests/integration/auth.test.js`, `tests/helpers.js`, `tests/setup.js` and `tests/unit/storage.test.js`
 
 **Checkpoint**: US9 independently functional for audit review and local identity.
 
@@ -442,6 +444,6 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - `[US#]` labels provide traceability from tasks to spec user stories
 - Keep domain rules (uniqueness, stock effects, immutability, history preservation, audit) centralized in `src/storage.js`
 - `costo_unitario` must never be an input in movement forms; costs and valuation are shown only in the panel and catalog (FR-044)
-- There is no role selector, login or role-based visibility (FR-047); the local-person selector only identifies the actor in audit records, movements and approvals (FR-049)
+- There is no role selector, permissions or role-based visibility (FR-047); the local demo access gate only blocks the UI until a browser profile is created, and the authenticated user becomes the active local person used in audit records, movements and approvals (FR-049)
 - US10 (Compras/Ventas) is deferred (FR-046) and must not add `orden_compra_id`/`pedido_venta_id` in this version
 - Stop at each checkpoint to validate the story independently before proceeding

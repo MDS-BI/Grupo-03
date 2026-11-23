@@ -21,12 +21,16 @@ describe('integración: shell, navegación y búsqueda', () => {
     expect(navCurrent('nav-search')).toBe('page');
   });
 
-  it('usa la persona local del marco para la auditoría y no expone selector de rol', async () => {
+  it('fija la persona local del marco al perfil de la sesión y no expone selector de rol', async () => {
     const app = mountApp(configuredConfig);
     expect(document.querySelector('[data-testid="role-selector"]')).toBeNull();
-    expect(document.querySelector('[data-testid="person-selector"]')).toBeTruthy();
+    const selector = document.querySelector('[data-testid="person-selector"]');
+    expect(selector.disabled).toBe(true);
+    expect(selector.value).toBe('Ana');
 
-    setValue(document.querySelector('[data-testid="person-selector"]'), 'Bruno');
+    setValue(selector, 'Bruno');
+    expect(selector.value).toBe('Ana');
+
     await go(app, 'manage', 'entities');
     const form = document.querySelector('[data-testid="entity-form"]');
     setValue(form.querySelector('[data-testid="entity-name"]'), 'Producto auditado');
@@ -38,10 +42,10 @@ describe('integración: shell, navegación y búsqueda', () => {
 
     const audit = getAuditTrail({ action: 'create' });
     expect(audit).toHaveLength(1);
-    expect(audit[0].person).toBe('Bruno');
+    expect(audit[0].person).toBe('Ana');
   });
 
-  it('agrega una persona local desde el marco y la deja seleccionada', () => {
+  it('agrega una persona para aprobaciones sin cambiar la persona de la sesión', () => {
     mountApp(configuredConfig);
     vi.spyOn(window, 'prompt').mockReturnValue('Elena');
 
@@ -49,7 +53,7 @@ describe('integración: shell, navegación y búsqueda', () => {
 
     expect(getPersons()).toContain('Elena');
     const selector = document.querySelector('[data-testid="person-selector"]');
-    expect(selector.value).toBe('Elena');
+    expect(selector.value).toBe('Ana');
     expect(Array.from(selector.options).some((option) => option.value === 'Elena')).toBe(true);
     expect(
       document.querySelector('[data-testid="person-selector-feedback"]').textContent

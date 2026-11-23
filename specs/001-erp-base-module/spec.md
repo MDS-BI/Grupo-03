@@ -238,20 +238,20 @@ Como Operador de Recepción o de Despacho, quiero mover stock de una ubicación 
 
 Como Administrador del módulo, quiero que cada acción quede registrada con la persona que la ejecuta, para poder auditar los cambios y verificar la separación de funciones sin crear una falsa sensación de seguridad.
 
-**Por qué esta prioridad**: El MVP es solo frontend y no tiene autenticación real. Ocultar costos o contactos mediante un selector de rol simulado daría una protección que cualquier usuario podría eludir desde el navegador; por eso se retiró esa funcionalidad (FR-047, decisiones de 2026-11-10 y 2026-11-17) y se conserva solo la identidad local como evidencia de auditoría.
+**Por qué esta prioridad**: El MVP es solo frontend y no tiene autenticación real en servidor. Ocultar costos o contactos mediante un selector de rol simulado daría una protección que cualquier usuario podría eludir desde el navegador; por eso se retiró esa funcionalidad (FR-047, decisiones de 2026-11-10 y 2026-11-17). El 2026-11-23 se incorporó un acceso local de demostración que crea un perfil en el primer uso y mantiene la sesión en el navegador; es una barrera visible, no seguridad, y no cambia la visibilidad de datos. La identidad local derivada del perfil sigue siendo la evidencia de auditoría (FR-049).
 
 **Prueba Independiente**: Elegir una persona en el selector local, crear y desactivar un producto y anular un movimiento; revisar la auditoría y comprobar que aparecen la persona, la acción, la fecha y el detalle con valores anterior y nuevo. Luego realizar un conteo con una persona y aprobarlo con otra distinta.
 
 **Escenarios de Aceptación**:
 
 1. **Dado** cualquier creación, edición, desactivación o anulación, **entonces** queda un registro de auditoría con persona local, acción, entidad, fecha y hora, y valores anterior y nuevo cuando aplica.
-2. **Dado** el MVP (solo frontend), **entonces** no existe inicio de sesión, selector de rol ni visibilidad condicionada por rol; la identidad se elige en un selector local sin contraseña (FR-047, FR-049).
+2. **Dado** el MVP (solo frontend), **entonces** no existen roles, permisos ni visibilidad condicionada por rol; existe un acceso local de demostración con perfil creado en el primer uso y sesión por navegador, y la identidad del perfil se usa como persona local en auditoría/aprobaciones (FR-047, FR-049).
 3. **Dado** un ajuste derivado de un conteo, **entonces** la persona que aprueba debe ser distinta de quien contó, y ambos datos quedan en el movimiento.
-4. **Dado** un despliegue a producción, **entonces** la autenticación, los permisos y la protección de datos sensibles deben validarse en el backend, no en la interfaz.
+4. **Dado** un despliegue a producción, **entonces** la autenticación, los permisos y la protección de datos sensibles deben validarse en el backend, no en la interfaz; el acceso local de demostración no sustituye este requisito.
 
-**Datos involucrados**: `PERSONA_LOCAL` (nombre/etiqueta elegida), `AUDITORIA` (`audit_id`, `person`, `action`, `entityId`, `timestamp`, `details`) y `MOVIMIENTO` (`actorPerson`, `approvedByPerson`).
+**Datos involucrados**: `PERSONA_LOCAL` (etiqueta derivada del perfil que entró), `AUDITORIA` (`audit_id`, `person`, `action`, `entityId`, `timestamp`, `details`) y `MOVIMIENTO` (`actorPerson`, `approvedByPerson`). El acceso local usa `erp.auth.users`/`erp.auth.session` fuera de `STORAGE_KEYS`; no es una cuenta de backend.
 
-**Decisión de diseño**: Los roles quedan como etiquetas descriptivas en la documentación, sin permisos asociados en el MVP. La auditoría y la separación de funciones se implementan en la capa de almacenamiento; el control real de acceso queda diferido al backend.
+**Decisión de diseño**: Los roles quedan como etiquetas descriptivas en la documentación, sin permisos asociados en el MVP. El perfil del acceso local de demostración se convierte en la persona local activa y el selector de actor queda fijo; el botón “+” solo agrega etiquetas para aprobaciones/separación de funciones, sin permitir cambiar al responsable registrado. La auditoría se implementa en la capa de almacenamiento; el control real de acceso queda diferido al backend.
 ### Historia de Usuario 10 – Integración con Compras y Ventas (Prioridad: P3)
 
 Como Analista de Inventario, quiero que las solicitudes de reposición lleguen al módulo de Compras y que los pedidos de Ventas aparezcan como despachos pendientes, para no digitar dos veces la misma información.
@@ -372,7 +372,7 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 ## Suposiciones
 
 - El módulo base gestiona datos para un único espacio de trabajo en lugar de una base de datos multiinquilino compartida.
-- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) se eligen con un selector simulado que controla la visibilidad de funciones y datos sensibles en la interfaz; el módulo base no implementa autenticación ni inicio de sesión, y en producción los permisos deben validarse en el backend.
+- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) son etiquetas descriptivas sin permisos ni visibilidad condicionada (FR-047). El acceso local de demostración usa un perfil creado en el primer uso y no es autenticación real; en producción los permisos deben validarse en el backend.
 - La valoración del stock usa un `costo_unitario` opcional por producto y se muestra solo en el panel y el catálogo; los formularios de Entrada y Salida de Inventario no incluyen campos de costo.
 - La adaptación a un módulo específico se realiza mediante un archivo de configuración del módulo en lugar de editando archivos fuente centrales.
 - Cada entidad incluye información básica suficiente para identificación y seguimiento; los módulos personalizados aportan los campos específicos del dominio.
