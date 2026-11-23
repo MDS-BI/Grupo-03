@@ -1648,14 +1648,14 @@ export function recordBlindCountDetail(countId, { entity_id, countedQuantity }) 
   const count = counts.find((c) => c.count_id === countId);
   if (!count) throw new NotFoundError('El conteo no existe.');
   if (count.state !== 'open')
-    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+    throw new ValidationError({ _form: 'El conteo ya está cerrado.' }, 'Conteo cerrado.');
   const entity = getEntity(entity_id);
   if (!entity) throw new NotFoundError('La entidad ya no existe.');
   const qty = Number(countedQuantity);
   if (!Number.isInteger(qty) || qty < 0) {
     throw new ValidationError(
       { countedQuantity: 'La cantidad contada debe ser un entero mayor o igual a 0.' },
-      'Cantidad inv�lida.'
+      'Cantidad inválida.'
     );
   }
   count.details = Array.isArray(count.details) ? count.details : [];
@@ -1677,7 +1677,7 @@ export function closePhysicalCount(countId) {
   const count = counts.find((c) => c.count_id === countId);
   if (!count) throw new NotFoundError('El conteo no existe.');
   if (count.state !== 'open')
-    throw new ValidationError({ _form: 'El conteo ya est� cerrado.' }, 'Conteo cerrado.');
+    throw new ValidationError({ _form: 'El conteo ya está cerrado.' }, 'Conteo cerrado.');
   const entities = loadEntities();
   count.details = (count.details || []).map((d) => {
     const entity = entities.find((e) => e.entity_id === d.entity_id);
@@ -1715,8 +1715,8 @@ export function approveCountAdjustment(
   const countedBy = resolveActor(count, count.actorLabel || 'operador');
   if (approver.toLocaleLowerCase('es') === countedBy.toLocaleLowerCase('es')) {
     throw new ValidationError(
-      { approverLabel: 'La aprobaci�n debe registrarse con un actor distinto al del conteo.' },
-      'Actor inv�lido.'
+      { approverLabel: 'La aprobación debe registrarse con un actor distinto al del conteo.' },
+      'Actor inválido.'
     );
   }
   const adjustmentReason = trimString(reason);

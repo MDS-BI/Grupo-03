@@ -307,7 +307,7 @@ describe('storage: US4 kardex y conteos', () => {
     localStorage.clear();
   });
 
-  it('genera kardex cronol�gico con saldo acumulado y permite filtrar por tipo', async () => {
+  it('genera kardex cronológico con saldo acumulado y permite filtrar por tipo', async () => {
     const { getKardex, addDocument } = await import('../../src/storage.js');
     const entity = seedEntity();
     addDocument(
@@ -388,12 +388,12 @@ describe('storage: US4 kardex y conteos', () => {
   });
 });
 
-describe('storage: US5 KPIs, alertas y reposici�n', () => {
+describe('storage: US5 KPIs, alertas y reposición', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('calcula KPIs incluyendo activos, alertas y sin movimiento en 90 d�as', async () => {
+  it('calcula KPIs incluyendo activos, alertas y sin movimiento en 90 días', async () => {
     const { getDashboardStats, addEntity, addDocument } = await import('../../src/storage.js');
     const { deactivateEntity } = await import('../../src/storage.js');
     const active = addEntity(
@@ -433,14 +433,14 @@ describe('storage: US5 KPIs, alertas y reposici�n', () => {
     expect(stats.noMovement90Days).toBeGreaterThanOrEqual(0);
   });
 
-  it('genera sugerencias de reposici�n con clasificaci�n de alerta y cantidad sugerida', async () => {
+  it('genera sugerencias de reposición con clasificación de alerta y cantidad sugerida', async () => {
     const { getReplenishmentSuggestions, addEntity, addDocument } =
       await import('../../src/storage.js');
     const e = addEntity(
       {
         name: 'Papel',
         code: 'P1',
-        category: 'Papeler�a',
+        category: 'Papelería',
         unit: 'u',
         reorderPoint: 20,
         customFields: { proveedor: 'Prov A' }
@@ -468,7 +468,7 @@ describe('storage: US5 KPIs, alertas y reposici�n', () => {
     expect(['red', 'yellow']).toContain(suggestions[0].alertLevel);
   });
 
-  it('crea solicitud de reposici�n agrupada por proveedor', async () => {
+  it('crea solicitud de reposición agrupada por proveedor', async () => {
     const { createReplenishmentRequest, loadReplenishmentRequests } =
       await import('../../src/storage.js');
     const e1 = seedEntity({ name: 'E1', code: 'E1', customFields: { proveedor: 'Prov A' } });
@@ -496,7 +496,7 @@ describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
     localStorage.clear();
   });
 
-  it('normaliza y valida el RUT chileno con d�gito verificador', async () => {
+  it('normaliza y valida el RUT chileno con dígito verificador', async () => {
     const { isValidRut, normalizeRut, computeRutCheckDigit } = await import('../../src/storage.js');
     expect(normalizeRut('76.123.456-7')).toBe('76123456-7');
     expect(normalizeRut('123456785')).toBe('12345678-5');
@@ -506,12 +506,12 @@ describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
     expect(isValidRut('abc')).toBe(false);
   });
 
-  it('crea proveedores y rechaza RUT inv�lido o duplicado', async () => {
+  it('crea proveedores y rechaza RUT inválido o duplicado', async () => {
     const { addProvider, loadProviders } = await import('../../src/storage.js');
     const provider = addProvider({
       rut: '12.345.678-5',
       razon_social: 'Distribuidora Sur',
-      contacto: 'Juan P�rez'
+      contacto: 'Juan Pérez'
     });
     expect(provider.provider_id).toMatch(/^prov_/);
     expect(provider.rut).toBe('12345678-5');
@@ -536,7 +536,7 @@ describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
       {
         name: 'Resma papel carta',
         code: 'PAP-CAR-075',
-        category: 'Papeler�a',
+        category: 'Papelería',
         unit: 'Paquete',
         reorderPoint: 20,
         providerId: provider.provider_id
@@ -565,7 +565,7 @@ describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
     const request = createProductRequest({
       name: 'Producto faltante',
       code: 'pf-1',
-      category: 'Papeler�a',
+      category: 'Papelería',
       actorPerson: 'Ana'
     });
     expect(request.request_id).toMatch(/^preq_/);
@@ -576,7 +576,7 @@ describe('storage: US1 proveedores, RUT y solicitudes de alta', () => {
   });
 });
 
-describe('storage: US4 saldo inicial de per�odo', () => {
+describe('storage: US4 saldo inicial de período', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -590,7 +590,7 @@ describe('storage: US4 saldo inicial de per�odo', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 50,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         aisle: 'A',
         shelf: '1',
         level: '1',
@@ -633,16 +633,16 @@ describe('storage: US7 cobertura de inventario', () => {
     localStorage.clear();
   });
 
-  it('calcula d�as de cobertura como stock / consumo diario promedio', async () => {
+  it('calcula días de cobertura como stock / consumo diario promedio', async () => {
     const { getDaysOfCoverage, getInventoryCoverage, loadDocuments, saveDocuments } =
       await import('../../src/storage.js');
-    const entity = seedEntity({ category: 'Ferreter�a' });
+    const entity = seedEntity({ category: 'Ferretería' });
     const entry = addDocument(
       {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 100,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         aisle: 'A',
         shelf: '1',
         level: '1',
@@ -678,7 +678,7 @@ describe('storage: US7 cobertura de inventario', () => {
     expect(coverage.sufficientHistory).toBe(true);
 
     const inventory = getInventoryCoverage({
-      category: 'Ferreter�a',
+      category: 'Ferretería',
       fromDate: '2026-01-01',
       toDate: '2026-01-31'
     });

@@ -295,7 +295,7 @@ describe('storage: movimientos de inventario', () => {
   });
 });
 
-describe('storage: US4 inmutabilidad, anulaci�n y ajustes', () => {
+describe('storage: US4 inmutabilidad, anulación y ajustes', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -370,7 +370,7 @@ describe('storage: US4 inmutabilidad, anulaci�n y ajustes', () => {
 
     const { adjustments } = approveCountAdjustment(count.count_id, {
       approvedByPerson: 'Supervisor',
-      reason: 'Da�o'
+      reason: 'Daño'
     });
     expect(adjustments).toHaveLength(1);
     expect(adjustments[0].type).toBe('AJUSTE');
@@ -431,7 +431,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
           entity_id: entity.entity_id,
           type: 'ENTRADA',
           quantity: 5,
-          doc_respaldo: 'Gu�a 1',
+          doc_respaldo: 'Guíaa 1',
           providerId: 'prov_missing',
           aisle: 'A',
           shelf: '1',
@@ -447,7 +447,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 5,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         providerId: provider.provider_id,
         aisle: 'A',
         shelf: '1',
@@ -456,7 +456,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
       baseConfig
     );
     expect(document.providerId).toBe(provider.provider_id);
-    expect(document.doc_respaldo).toBe('Gu�a 1');
+    expect(document.doc_respaldo).toBe('Guíaa 1');
   });
 });
 
@@ -465,7 +465,7 @@ describe('storage: US3 sugerencia FIFO', () => {
     localStorage.clear();
   });
 
-  it('sugiere la ubicaci�n de la entrada confirmada m�s antigua', async () => {
+  it('sugiere la ubicación de la entrada confirmada más antigua', async () => {
     const { getFifoLocationSuggestion, loadDocuments, saveDocuments } =
       await import('../../src/storage.js');
     const entity = seedEntity();
@@ -474,7 +474,7 @@ describe('storage: US3 sugerencia FIFO', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 10,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         aisle: 'A',
         shelf: '1',
         level: '1',
@@ -487,7 +487,7 @@ describe('storage: US3 sugerencia FIFO', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 10,
-        doc_respaldo: 'Gu�a 2',
+        doc_respaldo: 'Guíaa 2',
         aisle: 'B',
         shelf: '2',
         level: '2',

@@ -69,8 +69,8 @@ describe('integración: seguridad, persistencia y volumen', () => {
   });
 });
 
-describe('integraci�n: auditor�a y solicitudes de alta', () => {
-  it('registra auditor�a de anulaci�n y aprobaci�n de ajuste con valores antes/despu�s', async () => {
+describe('integración: auditoría y solicitudes de alta', () => {
+  it('registra auditoría de anulación y aprobación de ajuste con valores antes/después', async () => {
     const {
       addDocument,
       approveCountAdjustment,
@@ -87,7 +87,7 @@ describe('integraci�n: auditor�a y solicitudes de alta', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 20,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         aisle: 'A',
         shelf: '1',
         level: '1',
@@ -105,7 +105,7 @@ describe('integraci�n: auditor�a y solicitudes de alta', () => {
     closePhysicalCount(count.count_id);
     approveCountAdjustment(count.count_id, {
       approvedByPerson: 'Supervisor',
-      reason: 'Da�o por humedad'
+      reason: 'Daño por humedad'
     });
 
     const trail = getAuditTrail({ entityId: entity.entity_id });
@@ -120,7 +120,7 @@ describe('integraci�n: auditor�a y solicitudes de alta', () => {
     expect(adjustment.after.stockBalance).toBe(18);
   });
 
-  it('env�a una solicitud de alta sin crear el producto', async () => {
+  it('envía una solicitud de alta sin crear el producto', async () => {
     const { loadEntities, loadProductRequests } = await import('../../src/storage.js');
     const app = mountApp();
     await go(app, 'manage', 'documents');

@@ -203,7 +203,7 @@ describe('integración: entradas y salidas de inventario', () => {
   });
 });
 
-describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
+describe('integración: US4 kardex, anulación y conteos/ajustes', () => {
   it('muestra kardex con filtros y permite anular un movimiento confirmado', async () => {
     const { voidDocument, getKardex, addDocument } = await import('../../src/storage.js');
     const entity = seedEntity();
@@ -242,7 +242,7 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
       document.querySelectorAll('[data-testid^="document-row-"]').length
     ).toBeGreaterThanOrEqual(1);
 
-    voidDocument(salida.document_id, { reason: 'Correcci�n', actorPerson: 'Ana' });
+    voidDocument(salida.document_id, { reason: 'Corrección', actorPerson: 'Ana' });
     await go(app, 'manage', 'documents');
     setValue(document.querySelector('[data-testid="kardex-entity"]'), entity.entity_id);
     const kardex = getKardex(entity.entity_id);
@@ -286,11 +286,11 @@ describe('integraci�n: US4 kardex, anulaci�n y conteos/ajustes', () => {
     document.querySelector('[data-testid="count-close"]').click();
     await tick();
     setValue(document.querySelector('[data-testid="adjust-approver"]'), 'supervisor');
-    setValue(document.querySelector('[data-testid="adjust-reason"]'), 'Da�o');
+    setValue(document.querySelector('[data-testid="adjust-reason"]'), 'Daño');
     document.querySelector('[data-testid="count-approve-adjustment"]').click();
     await tick();
 
     expect(getEntity(entity.entity_id).stockBalance).toBe(18);
-    expect(loadDocuments().some((d) => d.type === 'AJUSTE' && d.reason === 'Da�o')).toBe(true);
+    expect(loadDocuments().some((d) => d.type === 'AJUSTE' && d.reason === 'Daño')).toBe(true);
   });
 });

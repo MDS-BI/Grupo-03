@@ -85,8 +85,8 @@ describe('integración: panel analítico', () => {
   });
 });
 
-describe('integraci�n: panel US5 reposici�n', () => {
-  it('renderiza alertas de reposici�n y genera solicitud agrupada por proveedor', async () => {
+describe('integración: panel US5 reposición', () => {
+  it('renderiza alertas de reposición y genera solicitud agrupada por proveedor', async () => {
     const { loadReplenishmentRequests } = await import('../../src/storage.js');
     const a = seedEntity({
       name: 'A',
@@ -123,19 +123,19 @@ describe('integraci�n: panel US5 reposici�n', () => {
   });
 
   it('mantiene comportamiento de filtros y limpiar filtros en el panel', () => {
-    const a = seedEntity({ name: 'A', code: 'FA', category: 'Ferreter�a', reorderPoint: 1 });
+    const a = seedEntity({ name: 'A', code: 'FA', category: 'Ferretería', reorderPoint: 1 });
     seedEntry(a.entity_id, { quantity: 5 });
     seedEntity({ name: 'B', code: 'FB', category: 'Oficina', reorderPoint: 1 });
     mountApp();
 
-    setValue(document.querySelector('[data-testid="dashboard-category"]'), 'Ferreter�a');
+    setValue(document.querySelector('[data-testid="dashboard-category"]'), 'Ferretería');
     expect(document.querySelector('[data-testid="active-filter"]')).toBeTruthy();
     document.querySelector('[data-testid="clear-filters"]').click();
     expect(document.querySelector('[data-testid="dashboard-category"]').value).toBe('');
   });
 });
 
-describe('integraci�n: panel US7 per�odo y cobertura', () => {
+describe('integración: panel US7 período y cobertura', () => {
   it('recalcula KPIs y cobertura al aplicar un rango de fechas', async () => {
     const { addDocument, loadDocuments, saveDocuments } = await import('../../src/storage.js');
     const entity = seedEntity({ name: 'A', code: 'PA', category: 'Cat', reorderPoint: 1 });
@@ -144,7 +144,7 @@ describe('integraci�n: panel US7 per�odo y cobertura', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 100,
-        doc_respaldo: 'Gu�a 1',
+        doc_respaldo: 'Guíaa 1',
         aisle: 'A',
         shelf: '1',
         level: '1',

@@ -57,7 +57,7 @@ function newLabel(labels) {
 
 export function initApp({ root, rawConfig = userConfig } = {}) {
   const targetRoot = root ?? document.getElementById('app');
-  if (!targetRoot) throw new Error('No se encontrÃ³ el contenedor raÃ­z de la aplicaciÃ³n.');
+  if (!targetRoot) throw new Error('No se encontró el contenedor raíz de la aplicación.');
 
   if (window.__erpApp?.destroy) {
     window.__erpApp.destroy();
@@ -102,7 +102,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     return Object.values(state.formApis).some((api) => api?.isDirty?.());
   }
 
-  function confirmDiscard(message = 'Hay cambios sin guardar. Â¿Desea salir sin guardar?') {
+  function confirmDiscard(message = 'Hay cambios sin guardar. ¿Desea salir sin guardar?') {
     if (!hasUnsavedChanges()) return true;
     try {
       return window.confirm(message);
@@ -209,7 +209,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleEntityCancel({ dirty }) {
-    if (dirty && !confirmAction('Hay cambios sin guardar. Â¿Desea cancelar la ediciÃ³n?')) return;
+    if (dirty && !confirmAction('Hay cambios sin guardar. ¿Desea cancelar la edición?')) return;
     state.editingEntityId = null;
     render();
   }
@@ -252,7 +252,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleDocumentCancel({ dirty }) {
-    if (dirty && !confirmAction('Hay cambios sin guardar. Â¿Desea cancelar el movimiento?')) return;
+    if (dirty && !confirmAction('Hay cambios sin guardar. ¿Desea cancelar el movimiento?')) return;
     state.editingDocumentId = null;
     render();
   }
@@ -264,13 +264,13 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       documentRecord.voidsMovementId;
     if (isImmutable) {
       state.notice =
-        'Los movimientos confirmados son inmutables. Use anulaciÃ³n con contramovimiento.';
+        'Los movimientos confirmados son inmutables. Use anulación con contramovimiento.';
       render();
       return;
     }
     if (
       !confirmAction(
-        `Â¿Eliminar ${config.labels.document.article} ${config.labels.document.singular.toLowerCase()} seleccionado? El stock se ajustarÃ¡ automÃ¡ticamente.`
+        `¿Eliminar ${config.labels.document.article} ${config.labels.document.singular.toLowerCase()} seleccionado? El stock se ajustará automáticamente.`
       )
     ) {
       return;
@@ -286,7 +286,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function handleDocumentVoid(documentRecord) {
     const reason =
-      window.prompt('Motivo de anulaciÃ³n (se generarÃ¡ un contramovimiento):', '') ?? '';
+      window.prompt('Motivo de anulación (se generará un contramovimiento):', '') ?? '';
     try {
       voidDocument(documentRecord.document_id, { reason, actorPerson: state.selectedPerson });
       state.notice = 'Movimiento anulado mediante contramovimiento.';
@@ -333,7 +333,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       ...entities.map((entity) =>
         option(
           entity.entity_id,
-          `${entity.name || entity.code} â€” ${entity.code || ''}`,
+          `${entity.name || entity.code} — ${entity.code || ''}`,
           entity.entity_id === state.editingEntityId
         )
       )
@@ -349,7 +349,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         h(
           'div',
           {},
-          h('h3', {}, `GestiÃ³n de ${labels.entity.plural.toLowerCase()}`),
+          h('h3', {}, `Gestión de ${labels.entity.plural.toLowerCase()}`),
           h(
             'p',
             { class: 'panel-subtitle' },
@@ -762,7 +762,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     const activeSectionTitle = isDocuments ? labels.document.plural : labels.entity.plural;
     const activeSectionSubtitle = isDocuments
       ? 'Registre entradas y salidas y consulte el historial de movimientos.'
-      : 'Cree, edite o elimine los registros del catÃ¡logo maestro.';
+      : 'Cree, edite o elimine los registros del catálogo maestro.';
 
     const panel = isDocuments
       ? renderDocumentPanel(entities, documents)
@@ -777,7 +777,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         h(
           'div',
           {},
-          h('h2', {}, `${labels.manage} Â· ${activeSectionTitle}`),
+          h('h2', {}, `${labels.manage} · ${activeSectionTitle}`),
           h('p', { class: 'page-subtitle' }, activeSectionSubtitle)
         )
       ),
