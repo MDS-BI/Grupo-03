@@ -112,8 +112,8 @@ El proyecto cuenta con una suite de pruebas unitarias e integración con Vitest.
 
 La especificación detallada del módulo, requerida para las entregas del curso, se encuentra distribuida en la carpeta de especificaciones:
 
-- [`plan.md`](./specs/001-erp-base-module/plan.md): Plan de trabajo, historias de usuario, perfiles de clientes y mitigación de sesgos.
-- [`data-model.md`](./specs/001-erp-base-module/data-model.md): Modelo Entidad-Relación (MER) en Mermaid, diccionario de variables críticas y análisis de escalabilidad.
+- [`plan.md`](./specs/001-erp-base-module/plan.md): Plan de trabajo, historias de usuario, perfiles de clientes, mitigación de sesgos y análisis de escalabilidad.
+- [`data-model.md`](./specs/001-erp-base-module/data-model.md): Modelo Entidad-Relación (MER) en Mermaid, imagen del MER, diccionario de variables críticas y reglas de validación.
 - [`quickstart.md`](./specs/001-erp-base-module/quickstart.md): Escenarios de validación de extremo a extremo.
 
 ---
@@ -124,4 +124,22 @@ La especificación detallada del módulo, requerida para las entregas del curso,
 - **Facultad:** Facultad de Ingeniería
 - **Departamento:** Departamento de Ingeniería Industrial (DII)
 - **Asignatura:** Modelación de Sistemas (2026-2)
+
+---
+
+## 7. Modelo entidad-relación (imagen)
+
+![Modelo entidad-relación del módulo Logística e Inventario](./docs/mer-logistica-inventario.png)
+
+Archivo: [`docs/mer-logistica-inventario.png`](./docs/mer-logistica-inventario.png), generado a partir de [`data-model.md`](./specs/001-erp-base-module/data-model.md). Incluye `CATEGORIA`, `PROVEEDOR`, `ENTIDAD`, `MOVIMIENTO`, `PERSONA_LOCAL`, `AUDITORIA`, `CONTEO_FISICO`, `DETALLE_CONTEO`, `SOLICITUD_REPOSICION` y su detalle, además de `MODULE_CONFIG` como configuración no persistida.
+
+## 8. Fuentes y referencias
+
+- Universidad de Concepción, Departamento de Ingeniería Industrial. **Modelación de Sistemas 2026-2: Trabajo Grupal** (instructivo y rúbrica), 2026. Documento entregado por la cátedra.
+- GitHub. **Spec Kit — Spec-Driven Development**: https://github.com/github/spec-kit
+- Vite. **Documentación oficial**: https://vite.dev/
+- Vitest. **Documentación oficial**: https://vitest.dev/
+- MDN Web Docs. **Window.localStorage**: https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+- OWASP. **Cross Site Scripting (XSS) Prevention Cheat Sheet**: https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+- W3C. **WCAG 2.2 Quick Reference**: https://www.w3.org/WAI/WCAG22/quickref/
 -

@@ -431,7 +431,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
           entity_id: entity.entity_id,
           type: 'ENTRADA',
           quantity: 5,
-          doc_respaldo: 'Guíaa 1',
+          doc_respaldo: 'Guía 1',
           providerId: 'prov_missing',
           aisle: 'A',
           shelf: '1',
@@ -447,7 +447,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 5,
-        doc_respaldo: 'Guíaa 1',
+        doc_respaldo: 'Guía 1',
         providerId: provider.provider_id,
         aisle: 'A',
         shelf: '1',
@@ -456,7 +456,7 @@ describe('storage: US2 respaldo y proveedor en entradas', () => {
       baseConfig
     );
     expect(document.providerId).toBe(provider.provider_id);
-    expect(document.doc_respaldo).toBe('Guíaa 1');
+    expect(document.doc_respaldo).toBe('Guía 1');
   });
 });
 
@@ -474,7 +474,7 @@ describe('storage: US3 sugerencia FIFO', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 10,
-        doc_respaldo: 'Guíaa 1',
+        doc_respaldo: 'Guía 1',
         aisle: 'A',
         shelf: '1',
         level: '1',
@@ -487,7 +487,7 @@ describe('storage: US3 sugerencia FIFO', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 10,
-        doc_respaldo: 'Guíaa 2',
+        doc_respaldo: 'Guía 2',
         aisle: 'B',
         shelf: '2',
         level: '2',

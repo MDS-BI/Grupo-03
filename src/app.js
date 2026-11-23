@@ -8,6 +8,7 @@ import { renderDocumentForm } from './components/document-form.js';
 import { renderDocumentList } from './components/document-list.js';
 import { renderSearch } from './components/search-bar.js';
 import { renderAuditLog } from './components/audit-log.js';
+import { loadDemoData } from './demo-data.js';
 import {
   addDocument,
   addEntity,
@@ -95,7 +96,8 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     config,
     errors,
     personControl: personControlHost,
-    onNavigate: handleNavigation
+    onNavigate: handleNavigation,
+    onLoadDemo: handleLoadDemo
   });
 
   function hasUnsavedChanges() {
@@ -163,6 +165,26 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     } else if (action === 'search') {
       navigate('search', { pendingFocus: 'search' });
     }
+  }
+
+  function handleLoadDemo() {
+    loadDemoData();
+    state.selectedPerson = getPersons()[0] || 'local';
+    state.approverPerson = '';
+    state.editingEntityId = null;
+    state.editingDocumentId = null;
+    state.kardexEntityId = null;
+    state.view = 'dashboard';
+    state.section = 'entities';
+    window.location.hash = '#/dashboard';
+    render();
+    shell.view.prepend(
+      h(
+        'p',
+        { class: 'alert alert-success', 'data-testid': 'demo-notice', role: 'status' },
+        'Datos demo cargados: 2 productos, 1 proveedor y 4 movimientos.'
+      )
+    );
   }
 
   function handleEntitySubmit(values) {

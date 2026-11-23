@@ -21,7 +21,7 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 
 ## Decisión 4: Modelo de inventario nativo y saldo derivado por movimientos
 **Decisión**: El núcleo soporta nativamente Entidades y Movimientos de inventario (Entrada, Salida, Transferencia, Ajuste), además de Conteo Físico y Solicitud de Reposición. El saldo total y por ubicación se deriva/aplica mediante movimientos confirmados (nunca edición manual directa del stock).
-**Justificación**: Alineado con las aclaraciones de 2026-11-17 (HU1–HU5 nativas; HU6 diferida) y con trazabilidad (HU4). La capa de almacenamiento aplica efectos de forma atómica al confirmar.
+**Justificación**: Alineado con las aclaraciones de 2026-11-17 (catálogo, movimientos, kardex, conteos e indicadores en alcance; integración Compras/Ventas —HU10— diferida) y con trazabilidad (HU4). La capa de almacenamiento aplica efectos de forma atómica al confirmar.
 **Alternativas consideradas**: Limitar base a Entrada/Salida (contradice FR-043/FR-048) o editar stock a mano (rompe integridad).
 
 ## Decisión 5: Ubicación por movimiento y ubicación actual derivada
@@ -54,7 +54,7 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 **Justificación**: Cumple Constitución (II, III) y supuestos de seguridad/XSS de la spec.
 **Alternativas consideradas**: Solo pruebas manuales o inserción directa de HTML no sanitizado.
 
-## Decisión 11: Integración HU6 diferida
+## Decisión 11: Integración con Compras y Ventas (HU10) diferida
 **Decisión**: No se implementa en esta versión la integración con Compras y Ventas: no hay `orden_compra_id`, `pedido_venta_id` ni `DemandaNoAtendida` operativos. El módulo queda preparado para añadirlos sin cambiar el núcleo.
-**Justificación**: Decisión de alcance de 2026-11-17 (FR-046); HU6 es P3 y el módulo funciona sin ella.
+**Justificación**: Decisión de alcance de 2026-11-17 (FR-046); HU10 es P3 y el módulo funciona sin ella.
 **Alternativas consideradas**: Simular OC y pedidos con datos de ejemplo desde el inicio (añade superficie de prueba sin valor para HU1–HU5).

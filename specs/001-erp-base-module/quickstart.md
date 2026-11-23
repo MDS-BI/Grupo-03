@@ -96,12 +96,12 @@ npm run preview
 - La identidad se elige en un selector local de persona sin contraseña; se registra en auditoría y aprobaciones.
 - `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
 - Ubicación actual del producto: derivada del último documento de entrada o transferencia confirmado.
-- HU6 (Compras/Ventas) está fuera de esta versión.
+- La integración con Compras y Ventas (HU10) está fuera de esta versión.
 
 
 ## Resultados de validación (2026-11-22; tareas pendientes completadas)
 
-- `npm run test:run`: **PASS** (12 archivos, 99 pruebas).
+- `npm run test:run`: **PASS** (13 archivos, 103 pruebas).
 - `npm run build`: **PASS** (Vite 8.2.1; 18 módulos transformados; salida en `dist/`).
 - `npm run lint`: **PASS** (ESLint sin errores ni advertencias).
 - `npm run format:check`: **PASS** (Prettier: todos los archivos cumplen el estilo).

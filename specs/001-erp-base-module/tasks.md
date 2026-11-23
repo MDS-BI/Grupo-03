@@ -16,7 +16,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
 - **[Story]**: User story label (`[US1]`..`[US11]`) for story-phase tasks only
 - Every task includes an exact file path
-- `[X]` = implemented and covered by passing tests (99 tests green; `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` pass); `[ ]` = pending
+- `[X]` = implemented and covered by passing tests (103 tests green; `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build` pass); `[ ]` = pending
 
 ## Story Traceability
 

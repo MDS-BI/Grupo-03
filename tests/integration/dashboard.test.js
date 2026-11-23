@@ -144,7 +144,7 @@ describe('integración: panel US7 período y cobertura', () => {
         entity_id: entity.entity_id,
         type: 'ENTRADA',
         quantity: 100,
-        doc_respaldo: 'Guíaa 1',
+        doc_respaldo: 'Guía 1',
         aisle: 'A',
         shelf: '1',
         level: '1',

@@ -2,12 +2,14 @@
 
 **Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
 
-Modelo alineado con las clarificaciones vigentes: alcance nativo HU1–HU5 (HU6 diferida), Transferencia como tercer tipo de documento, sin roles operativos ni visibilidad por rol, selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
+Modelo alineado con las clarificaciones vigentes: catálogo, movimientos, kardex, conteos, indicadores y terminología configurable en alcance (la integración con Compras/Ventas, HU10, queda diferida), Transferencia como tercer tipo de documento, sin roles operativos ni visibilidad por rol, selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
 
 ## 1. Diagrama Entidad-Relación (conceptual)
 
 ```mermaid
 erDiagram
+    CATEGORIA ||--o{ ENTIDAD : "clasifica"
+    PROVEEDOR ||--o{ ENTIDAD : "abastece"
     ENTIDAD ||--o{ MOVIMIENTO : "tiene historial"
     ENTIDAD ||--o{ CONTEO_FISICO : "se cuenta"
     CONTEO_FISICO ||--o{ DETALLE_CONTEO : "incluye"
@@ -17,6 +19,18 @@ erDiagram
     PERSONA_LOCAL ||--o{ MOVIMIENTO : "actor / aprobador"
     PERSONA_LOCAL ||--o{ AUDITORIA : "registra"
     ENTIDAD ||--o{ AUDITORIA : "afectada"
+
+    CATEGORIA {
+        string code PK
+        string nombre
+    }
+
+    PROVEEDOR {
+        string provider_id PK
+        string rut "Único, validado"
+        string razon_social
+        string contacto
+    }
 
     ENTIDAD {
         string entity_id PK
@@ -104,7 +118,27 @@ erDiagram
 
 `MODULE_CONFIG` no se persiste como entidad de negocio; se carga al arrancar y configura etiquetas, campos, ciclo de vida y tema.
 
-## 2. Entidades y registros
+**Notas de alineación con la implementación del MVP:**
+
+- `CATEGORIA` se modela como entidad conceptual para hacer explícita la integridad referencial con `ENTIDAD`, pero en esta versión se persiste como texto en `ENTIDAD.category`; su normalización a tabla está prevista en el plan de escalabilidad.
+- `PROVEEDOR` sí está implementado como maestro con `rut` validado (formato y dígito verificador chileno) y vínculo `ENTIDAD.providerId`.
+- No existe una entidad `StockUbicacion`: `ENTIDAD.stockBalance` es el saldo total y la ubicación se deriva del último `MOVIMIENTO` confirmado (FR-041). El desglose por ubicación se documenta como evolución futura en `plan.md`.
+- La imagen del diagrama está disponible en [`docs/mer-logistica-inventario.png`](../../docs/mer-logistica-inventario.png).
+
+## 2. Entidades y registros (diccionario de variables críticas)
+
+| Variable crítica | Entidad | Regla / efecto |
+|---|---|---|
+| `code` (SKU) | ENTIDAD | Normalizado y único global; bloquea alta/edición duplicada |
+| `reorderPoint` | ENTIDAD | ≥ 0; define alerta de reposición |
+| `unitCost` | ENTIDAD | Opcional; alimenta la valoración `Σ(stock × unitCost)` solo en panel/catálogo |
+| `stockBalance` | ENTIDAD | ≥ 0; se modifica solo por movimientos confirmados |
+| `quantity` | MOVIMIENTO | > 0; incrementa o decrementa el saldo según `type` |
+| `type` | MOVIMIENTO | `ENTRADA`, `SALIDA`, `TRANSFERENCIA` o `AJUSTE` |
+| `state` | MOVIMIENTO | `draft`, `confirmed` o `voided`; los confirmados son inmutables |
+| `voidsMovementId` | MOVIMIENTO | Vincula un contramovimiento al documento anulado |
+| `actorPerson` / `approvedByPerson` | MOVIMIENTO | Identidad local; el aprobador debe diferir de quien contó |
+| `rut` | PROVEEDOR | Único y validado con dígito verificador chileno |
 
 ### 2.1 ENTIDAD (Producto / maestro)
 

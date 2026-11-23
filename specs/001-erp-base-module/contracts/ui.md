@@ -4,7 +4,7 @@
 
 ## Propósito
 
-Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). No hay roles operativos: la identidad se elige en un selector local de persona solo para auditoría y aprobaciones (FR-049). HU6 queda fuera de este contrato (FR-046).
+Definir pantallas, navegación y comportamiento observable de la SPA. Las etiquetas provienen de [module-config.md](./module-config.md). No hay roles operativos: la identidad se elige en un selector local de persona solo para auditoría y aprobaciones (FR-049). La integración con Compras y Ventas (HU10) queda fuera de este contrato (FR-046).
 
 ## Marco persistente (workspace shell)
 

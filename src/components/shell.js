@@ -88,7 +88,7 @@ function warningContent(errors) {
 
 export function mountShell(
   root,
-  { config, errors = [], onNavigate = () => {}, personControl = null }
+  { config, errors = [], onNavigate = () => {}, personControl = null, onLoadDemo = null }
 ) {
   const logo = monogram(config.moduleName);
   const brandName = h(
@@ -102,7 +102,24 @@ export function mountShell(
     { class: 'topbar' },
     h('div', { class: 'brand' }, logo, brandName),
     h('div', { class: 'topbar-spacer' }),
-    h('div', { class: 'topbar-actions' }, personControl)
+    h(
+      'div',
+      { class: 'topbar-actions' },
+      onLoadDemo
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: 'button button-ghost button-small',
+              'data-testid': 'load-demo-data',
+              title: 'Cargar datos simulados de demostración',
+              onclick: () => onLoadDemo()
+            },
+            'Datos demo'
+          )
+        : null,
+      personControl
+    )
   );
 
   const navDefinitions = [

@@ -9,6 +9,31 @@
 
 Este proyecto sirve como módulo base reutilizable para construir módulos ERP personalizados. Establece los patrones comunes que todo módulo ERP necesita: gestionar registros de datos maestros (**Entidades**) y sus **Documentos** transaccionales asociados, con navegación, validación, persistencia y búsqueda ya implementadas, de modo que los módulos personalizados solo necesiten definir sus campos y reglas específicos del dominio.
 
+## Problema y solución propuesta
+
+### Problema
+
+La operación de bodega se gestiona hoy con planillas y registros dispersos, lo que genera tres problemas concretos:
+
+1. **Duplicidad de maestros.** Productos equivalentes se registran con distinta grafía (p. ej. «Resma Carta» y «RESMA carta 75g»), dividiendo el stock entre varios registros y haciendo que los reportes sean incorrectos.
+2. **Pérdida de trazabilidad y confianza en el stock.** Las entradas y salidas no quedan vinculadas a un documento ni a un responsable; ante una diferencia no es posible reconstruir el saldo ni saber quién hizo qué.
+3. **Decisiones sesgadas.** Los conteos se hacen viendo el saldo del sistema (sesgo de anclaje), los indicadores se calculan con historiales muy cortos (sesgo de disponibilidad) y los datos sensibles (costos, contactos de proveedores) se muestran sin distinción en una demo compartida.
+
+Además, la plantilla base del curso es genérica (Entidad/Documento) y no habla el lenguaje de bodega, por lo que cada módulo tendría que modificar el núcleo para adaptarlo.
+
+### Solución propuesta
+
+Un MVP **solo frontend** del módulo **Logística e Inventario (SCM)** construido con Spec Driven Development sobre la plantilla:
+
+- **Catálogo maestro** con SKU normalizado y único, categoría, unidad, punto de reorden y costo opcional; los productos con historial se desactivan en vez de borrarse.
+- **Movimientos nativos** de Entrada, Salida, Transferencia y Ajuste, con ubicación por documento, validación de stock y sugerencia FIFO.
+- **Kardex inmutable** con contramovimientos vinculados para corregir errores sin destruir el historial.
+- **Conteos ciegos** con aprobación por una persona distinta de quien contó, y **auditoría** de todas las operaciones.
+- **Panel de KPIs** con alertas de reposición, filtros por categoría/período y rotación marcada como «Datos insuficientes» cuando el historial es menor a 30 días.
+- **Adaptación declarativa** desde `src/module-config.js`: nombre, etiquetas, campos, ciclo de vida y color de acento, sin tocar el código central.
+
+La solución se materializa en el repositorio con el mock-up funcional, los archivos `.md` de Spec Kit (`spec`, `plan`, `data-model`, `tasks`), el MER en Mermaid y su imagen, y las instrucciones de ejecución. Cubre los RA1, RA3 y RA4 del instructivo.
+
 ## Clarifications
 
 ### Session 2026-11-03
@@ -61,23 +86,23 @@ Como operador de recepción, quiero registrar una entrada indicando el proveedor
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el operador busca un producto por SKU o nombre, **cuando** lo selecciona, **entonces** se muestra el stock actual por ubicación como referencia.
+1. **Dado** que el operador busca un producto por SKU o nombre, **cuando** lo selecciona, **entonces** se muestra el stock total actual como referencia y la ubicación derivada del último movimiento confirmado (FR-041).
 2. **Dado** que un documento de entrada tiene varias líneas (producto, cantidad, ubicación), **cuando** el operador confirma, **entonces** se genera un documento correlativo (ENT-000123), fecha, hora y usuario, y el stock de cada producto aumenta en su ubicación.
 3. **Dado** que la ubicación ingresada no existe en el maestro de ubicaciones, **cuando** se intenta guardar, **entonces** el sistema no lo permite y sugiere ubicaciones válidas.
-4. **Dado** que el mismo producto ya está en otra ubicación, **cuando** se recibe en una nueva, **entonces** el stock se registra por ubicación y el total es la suma.
+4. **Dado** que el mismo producto ya está en otra ubicación, **cuando** se recibe en una nueva, **entonces** la ubicación vigente pasa a ser la del documento más reciente y el stock total aumenta en la cantidad indicada (el desglose por ubicación queda como evolución futura documentada en `plan.md`).
 5. **Dado**  que falta la cantidad, la ubicación o el documento de respaldo, o la cantidad es ≤ 0, **cuando** se intenta guardar, **entonces** el sistema indica qué falta y no modifica el stock.
 6.**Dado** que el producto no existe en el catálogo, **cuando** el operador lo busca, **entonces** puede enviar una solicitud de alta al Administrador, pero no puede crearlo él mismo.
 7.**Dado** que el operador está a mitad del ingreso, **cuando** cancela, **entonces** no se genera el documento ni cambia el stock.
 
-**Datos involucrados**: MovimientoInventario (tipo = ENTRADA, numero, fecha, usuario_id, proveedor_id, doc_respaldo), DetalleMovimiento (producto_id, ubicacion_id, cantidad, costo_unitario*), Ubicacion (pasillo, estante, nivel), StockUbicacion (producto_id, ubicacion_id, cantidad).
+**Datos involucrados**: `MOVIMIENTO` (tipo = ENTRADA, `entity_id`, `actorPerson`, `providerId`, `doc_respaldo`, `location` con pasillo/estante/nivel, `quantity`, marcas de tiempo) y `ENTIDAD` (`stockBalance`). En el MVP la ubicación se guarda dentro del movimiento y no existe una tabla `StockUbicacion` separada.
 
-**Decisión de diseño**:  El stock no se edita a mano: siempre es el resultado de los movimientos. El costo de la entrada lo completa el Analista o lo toma del catálogo, y seoculta al operador.
+**Decisión de diseño**: El stock no se edita a mano: siempre es el resultado de los movimientos confirmados. El costo unitario se toma del catálogo y solo se visualiza en panel/catálogo (FR-044); no se ingresa en los formularios de Entrada o Salida.
 
 ---
 
 ### Historia de Usuario 3 - Despacho con validación de stock (Prioridad: P1)
 
-Como Operador de Despacho, quiero registrar salidas viendo el stock disponible por ubicación y la ubicación sugerida para retirar, para despachar rápido, sin dejar el inventario en negativo y usando primero lo que entró antes.
+Como Operador de Despacho, quiero registrar salidas viendo el stock disponible total y la ubicación sugerida para retirar (la entrada confirmada más antigua), para despachar rápido, sin dejar el inventario en negativo y usando primero lo que entró antes.
 
 **Por qué esta prioridad**: Sin validar las salidas aparecen stocks negativos, y el inventario deja de ser confiable para planificar entregas.
 
@@ -85,16 +110,16 @@ Como Operador de Despacho, quiero registrar salidas viendo el stock disponible p
 
 **Escenarios de Aceptación**:
 
-1. **Dado** que el operador selecciona un producto, **cuando** se carga la línea, **entonces** ve el stock disponible por ubicación y el sistema sugiere la ubicación con la entrada más antigua (FIFO).
-2. **Dado** que la cantidad supera el stock de la ubicación elegida, **cuando** la ingresa, **entonces** aparece "Stock insuficiente en A-03-2: disponible 50" y el botón Guardar se deshabilita.
+1. **Dado** que el operador selecciona un producto, **cuando** se carga la línea, **entonces** ve el stock disponible total y el sistema sugiere la ubicación de la entrada confirmada más antigua (FIFO).
+2. **Dado** que la cantidad supera el stock total disponible, **cuando** la ingresa, **entonces** aparece "Stock insuficiente: disponible 50" y el botón Guardar se deshabilita.
 3. **Dado** que se elige un motivo de salida (Venta, Consumo interno, Merma, Devolución a proveedor), **cuando** el motivo es Merma, **entonces** el sistema exige una observación.
 4. **Dado** que la salida es válida, **cuando** se confirma, **entonces** se genera el documento `SAL-xxxxx` y el stock disminuye exactamente en la cantidad despachada.
 5. **Dado** que la salida deja el producto bajo su punto de reorden, **cuando** se guarda, **entonces** se informa al operador y se genera una alerta (ver HU5).
 6. **Dado** que el operador cancela a mitad del registro, **entonces** no cambia nada.
 
-**Datos involucrados**: `MovimientoInventario` (tipo = SALIDA, motivo, destino), `DetalleMovimiento`, `StockUbicacion`.
+**Datos involucrados**: `MOVIMIENTO` (tipo = SALIDA, `reason`, `quantity`, `actorPerson`) y `ENTIDAD` (`stockBalance`). La sugerencia de ubicación se deriva de los movimientos de Entrada confirmados; no hay una tabla `StockUbicacion` en el MVP.
 
-**Decisión de diseño**: La validación se hace contra el stock de la ubicación, no solo contra el total, porque físicamente se retira de un lugar concreto.
+**Decisión de diseño**: La validación se hace contra el stock total disponible al confirmar, y la sugerencia FIFO indica la ubicación de retiro. El control de stock por ubicación se registra como evolución futura en `plan.md`, para no introducir una tabla adicional en el MVP.
 ---
 
 ### Historia de Usuario 4 – Kardex e historial de movimientos (Prioridad: P1)
@@ -107,12 +132,12 @@ Como Jefe de Bodega, quiero consultar el kardex de un producto (todas sus entrad
 
 **Escenarios de Aceptación**:
 
-1. **Dado** un producto con movimientos, **cuando** se abre su kardex, **entonces** se listan en orden cronológico con tipo, documento, cantidad, saldo, ubicación y usuario.
+1. **Dado** un producto con movimientos, **cuando** se abre su kardex, **entonces** se listan en orden cronológico con tipo, documento, cantidad, saldo acumulado, ubicación y persona local responsable.
 2. **Dado** que se filtra por rango de fechas o tipo de movimiento, **entonces** la lista y el saldo inicial del período se recalculan.
 3. **Dado** un documento con un error, **cuando** el Jefe de Bodega lo anula, **entonces** no se borra: se crea un contramovimiento que revierte el stock y queda enlazado al original con su motivo.
 4. **Dado** cualquier documento confirmado, **cuando** un usuario intenta editarlo, **entonces** el sistema no lo permite (los documentos son inmutables).
 
-**Datos involucrados**: `MovimientoInventario` (tipo, `numero`, fecha, `usuario_id`, `doc_respaldo`, estado, `anula_a_id`, motivo), `DetalleMovimiento` (producto_id, ubicacion_id, cantidad), `StockUbicacion`.
+**Datos involucrados**: `MOVIMIENTO` (tipo, `numero`, fecha, `actorPerson`, `doc_respaldo`, estado, `voidsMovementId`, motivo, `location`, `quantity`) y `ENTIDAD` (`entity_id`, `stockBalance`). El saldo del período se reconstruye desde el historial.
 
 **Decisión de diseño**: Los documentos son inmutables y se corrigen con contramovimientos, el mismo principio de la contabilidad, así que el saldo siempre se puede reconstruir.
 
@@ -163,12 +188,12 @@ Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las 
 **Escenarios de Aceptación**:
 
 1. **Dado** que se inicia un conteo físico de una ubicación, **cuando** se muestran los productos esperados, **entonces** el sistema oculta las cantidades registradas para permitir un conteo ciego y evitar sesgar a quien cuenta.
-2. **Dado** que se ingresan las cantidades contadas, **cuando** se cierra el conteo, **entonces** el sistema muestra la diferencia por producto en cantidad y porcentaje, y su valor monetario únicamente al Jefe de Bodega y al Analista.
+2. **Dado** que se ingresan las cantidades contadas, **cuando** se cierra el conteo, **entonces** el sistema muestra la diferencia por producto en cantidad y porcentaje; la valorización se consulta en panel/catálogo y en el MVP no hay visibilidad condicionada por rol (FR-044, FR-047).
 3. **Dado** que existe una diferencia entre el conteo y el sistema, **cuando** se genera un ajuste, **entonces** el motivo es obligatorio —Merma, Error de registro, Daño, Robo u Otro— y el ajuste queda pendiente de aprobación, sin modificar todavía el stock.
 4. **Dado** que quien realizó el conteo intenta aprobar su propio ajuste, **cuando** solicita la aprobación, **entonces** el sistema bloquea la acción e indica que debe aprobarlo otra persona.
-5. **Dado** un ajuste pendiente con motivo registrado, **cuando** una persona autorizada distinta de quien contó lo aprueba, **entonces** el stock de la ubicación se corrige según la diferencia y se registra un movimiento de tipo `AJUSTE` en el kardex.
+5. **Dado** un ajuste pendiente con motivo registrado, **cuando** una persona local distinta de quien contó lo aprueba, **entonces** el stock total se corrige según la diferencia y se registra un movimiento de tipo `AJUSTE` en el kardex.
 
-**Datos involucrados**: `ConteoFisico` (`ubicacion_id`, fecha, `contado_por`, estado), `DetalleConteo` (`producto_id`, `cantidad_sistema`, `cantidad_contada`), `MovimientoInventario` (tipo `AJUSTE`, `aprobado_por`, motivo), `StockUbicacion`.
+**Datos involucrados**: `CONTEO_FISICO` (`count_id`, `state`, `actorPerson`, fechas), `DETALLE_CONTEO` (`entity_id`, `countedQty`, `systemQtyAtClose`) y `MOVIMIENTO` (tipo `AJUSTE`, `approvedByPerson`, `reason`, `quantity`). La corrección aplica sobre `ENTIDAD.stockBalance`; no hay tabla `StockUbicacion` en el MVP.
 
 **Decisión de diseño**: El conteo no modifica directamente las existencias. Las diferencias se corrigen mediante movimientos de ajuste aprobados y vinculados al conteo original. Se conserva la identidad de quien contó y de quien aprobó para asegurar la separación de funciones y la trazabilidad.
 
@@ -189,9 +214,9 @@ Como Analista de Inventario, quiero un panel con los KPIs principales, filtrable
 2. **Dado** que hay historial suficiente, **cuando** se consultan los indicadores detallados, **entonces** se muestra la rotación y los días de cobertura (stock / consumo diario promedio) por producto.
 3. **Dado** que un producto tiene menos de 30 días de historial, **cuando** se evalúa su rotación, **entonces** se muestra como "Datos insuficientes" en vez de un número engañoso.
 4. **Dado** un filtro de categoría o fecha, **cuando** se aplica, **entonces** todas las tarjetas y la tabla se recalculan, y el filtro activo queda visible.
-5. **Dado** un usuario con rol Operador, **cuando** intenta entrar al panel, **entonces** ve solo los KPIs de cantidades, sin valores en $.
+5. **Dado** cualquier usuario de la demo, **cuando** entra al panel, **entonces** ve los KPIs de cantidades y la valorización; en el MVP no existe control de acceso por rol (FR-047) y la persona local solo identifica al responsable en auditoría y aprobaciones.
 
-**Datos involucrados**: Lectura de `Producto`, `StockUbicacion` y `MovimientoInventario` (sin tablas nuevas).
+**Datos involucrados**: Lectura de `ENTIDAD` (Producto) y `MOVIMIENTO` (sin tablas nuevas). El saldo por ubicación se documenta como evolución futura en `plan.md`.
 
 **Decisión de diseño**: La valorización usa costo promedio ponderado, que se recalcula con cada entrada.
 
@@ -209,24 +234,24 @@ Como Operador de Recepción o de Despacho, quiero mover stock de una ubicación 
 
 ---
 
-### Historia de Usuario 9 – Roles, datos sensibles y auditoría (Prioridad: P3)
+### Historia de Usuario 9 – Auditoría e identidad local, sin roles operativos (Prioridad: P3)
 
-Como Administrador del módulo, quiero asignar un rol a cada usuario y que el sistema muestre u oculte funciones y datos según ese rol, para proteger la información sensible (costos, proveedores) y poder auditar las acciones.
+Como Administrador del módulo, quiero que cada acción quede registrada con la persona que la ejecuta, para poder auditar los cambios y verificar la separación de funciones sin crear una falsa sensación de seguridad.
 
-**Por qué esta prioridad**: El módulo puede operar sin autenticación real, pero la protección de datos sensibles y la auditoría son necesarias para un uso responsable. Es P3 porque en el MVP los roles son una simulación y la seguridad efectiva depende del backend.
+**Por qué esta prioridad**: El MVP es solo frontend y no tiene autenticación real. Ocultar costos o contactos mediante un selector de rol simulado daría una protección que cualquier usuario podría eludir desde el navegador; por eso se retiró esa funcionalidad (FR-047, decisiones de 2026-11-10 y 2026-11-17) y se conserva solo la identidad local como evidencia de auditoría.
 
-**Prueba Independiente**: Cambiar el selector de rol a Operador y comprobar que no aparecen costos, valorización ni contactos de proveedores; cambiar a Analista y verificar que puede consultar toda la información, pero no registrar entradas, salidas ni ajustes; revisar la auditoría y ver la acción registrada con usuario, fecha y hora, valor anterior y nuevo.
+**Prueba Independiente**: Elegir una persona en el selector local, crear y desactivar un producto y anular un movimiento; revisar la auditoría y comprobar que aparecen la persona, la acción, la fecha y el detalle con valores anterior y nuevo. Luego realizar un conteo con una persona y aprobarlo con otra distinta.
 
 **Escenarios de Aceptación**:
 
-1. **Dado** un usuario con rol Operador, **entonces** no ve costos, valorización ni datos de contacto de proveedores en ninguna pantalla, exportación o tooltip.
-2. **Dado** un usuario con rol Analista, **entonces** puede ver toda la información, pero no registrar entradas, salidas ni ajustes.
-3. **Dado** cualquier creación, anulación o aprobación, **entonces** queda en un registro de auditoría (usuario, acción, fecha y hora, valor anterior y nuevo).
-4. **Dado** el MVP (solo frontend), **entonces** el rol se elige con un selector de rol simulado, y queda documentado que en producción debe validarse en el backend.
+1. **Dado** cualquier creación, edición, desactivación o anulación, **entonces** queda un registro de auditoría con persona local, acción, entidad, fecha y hora, y valores anterior y nuevo cuando aplica.
+2. **Dado** el MVP (solo frontend), **entonces** no existe inicio de sesión, selector de rol ni visibilidad condicionada por rol; la identidad se elige en un selector local sin contraseña (FR-047, FR-049).
+3. **Dado** un ajuste derivado de un conteo, **entonces** la persona que aprueba debe ser distinta de quien contó, y ambos datos quedan en el movimiento.
+4. **Dado** un despliegue a producción, **entonces** la autenticación, los permisos y la protección de datos sensibles deben validarse en el backend, no en la interfaz.
 
-**Datos involucrados**: `Usuario` (nombre, rol), `Rol` (permisos), `Auditoria` (`usuario_id`, `accion`, `entidad`, `entidad_id`, `fecha`, `detalle`).
+**Datos involucrados**: `PERSONA_LOCAL` (nombre/etiqueta elegida), `AUDITORIA` (`audit_id`, `person`, `action`, `entityId`, `timestamp`, `details`) y `MOVIMIENTO` (`actorPerson`, `approvedByPerson`).
 
-**Decisión de diseño**: En el MVP (solo frontend) el rol se elige con un selector simulado y las restricciones se aplican en la interfaz; en producción los permisos deben validarse en el backend para que no puedan eludirse desde el cliente.
+**Decisión de diseño**: Los roles quedan como etiquetas descriptivas en la documentación, sin permisos asociados en el MVP. La auditoría y la separación de funciones se implementan en la capa de almacenamiento; el control real de acceso queda diferido al backend.
 ### Historia de Usuario 10 – Integración con Compras y Ventas (Prioridad: P3)
 
 Como Analista de Inventario, quiero que las solicitudes de reposición lleguen al módulo de Compras y que los pedidos de Ventas aparezcan como despachos pendientes, para no digitar dos veces la misma información.
