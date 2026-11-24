@@ -1,6 +1,6 @@
 # Implementation Plan: Módulo Base ERP — Logística e Inventario
 
-**Branch**: `001-erp-base-module` | **Date**: 2026-11-17 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-erp-base-module` | **Date**: 2026-11-23 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-erp-base-module/spec.md`
 
@@ -8,7 +8,7 @@
 
 Construir un módulo base ERP frontend reutilizable para gestión de datos maestros (Entidades/Productos) y operaciones nativas de inventario (Entradas, Salidas, Transferencias, Ajustes, conteos físicos, anulaciones con contramovimiento y solicitudes de reposición), con saldo/ubicación por movimiento, validación de existencias, kardex, panel de KPIs y reetiquetado total desde configuración. El MVP se implementa como una SPA con Vite, HTML, CSS y JavaScript vanilla, persistencia en `localStorage` y pruebas con Vitest + jsdom.
 
-Alcance aclarado (2026-11-17): entran en esta versión las historias de catálogo, movimientos, kardex, conteos, indicadores y terminología configurable; la integración con Compras y Ventas (HU10) queda diferida. Los roles son solo etiquetas descriptivas, sin permisos, selector de rol ni visibilidad condicionada por rol; desde 2026-11-23 existe un acceso local de demostración con perfil en primer uso, y la identidad de ese perfil se registra en el selector local para auditoría y aprobaciones. No es autenticación real. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
+Alcance aclarado (2026-11-17): entran en esta versión las historias de catálogo, movimientos, kardex, conteos, indicadores y terminología configurable; la integración con Compras y Ventas (HU10) queda diferida. Desde 2026-11-23 el acceso local es un **registro con cargo/rol obligatorio** que filtra la interfaz: cada usuario ve solo los módulos y acciones de su rol y el Administrador accede a todo (HU12, FR-050–FR-056). La autorización sigue siendo de presentación (sin backend) y debe validarse en servidor en producción. La identidad del perfil se registra en el selector local para auditoría y aprobaciones. La entidad requiere nombre, código (SKU), categoría, unidad y punto de reorden; la eliminación física solo es posible sin historial asociado (con historial se desactiva); los movimientos confirmados son inmutables y se corrigen por anulación con contramovimiento. La valoración usa `costo_unitario` opcional visible solo en panel/catálogo.
 
 ## Technical Context
 
@@ -26,9 +26,9 @@ Alcance aclarado (2026-11-17): entran en esta versión las historias de catálog
 
 **Performance Goals**: Listado y búsqueda correctos y responsivos con al menos 500 entidades (FR-032, SC-004); crear entidad y verla en la lista < 2 min (SC-001); búsqueda < 10 s (SC-002); navegación a gestión/búsqueda < 10 s (SC-005)
 
-**Constraints**: Sin backend ni autenticación real; acceso local de demostración con perfil y sesión en el navegador, sin permisos ni visibilidad por rol (FR-047); selector local de persona derivado del perfil para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
+**Constraints**: Sin backend ni autenticación real; registro con cargo/rol obligatorio y sesión en el navegador que filtra la interfaz por una matriz de permisos en `src/roles.js` (FR-050–FR-056); el control de acceso es de presentación y debe validarse en servidor en producción; selector local de persona derivado del perfil para auditoría y separación de funciones (FR-049); etiquetas visibles derivadas de `src/module-config.js`; renderizado seguro contra XSS; controles nativos accesibles; persistencia local; una sola pantalla visible a la vez; barra lateral contraíble; movimientos confirmados inmutables; eliminación solo sin historial
 
-**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 10 historias en alcance (US1–US9 y US11; US10 —Compras/Ventas— diferida); 3 pantallas (Panel, Gestión, Búsqueda); 49 requisitos funcionales + 5 requisitos de extensibilidad
+**Scale/Scope**: Un espacio de trabajo; ≥ 500 registros de entidad; 11 historias en alcance (US1–US9, US11 y US12; US10 —Compras/Ventas— diferida); 4 pantallas (Acceso, Panel, Gestión, Búsqueda); 56 requisitos funcionales + 5 requisitos de extensibilidad; 5 roles de acceso
 
 ## Constitution Check
 
@@ -38,7 +38,7 @@ Alcance aclarado (2026-11-17): entran en esta versión las historias de catálog
 |-----------|------|--------------|
 | I. Code Quality & Maintainability | Código modular con responsabilidades separadas (almacenamiento, configuración, componentes, shell) y funciones pequeñas | PASS — la estructura propuesta aísla almacenamiento, configuración y UI; reglas de dominio e inmutabilidad en la capa de almacenamiento |
 | II. Test-First & Verification | Pruebas unitarias e integración para comportamiento visible y lógica de negocio antes/junto a la implementación | PASS — Vitest + jsdom cubre validación, stock, unicidad, inmutabilidad/contramovimientos, configuración y flujos críticos |
-| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad; identidad local sin control de acceso por rol | PASS — tokens compartidos, etiquetas desde configuración, controles nativos accesibles, persona local para auditoría y sin visibilidad condicionada por rol |
+| III. User Experience Consistency | Patrones consistentes de layout, terminología, validación, estados vacíos y accesibilidad; control de acceso por rol coherente en navegación, acciones y rutas | PASS — tokens compartidos, etiquetas desde configuración, controles nativos accesibles, matriz de permisos única que filtra navegación/acciones/rutas y Administrador con acceso total |
 | IV. Performance & Reliability | Presupuestos de rendimiento y comportamiento responsivo bajo uso esperado | PASS — objetivos medibles para 500 registros; operaciones locales y búsqueda sin trabajo bloqueante innecesario |
 
 **Resultado**: Sin violaciones. No se requiere Complexity Tracking.
@@ -70,13 +70,16 @@ index.html
 src/
 ├── main.js              # Arranque, carga de configuración y montaje
 ├── app.js               # Enrutamiento de vistas, estado y coordinación
+├── auth.js              # Registro/ingreso con rol, sesión y perfil
+├── roles.js             # Catálogo de roles y matriz de permisos (FR-050–FR-056)
 ├── module-config.js     # Configuración del módulo (nombre, etiquetas, campos, tema)
 ├── storage.js           # Entidades, movimientos, conteos, solicitudes, stock y persistencia
 ├── styles.css           # Tokens de diseño, shell, formularios, listas y responsive
 └── components/
     ├── shell.js         # Barra superior, logotipo SVG, barra lateral y módulo activo
+    ├── login.js         # Registro/ingreso con campo Cargo/Rol obligatorio
     ├── person-selector.js # Persona local para auditoría y aprobaciones (FR-049)
-    ├── dashboard.js     # Acciones rápidas, KPIs, alertas y solicitudes de reposición
+    ├── dashboard.js     # Acciones rápidas filtradas por rol, KPIs, alertas y solicitudes
     ├── entity-form.js   # Alta/edición/desactivación de entidades y campos personalizados
     ├── entity-list.js   # Listado, acciones y estados vacíos
     ├── document-form.js # Registro de movimientos (entrada/salida/transferencia/ajuste)
@@ -87,8 +90,11 @@ tests/
 ├── unit/
 │   ├── storage.test.js
 │   ├── module-config.test.js
+│   ├── roles.test.js      # Catálogo, matriz y resolución de permisos
 │   └── stock.test.js
 └── integration/
+    ├── auth.test.js       # Registro con rol, sesión con rol y bloqueo de rutas
+    ├── role-access.test.js # Navegación filtrada y denegación de rutas por rol
     ├── dashboard.test.js
     ├── create-entity.test.js
     ├── edit-delete-entity.test.js
@@ -98,7 +104,7 @@ tests/
     └── workspace-shell.test.js
 ```
 
-**Structure Decision**: Proyecto único frontend sin backend. `storage.js` concentra persistencia y reglas de dominio (unicidad de SKU, stock por ubicación/total derivado, inmutabilidad de confirmados, contramovimientos, conteos y solicitudes). `module-config.js` es el único punto de adaptación. La UI consume contratos sin duplicar reglas de negocio.
+**Structure Decision**: Proyecto único frontend sin backend. `storage.js` concentra persistencia y reglas de dominio (unicidad de SKU, stock por ubicación/total derivado, inmutabilidad de confirmados, contramovimientos, conteos y solicitudes). `auth.js` persiste el perfil con su `role` y la sesión; `roles.js` es la única fuente de verdad de la matriz de permisos que consumen la barra lateral, las acciones rápidas y el guardia de rutas. `module-config.js` es el único punto de adaptación. La UI consume contratos sin duplicar reglas de negocio.
 
 ## Phase 0: Research
 
@@ -107,20 +113,20 @@ Salida: [research.md](./research.md). Resuelve decisiones tecnológicas y de dom
 ## Phase 1: Design & Contracts
 
 Salidas:
-- [data-model.md](./data-model.md): entidades, movimientos, conteos, solicitudes, validaciones y transiciones.
-- [contracts/entity-storage.md](./contracts/entity-storage.md): forma de datos y operaciones de persistencia.
+- [data-model.md](./data-model.md): entidades, movimientos, conteos, solicitudes, validaciones y transiciones, más el catálogo de roles y la matriz de permisos.
+- [contracts/entity-storage.md](./contracts/entity-storage.md): forma de datos y operaciones de persistencia, incluido `PerfilAcceso.role`.
 - [contracts/module-config.md](./contracts/module-config.md): contrato de configuración y extensibilidad.
-- [contracts/ui.md](./contracts/ui.md): pantallas, navegación, etiquetas y comportamiento esperado.
-- [quickstart.md](./quickstart.md): escenarios de validación ejecutables.
+- [contracts/ui.md](./contracts/ui.md): pantallas, navegación, etiquetas, acceso por rol y comportamiento esperado.
+- [quickstart.md](./quickstart.md): escenarios de validación ejecutables, incluidos los de cada rol.
 
 ## Post-Design Constitution Check
 
 | Principio | Re-evaluación tras diseño | Resultado |
 |-----------|---------------------------|-----------|
-| I. Code Quality & Maintainability | Contratos separados por responsabilidad; reglas de stock/inmutabilidad centralizadas; extensibilidad por configuración | PASS |
-| II. Test-First & Verification | Contratos definen validaciones y efectos verificables (unicidad, stock, contramovimientos, conteos); quickstart mapea historias a pruebas | PASS |
-| III. User Experience Consistency | Contrato UI fija navegación, estados, mensajes y selector local de persona sin permisos por rol | PASS |
-| IV. Performance & Reliability | Modelo local apto para 500 registros; recálculo de KPIs y stock por operaciones explícitas | PASS |
+| I. Code Quality & Maintainability | Contratos separados por responsabilidad; reglas de stock/inmutabilidad centralizadas; permisos en una sola matriz (`roles.js`); extensibilidad por configuración | PASS |
+| II. Test-First & Verification | Contratos definen validaciones y efectos verificables (unicidad, stock, contramovimientos, conteos, rol obligatorio, denegación de rutas); quickstart mapea historias y roles a pruebas | PASS |
+| III. User Experience Consistency | Contrato UI fija navegación, estados, mensajes, cargo visible y vistas por rol, con el Administrador como acceso total | PASS |
+| IV. Performance & Reliability | Modelo local apto para 500 registros; filtrado de permisos O(1) por vista; recálculo de KPIs y stock por operaciones explícitas | PASS |
 
 **Resultado post-diseño**: Sin violaciones. Se puede proceder a `/speckit.tasks`.
 
@@ -135,6 +141,7 @@ El MVP es una SPA sin backend: la persistencia es `localStorage` (`erp.entities`
 | Límite | Consecuencia | Mitigación en el MVP |
 |---|---|---|
 | `localStorage` por navegador | Un solo espacio de trabajo, sin multiusuario real ni sincronización | Selector local de persona para auditoría; se documenta que en producción requiere backend |
+| Control de acceso por rol en el navegador | Un usuario técnico puede modificar el perfil o la sesión y eludir la interfaz | Se define como barrera de presentación; la autorización real se valida en backend (FR-056) |
 | `stockBalance` como saldo total | No hay saldo por ubicación consultable | La ubicación se guarda por movimiento y se deriva del último confirmado (FR-041); la sugerencia FIFO usa la entrada más antigua |
 | Historial corto | La rotación y cobertura pueden engañar | Etiqueta «Datos insuficientes» con menos de 30 días |
 | Cálculo síncrono de KPIs | Con volúmenes muy altos puede degradar la UI | Filtrado lineal simple validado hasta 500 registros; se recomienda índices y agregación al migrar a backend |
@@ -145,7 +152,7 @@ El MVP es una SPA sin backend: la persistencia es `localStorage` (`erp.entities`
 1. **Persistencia y concurrencia.** Sustituir `localStorage` por una API con base de datos relacional; las tablas `ENTIDAD`, `MOVIMIENTO`, `PROVEEDOR`, `CONTEO_FISICO`, `AUDITORIA` ya están modeladas en `data-model.md`.
 2. **Saldo por ubicación.** Crear la tabla `StockUbicacion` y derivar el saldo por pasillo/estante/nivel con vistas materializadas, conservando los movimientos como fuente de verdad.
 3. **Integración con Compras y Ventas (US10).** Añadir `orden_compra_id` y `pedido_venta_id` sin cambiar el contrato central de almacenamiento.
-4. **Identidad y permisos reales.** Autenticar en backend y aplicar control de acceso por rol validado en servidor; hoy los roles son solo etiquetas descriptivas y el acceso local de demostración no sustituye esta capacidad (FR-047).
+4. **Identidad y permisos reales.** Autenticar en backend y validar la matriz de permisos (hoy aplicada en la interfaz) del lado servidor, incluyendo la confidencialidad de costos y contactos; el rol del perfil local filtra la UI, pero no es una frontera de seguridad (FR-056).
 5. **Auditoría inmutable y observabilidad.** Registros solo de inserción, trazas de las operaciones de stock y panel de errores.
 
 ## Potenciales usuarios y mitigación de sesgos
@@ -160,7 +167,25 @@ El MVP es una SPA sin backend: la persistencia es `localStorage` (`erp.entities`
 | Jefe de bodega | Explicar diferencias de stock | Kardex cronológico, anulación con contramovimiento, conteos ciegos y ajustes aprobados |
 | Analista de inventario | Apoyar decisiones | KPIs, alertas de reposición, filtros por categoría/período y rotación/cobertura |
 
-En el MVP **no hay selector de rol**: estos perfiles son los usuarios potenciales descritos en las historias; la identidad real queda fija desde el perfil que entró y solo se usa para auditoría y aprobaciones, mientras que el botón “+” agrega etiquetas para aprobador.
+En el MVP **no hay selector de rol dentro del espacio de trabajo**: el cargo se elige obligatoriamente al registrarse, se guarda en el perfil y se carga en la sesión; la identidad del perfil se usa además como persona local para auditoría y aprobaciones, y el botón “+” agrega etiquetas para aprobador.
+
+### Matriz de acceso por rol (HU12)
+
+| Módulo / acción | Administrador | Recepción | Despacho | Jefe de Bodega | Analista |
+|---|---|---|---|---|---|
+| Panel y KPIs | Sí | Sí | Sí | Sí | Sí |
+| Ver catálogo y buscar | Sí | Sí | Sí | Sí | Sí |
+| Crear/editar/desactivar entidad | Sí | No | No | No | No |
+| Entrada de inventario | Sí | Sí | No | Sí | No |
+| Salida de inventario | Sí | No | Sí | Sí | No |
+| Transferencia | Sí | Sí | Sí | Sí | No |
+| Ajuste / conteo físico | Sí | No | No | Sí | No |
+| Aprobar ajuste (persona distinta) | Sí | No | No | Sí | No |
+| Anular movimiento | Sí | No | No | Sí | No |
+| Auditoría | Sí | No | No | Sí | No |
+| Solicitar alta de producto | Sí | Sí | No | No | No |
+
+La fuente única es `src/roles.js` (`ROLE_PERMISSIONS`); la barra lateral, las acciones rápidas, los formularios y el guardia de rutas consultan la misma matriz. El Administrador se define como comodín (todas las claves) para no depender de una lista mantenida a mano.
 
 ### Sesgos asociados a los datos y su uso
 

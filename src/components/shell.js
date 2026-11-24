@@ -1,4 +1,5 @@
 import { h, mount } from './dom.js';
+import { getRoleLabel, hasPermission, NAV_PERMISSIONS } from '../roles.js';
 
 const ICONS = {
   dashboard:
@@ -104,6 +105,12 @@ export function mountShell(
     config.moduleName
   );
 
+  const cargoBadge = h('span', {
+    class: 'badge cargo-badge',
+    'data-testid': 'cargo-badge',
+    hidden: true
+  });
+
   const topbar = h(
     'header',
     { class: 'topbar' },
@@ -112,6 +119,7 @@ export function mountShell(
     h(
       'div',
       { class: 'topbar-actions' },
+      cargoBadge,
       onLoadDemo
         ? h(
             'button',
@@ -206,6 +214,21 @@ export function mountShell(
     });
   }
 
+  function setRole(role) {
+    navDefinitions.forEach((definition) => {
+      const button = navButtons.get(definition.id);
+      if (!button) return;
+      const permissions = NAV_PERMISSIONS[definition.id] ?? [];
+      const allowed = permissions.some((permission) => hasPermission(role, permission));
+      button.hidden = !allowed;
+      if (button.parentElement) button.parentElement.hidden = !allowed;
+    });
+    const label = getRoleLabel(role);
+    cargoBadge.textContent = label;
+    cargoBadge.title = label ? `Cargo activo: ${label}` : '';
+    cargoBadge.hidden = !label;
+  }
+
   function setWarnings(nextErrors = []) {
     warning.replaceChildren();
     if (nextErrors.length > 0) {
@@ -216,5 +239,5 @@ export function mountShell(
     }
   }
 
-  return { view, main, setActive, setWarnings, navButtons };
+  return { view, main, setActive, setWarnings, setRole, navButtons, cargoBadge };
 }

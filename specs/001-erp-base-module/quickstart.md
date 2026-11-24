@@ -1,6 +1,6 @@
 # Quickstart: Validación del Módulo Base ERP — Logística e Inventario
 
-**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-17
+**Feature**: `001-erp-base-module` | **Plan**: [plan.md](./plan.md) | **Modelo**: [data-model.md](./data-model.md) | **Fecha**: 2026-11-23
 
 Guía para ejecutar y validar el módulo de extremo a extremo. Contratos en [contracts/](./contracts/).
 
@@ -16,12 +16,13 @@ npm run dev
 ```
 Abrir la URL de Vite (por defecto `http://localhost:5173`).
 
-## Primer acceso (demostración)
+## Primer acceso (registro con cargo/rol)
 
-1. En la pantalla inicial, crear un perfil con usuario y contraseña de al menos 4 caracteres.
-2. **Esperado**: el usuario creado queda como persona local activa y fija en el selector; “Salir” bloquea la interfaz y permite volver a entrar con el mismo perfil.
-3. **Esperado**: no hay roles ni permisos; este acceso es solo una barrera local en el navegador, no autenticación real.
-4. Opcional: pulsar “Datos demo” para cargar las etiquetas Ana/Bruno/Carlos/Diana y el dataset de logística.
+1. En la pantalla inicial, crear un perfil con usuario, contraseña de al menos 4 caracteres y **Cargo/Rol obligatorio** (Administrador del módulo, Operador de Recepción, Operador de Despacho, Jefe de Bodega o Analista de Inventario).
+2. **Esperado**: el usuario creado queda como persona local activa y fija en el selector, y el marco muestra su cargo; “Salir” bloquea la interfaz y permite volver a entrar con el mismo perfil y su rol.
+3. **Esperado**: la barra lateral y las acciones rápidas muestran solo lo permitido para el rol; el Administrador ve todas las funciones (FR-052, FR-053).
+4. **Esperado**: el rol es un control de presentación en el navegador, no autenticación real; la autorización debe validarse en backend (FR-056).
+5. Opcional: pulsar “Datos demo” para cargar el dataset de logística (las etiquetas de aprobador se agregan con “+”).
 
 ## Pruebas automatizadas
 
@@ -41,8 +42,8 @@ npm run preview
 4. **Esperado**: guardado bloqueado con mensaje descriptivo.
 5. Intentar eliminar un producto con movimientos/historial.
 6. **Esperado**: eliminación bloqueada y solo se permite desactivación conservando historial. Si no tiene historial, la eliminación física es posible.
-7. Revisar la interfaz en busca de un selector de rol o de una vista que oculte costos/contactos por rol.
-8. **Esperado**: no existe selector de rol ni visibilidad condicionada por rol; la persona local, derivada del perfil que entró, solo identifica al actor y los costos/valorización se muestran solo en panel/catálogo (FR-044, FR-047, FR-049).
+7. Revisar el marco y la navegación como Administrador.
+8. **Esperado**: el Administrador ve todas las funciones; el cargo activo aparece en el marco y no existe selector de rol dentro del espacio de trabajo (FR-053, FR-055). La visibilidad de costos/valorización sigue la regla FR-044 (panel/catálogo).
 
 ### HU2 — Recepción (entrada) y transferencia con ubicación
 1. Registrar Entrada confirmada con cantidad y ubicación (pasillo-estante-nivel).
@@ -74,6 +75,19 @@ npm run preview
 5. Aplicar/limpiar filtros.
 6. **Esperado**: KPIs y tabla se recalculan; productos con < 30 días de historial muestran rotación "Datos insuficientes".
 
+### HU12 — Registro con cargo/rol y acceso restringido
+
+1. Crear un perfil sin seleccionar Cargo/Rol.
+2. **Esperado**: el registro se bloquea con mensaje accesible; no se crea el perfil (FR-050).
+3. Crear un perfil con rol **Analista de Inventario** e ingresar.
+4. **Esperado**: se ven Panel, Búsqueda y consultas en lectura; no aparecen formularios de producto/movimiento, conteos ni auditoría (FR-052).
+5. Con la sesión del Analista, abrir `#/documents` o `#/audit` directamente en la URL.
+6. **Esperado**: la vista prohibida no se renderiza; se redirige a una vista permitida con aviso (FR-054).
+7. Cerrar sesión y repetir con **Operador de Recepción** y **Operador de Despacho**: verificar que cada uno solo accede a su tipo de movimiento.
+8. Cerrar sesión e ingresar con **Jefe de Bodega**: verificar movimientos, conteo/aprobación y auditoría, sin edición de catálogo.
+9. Ingresar con **Administrador del módulo**: verificar acceso a todas las funciones (FR-053).
+10. **Esperado**: el rol no se puede cambiar dentro de la sesión; se requiere cerrar sesión (FR-055).
+
 ## Validación transversal
 
 | Comprobación | Esperado |
@@ -81,7 +95,10 @@ npm run preview
 | Campos obligatorios entidad (nombre, SKU, categoría, unidad, punto de reorden) | Bloqueo y mensajes claros si faltan |
 | SKU único global (normalizado) | Bloqueo en alta/edición duplicada |
 | Eliminación con/sin historial | Sin historial: elimina; con historial: solo desactiva |
-| Acceso / visibilidad por rol | Acceso local de demostración con perfil en primer uso; sin roles, permisos ni ocultación de costos/contactos (FR-047) |
+| Registro con cargo/rol | Rol obligatorio del catálogo; sin rol no se crea el perfil (FR-050) |
+| Interfaz por rol | Navegación, acciones y rutas limitadas al rol; Administrador con acceso total (FR-052, FR-053) |
+| Ruta no permitida | Bloqueo con redirección y aviso, sin renderizar la vista (FR-054) |
+| Cambio de rol | Solo cerrando sesión e ingresando con otro perfil (FR-055) |
 | Persona local en auditoría | Toda creación/edición/desactivación registra persona y fecha (FR-049) |
 | Aprobación de ajustes | Requiere persona distinta de la del conteo (HU4#4) |
 | Movimientos confirmados | Inmutables; corrección por contramovimiento |
@@ -99,7 +116,7 @@ npm run preview
 
 ## Notas de alineación
 
-- Los roles son etiquetas descriptivas: no hay permisos, selector de rol ni visibilidad por rol; el acceso local de demostración no es autenticación real.
+- El acceso local exige Cargo/Rol al registrar y filtra la interfaz con la matriz de `src/roles.js`; el Administrador accede a todo. No es autenticación real: la autorización se valida en backend en producción.
 - La identidad del perfil que entra queda fija en el selector local de persona y se usa en auditoría; el botón “+” solo agrega etiquetas para aprobaciones/separación de funciones.
 - `costo_unitario` no se ingresa en formularios de movimientos; solo se visualiza en panel/catálogo.
 - Ubicación actual del producto: derivada del último documento de entrada o transferencia confirmado.
@@ -115,7 +132,7 @@ npm run preview
 - HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
 - Nuevas coberturas verificadas: proveedor con RUT chileno y vínculo producto-proveedor, `doc_respaldo` y proveedor obligatorios en entradas, solicitud de alta sin crear el producto, sugerencia FIFO, saldo inicial de período en kardex, días de cobertura y filtro de período del panel, y vista de auditoría con filtros y valores antes/después.
 - Corrección de fechas: los filtros por rango de fechas usan límites de día en UTC, evitando desfases en zonas horarias con offset negativo (p. ej. `America/Santiago`).
-- Clarificaciones aplicadas y verificadas: sin selector de rol ni visibilidad por rol; `TRANSFERENCIA` como tercer tipo de documento con ubicación derivada; persona local para auditoría/aprobaciones con `actorPerson`/`approvedByPerson`; entidades con historial se desactivan conservando documentos; clave canónica `erp.movements` con migración desde `erp.documents`.
+- Clarificaciones aplicadas y verificadas: sin selector de rol dentro de la sesión; `TRANSFERENCIA` como tercer tipo de documento con ubicación derivada; persona local para auditoría/aprobaciones con `actorPerson`/`approvedByPerson`; entidades con historial se desactivan conservando documentos; clave canónica `erp.movements` con migración desde `erp.documents`.
 - Búsqueda: filtrado por término y categoría con estados vacíos seguros; renderizado sin `innerHTML` con datos de usuario.
 - Seguridad XSS: componentes usan creación de nodos/`textContent`; se eliminó el uso de inserción HTML sin sanitizar en utilidades compartidas.
 - Accesibilidad/responsivo: navegación con `aria-current`, controles con etiquetas, retroalimentación con `role`/`aria-live` donde aplica, barra lateral colapsable por ancho reducido.

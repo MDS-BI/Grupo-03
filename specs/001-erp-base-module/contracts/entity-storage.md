@@ -1,10 +1,10 @@
 # Contrato de Almacenamiento (Entidades, Movimientos e Inventario)
 
-**Feature**: `001-erp-base-module` | **Modelo**: [../data-model.md](../data-model.md) | **Fecha**: 2026-11-17
+**Feature**: `001-erp-base-module` | **Modelo**: [../data-model.md](../data-model.md) | **Fecha**: 2026-11-23
 
 ## Propósito
 
-Definir la forma de datos y las operaciones de persistencia/reglas de dominio expuestas por `src/storage.js` (o capa equivalente). Almacenamiento en `localStorage`, espacio de trabajo único. La UI no accede directamente a `localStorage`.
+Definir la forma de datos y las operaciones de persistencia/reglas de dominio expuestas por `src/storage.js` (o capa equivalente), además del contrato de acceso en `src/auth.js` y la matriz de permisos en `src/roles.js`. Almacenamiento en `localStorage`, espacio de trabajo único. La UI no accede directamente a `localStorage`.
 
 ## Claves de almacenamiento (sugeridas)
 
@@ -16,8 +16,19 @@ Definir la forma de datos y las operaciones de persistencia/reglas de dominio ex
 | `erp.replenishmentRequests` | Arreglo JSON de solicitudes de reposición |
 | `erp.persons` | Arreglo JSON de etiquetas de PersonaLocal del selector |
 | `erp.audit` | Arreglo JSON de registros de auditoría |
+| `erp.auth.users` | Arreglo JSON de perfiles: `{ username, salt, hash, role }` |
+| `erp.auth.session` | `{ username, role }` de la sesión activa (fuera de `STORAGE_KEYS`) |
 
 (Los nombres exactos pueden ajustarse en implementación siempre que el contrato lógico se mantenga.)
+
+## Acceso y roles
+
+- `registerUser({ username, password, role })`: valida usuario no vacío/único, contraseña ≥ 4 y `role` perteneciente al catálogo; persiste `{ username, salt, hash, role }`.
+- `signIn({ username, password })`: valida credenciales y que el `role` del perfil siga existiendo; guarda `{ username, role }` en `erp.auth.session`.
+- `getCurrentUser()` / `getCurrentRole()`: reconstruyen la sesión; sin sesión no se renderiza el módulo.
+- `hasPermission(role, permission)`: consulta la matriz de `src/roles.js`; `admin` siempre devuelve permitido.
+- Roles válidos: `admin`, `recepcion`, `despacho`, `bodega`, `analista` (ver matriz en [../data-model.md](../data-model.md#27-rol-y-rol_permiso-catálogo-y-matriz-de-acceso)).
+- El rol es de presentación: no cifra datos ni reemplaza la autorización de backend (FR-056).
 
 ## Entidad
 
@@ -73,7 +84,7 @@ Operaciones para crear/cerrar conteos ciegos, registrar diferencias, generar aju
 
 ## Validación y errores
 
-- Errores descriptivos para: campos obligatorios faltantes, `code` duplicado, `reorderPoint`/`unitCost` inválidos, entidad inexistente, cantidad ≤ 0, ubicación incompleta en entrada, stock insuficiente en salida/transferencia, intento de editar/eliminar confirmado, intento de eliminar entidad con historial, ajuste sin `approvedByPerson` o con la misma persona que contó.
+- Errores descriptivos para: campos obligatorios faltantes, `code` duplicado, `reorderPoint`/`unitCost` inválidos, entidad inexistente, cantidad ≤ 0, ubicación incompleta en entrada, stock insuficiente en salida/transferencia, intento de editar/eliminar confirmado, intento de eliminar entidad con historial, ajuste sin `approvedByPerson` o con la misma persona que contó, registro sin `role`, rol desconocido y acción/vista solicitada sin permiso.
 - La UI debe presentar retroalimentación clara y consistente (FR-006).
 
 ## Extensibilidad

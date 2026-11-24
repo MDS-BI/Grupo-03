@@ -1,10 +1,13 @@
 import { h } from './dom.js';
 import { hasUsers } from '../auth.js';
+import { ROLES } from '../roles.js';
 
 export function renderLogin(container, { config, onSubmit }) {
   let mode = hasUsers() ? 'login' : 'register';
+  let requireRole = false;
 
-  function render(error = '') {
+  function render(error = '', { forceRole = false } = {}) {
+    if (forceRole) requireRole = true;
     container.replaceChildren();
 
     const usernameInput = h('input', {
@@ -34,6 +37,21 @@ export function renderLogin(container, { config, onSubmit }) {
           })
         : null;
 
+    const showRole = mode === 'register' || requireRole;
+    const roleSelect = showRole
+      ? h(
+          'select',
+          {
+            id: 'auth-role',
+            name: 'role',
+            required: true,
+            'data-testid': 'auth-role'
+          },
+          h('option', { value: '' }, 'Seleccione un cargo/rol'),
+          ...Object.values(ROLES).map((role) => h('option', { value: role.code }, role.label))
+        )
+      : null;
+
     const errorNode = h('p', {
       class: 'auth-error',
       'data-testid': 'auth-error',
@@ -51,6 +69,9 @@ export function renderLogin(container, { config, onSubmit }) {
         h('label', { for: 'auth-password' }, 'Contraseña'),
         passwordInput
       ),
+      roleSelect
+        ? h('div', { class: 'field' }, h('label', { for: 'auth-role' }, 'Cargo/Rol'), roleSelect)
+        : null,
       confirmInput
         ? h(
             'div',
@@ -94,9 +115,14 @@ export function renderLogin(container, { config, onSubmit }) {
           mode,
           username: usernameInput.value,
           password: passwordInput.value,
-          confirm: confirmInput?.value ?? passwordInput.value
+          confirm: confirmInput?.value ?? passwordInput.value,
+          role: roleSelect?.value ?? ''
         });
       } catch (submittedError) {
+        if (submittedError?.code === 'ROLE_REQUIRED') {
+          render(submittedError.message, { forceRole: true });
+          return;
+        }
         errorNode.textContent = submittedError.message;
       }
     });
@@ -109,8 +135,10 @@ export function renderLogin(container, { config, onSubmit }) {
         'p',
         { class: 'page-subtitle' },
         mode === 'login'
-          ? 'Ingrese con su perfil local para acceder al módulo.'
-          : 'Cree un perfil local para comenzar a utilizar el módulo.'
+          ? requireRole
+            ? 'Complete su cargo/rol para continuar.'
+            : 'Ingrese con su perfil local para acceder al módulo.'
+          : 'Cree un perfil local con su cargo/rol para comenzar a utilizar el módulo.'
       ),
       form
     );

@@ -1,8 +1,8 @@
 # Modelo de Datos (Phase 1): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-23
 
-Modelo alineado con las clarificaciones vigentes: catálogo, movimientos, kardex, conteos, indicadores y terminología configurable en alcance (la integración con Compras/Ventas, HU10, queda diferida), Transferencia como tercer tipo de documento, sin roles operativos ni visibilidad por rol, selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
+Modelo alineado con las clarificaciones vigentes: catálogo, movimientos, kardex, conteos, indicadores y terminología configurable en alcance (la integración con Compras/Ventas, HU10, queda diferida), Transferencia como tercer tipo de documento, **acceso local con cargo/rol obligatorio y matriz de permisos de interfaz** (HU12, FR-050–FR-056), selector local de persona para auditoría y aprobaciones, campos obligatorios de entidad, unicidad de SKU, eliminación/desactivación por historial e inmutabilidad de movimientos confirmados con contramovimiento.
 
 ## 1. Diagrama Entidad-Relación (conceptual)
 
@@ -17,6 +17,8 @@ erDiagram
     SOLICITUD_REPOSICION ||--o{ SOLICITUD_REPOSICION_DET : "agrupa"
     MOVIMIENTO ||--o| MOVIMIENTO : "anula_a / contramovimiento"
     PERFIL_ACCESO ||--o| PERSONA_LOCAL : "se registra como"
+    ROL ||--o{ PERFIL_ACCESO : "clasifica"
+    ROL ||--o{ ROL_PERMISO : "concede"
     PERSONA_LOCAL ||--o{ MOVIMIENTO : "actor / aprobador"
     PERSONA_LOCAL ||--o{ AUDITORIA : "registra"
     ENTIDAD ||--o{ AUDITORIA : "afectada"
@@ -71,9 +73,20 @@ erDiagram
     }
 
     PERFIL_ACCESO {
-        string username PK "Usuario del acceso local de demostración"
+        string username PK "Usuario del acceso local"
         string salt "Salt del hash de la contraseña"
         string hash "SHA-256(salt:password); no es autenticación de backend"
+        string role FK "Cargo obligatorio (FR-050)"
+    }
+
+    ROL {
+        string code PK "admin|recepcion|despacho|bodega|analista"
+        string label "Cargo visible"
+    }
+
+    ROL_PERMISO {
+        string role FK
+        string permission "Clave de módulo/acción"
     }
 
     AUDITORIA {
@@ -207,11 +220,30 @@ Contrato en [contracts/module-config.md](./contracts/module-config.md): `moduleN
 
 ### 2.6 PERSONA_LOCAL y AUDITORIA
 
-- **PERSONA_LOCAL**: etiqueta del selector local, sin permisos (FR-049). No es un rol y no habilita ni oculta funcionalidad. El perfil que inicia sesión se registra como persona local activa y queda fijo como actor; se pueden agregar otras etiquetas solo como aprobadores.
-- **PERFIL_ACCESO**: acceso local de demostración guardado fuera de `STORAGE_KEYS` (`erp.auth.users`/`erp.auth.session`). No valida identidad en servidor ni protege datos sensibles (FR-047).
+- **PERSONA_LOCAL**: etiqueta del selector local, usada como actor en movimientos, conteos y auditoría. El perfil que inicia sesión se registra como persona local activa y queda fijo como actor; se pueden agregar otras etiquetas solo como aprobadores.
+- **PERFIL_ACCESO**: acceso local de demostración guardado fuera de `STORAGE_KEYS` (`erp.auth.users`/`erp.auth.session`). Incluye `role` obligatorio (FR-050); la sesión guarda `username` y `role`. No valida identidad en servidor ni protege datos sensibles (FR-056).
 - **AUDITORIA**: registro automático de cada creación, edición o desactivación de entidad (HU1#4) con `action`, `person` (PersonaLocal), `timestamp` y, si aplica, `entityId` y `details`. Las aprobaciones de ajustes guardan además `approvedByPerson` en el movimiento.
 
 La separación de funciones se valida comparando la persona del conteo con `approvedByPerson`; ambas deben ser distintas.
+
+### 2.7 ROL y ROL_PERMISO (catálogo y matriz de acceso)
+
+`ROL` es un catálogo fijo (no editable desde la interfaz) y `ROL_PERMISO` es la matriz que consume `src/roles.js`; juntos gobiernan qué módulos y acciones se renderizan.
+
+| Rol / cargo | `code` | Permisos (`permission`) |
+|---|---|---|
+| Administrador del módulo | `admin` | Todas (`*` / comodín) |
+| Operador de Recepción | `recepcion` | `dashboard.read`, `catalog.read`, `search.read`, `movement.entry`, `movement.transfer`, `kardex.read`, `product.request` |
+| Operador de Despacho | `despacho` | `dashboard.read`, `catalog.read`, `search.read`, `movement.exit`, `movement.transfer`, `kardex.read` |
+| Jefe de Bodega | `bodega` | `dashboard.read`, `catalog.read`, `search.read`, `movement.entry`, `movement.exit`, `movement.transfer`, `movement.adjust`, `movement.void`, `count.manage`, `count.approve`, `kardex.read`, `audit.read` |
+| Analista de Inventario | `analista` | `dashboard.read`, `catalog.read`, `search.read`, `kardex.read` |
+
+Reglas:
+1. `role` es obligatorio al registrar y debe existir en el catálogo; un valor desconocido bloquea el registro con mensaje descriptivo.
+2. `admin` concede todo sin enumerar permisos; añadir un permiso nuevo no requiere tocar su fila.
+3. Una vista se permite si el rol tiene el permiso de lectura correspondiente; una acción se permite si tiene el permiso de la acción.
+4. El rol es inmutable durante la sesión: cambiarlo exige cerrar sesión e ingresar con otro perfil (FR-055).
+5. La matriz es de presentación; la autorización definitiva se valida en backend en producción (FR-056).
 
 ## 3. Relaciones e Integridad
 
@@ -220,6 +252,7 @@ La separación de funciones se valida comparando la persona del conteo con `appr
 - **Eliminación**: si existen registros asociados, la entidad no se elimina físicamente; se desactiva. Si no existen, se permite eliminación física (FR-003/FR-009).
 - Ubicación actual del producto: derivada del movimiento de entrada o transferencia confirmado más reciente (no duplicada en entidad; FR-041).
 - Campos personalizados se persisten junto a campos base sin cambiar la estructura.
+- Todo `PERFIL_ACCESO` referencia exactamente un `ROL`; `ROL_PERMISO` no puede contener permisos desconocidos (la matriz se valida al cargar).
 - Toda operación de entidad genera auditoría con la persona local activa (FR-049).
 
 ## 4. Reglas de Validación
@@ -249,6 +282,13 @@ La separación de funciones se valida comparando la persona del conteo con `appr
 2. Ajuste derivado requiere motivo y aprobación con persona local distinta a la del conteo.
 3. Solicitud de reposición agrupa líneas y sugiere cantidad editable según regla definida.
 4. Toda creación/edición/desactivación de entidad queda en auditoría con persona local y fecha.
+
+### Acceso y roles
+1. `username` no vacío y único (sin distinguir mayúsculas); contraseña ≥ 4 caracteres.
+2. `role` obligatorio y perteneciente al catálogo; valor ausente o desconocido bloquea el registro (FR-050).
+3. La sesión carga `username` y `role`; si el rol del perfil ya no existe, se deniega el ingreso con mensaje descriptivo.
+4. Toda ruta/acción solicitada se compara con la matriz; sin permiso se redirige a la primera vista autorizada con aviso (FR-054).
+5. El rol no se modifica dentro de la sesión (FR-055).
 
 ### Configuración
 1. Inválida/conflictiva se informa claramente (sin fallo silencioso).

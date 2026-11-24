@@ -9,7 +9,11 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 **Tests**: Included because Constitution Principle II requires automated tests for user-visible behavior and business logic. Write tests before or alongside implementation.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing. The plan of 2026-11-17 keeps HU1–HU5 as native scope, folds transfer into the inventory model, retracts role-based permissions (FR-047) and defers the Compras/Ventas integration (FR-046). On 2026-11-23 a local demo access gate was added without roles or permissions (FR-047), deriving the active PERSONA_LOCAL from the registered profile (FR-049). This list maps every spec story to a phase: US1–US9 and US11 are actionable; US10 is deferred and generates no phase.
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing. The plan of 2026-11-17 keeps HU1–HU5 as native scope, folds transfer into the inventory model and defers the Compras/Ventas integration (FR-046).
+
+> **Actualización 2026-11-23**: la clarificación 2026-11-23 **sustituye** la decisión de roles como etiquetas (FR-047). El acceso local exige cargo/rol y filtra la interfaz con la matriz de `src/roles.js` (HU12, FR-050–FR-056); el Administrador accede a todo. Las tareas de HU12 se generan en la **Phase 14** (T097–T109). Las referencias a «sin roles/permisos» de T092 en la fase de polish quedan actualizadas por T108.
+
+This list maps every spec story to a phase: US1–US9, US11 and US12 are actionable; US10 is deferred and generates no phase.
 
 ## Format: `[ID] [P?] [Story?] Description`
 
@@ -255,11 +259,11 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ---
 
-## Phase 11: User Story 9 - Roles, datos sensibles y auditoría (Priority: P3)
+## Phase 11: User Story 9 - Auditoría, identidad local y control de acceso (Priority: P3)
 
-**Goal**: Mantener auditoría completa con persona local, incorporar el acceso local de demostración sin roles ni permisos y documentar que los roles son etiquetas descriptivas sin visibilidad condicionada (FR-047).
+**Goal**: Mantener auditoría completa con persona local e incorporar el acceso local con cargo/rol obligatorio y permisos de interfaz (HU12, FR-050–FR-056), documentando que el rol es un control de presentación y no seguridad de servidor.
 
-**Independent Test**: Crear un perfil en el primer ingreso, confirmar que ese usuario queda como persona local activa y que la sesión persiste al remontar; revisar la auditoría tras crear, editar, desactivar y anular, comprobando persona, acción, fecha y detalle; verificar que no existe selector de rol ni ocultación de costos/contactos por rol; comprobar que la persona del selector local queda registrada en movimientos y aprobaciones.
+**Independent Test**: Crear un perfil en el primer ingreso con un cargo, confirmar que ese usuario queda como persona local activa y que la sesión persiste al remontar; revisar la auditoría tras crear, editar, desactivar y anular, comprobando persona, acción, fecha y detalle; verificar que la navegación y las acciones corresponden al rol y que el Administrador accede a todo; comprobar que la persona del selector local queda registrada en movimientos y aprobaciones.
 
 ### Tests for User Story 9
 
@@ -270,7 +274,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - [X] T076 [P] [US9] Implement audit recording for entity create/update/deactivate/delete operations in `src/storage.js`
 - [X] T077 [P] [US9] Implement the local-person selector used for audit, movement actor and adjustment approval without granting permissions in `src/components/person-selector.js` and `src/app.js`
-- [X] T078 [US9] Document that roles are descriptive only (no permissions, role selector or role-based visibility) and that local demo access is not backend authentication per FR-047; remove contradictory role-simulation text in `README.md` and `specs/001-erp-base-module/quickstart.md`
+- [X] ~~T078~~ **OBSOLETA (2026-11-23)**: la decisión de roles descriptivos fue sustituida por HU12/FR-050–FR-056. Debe reemplazarse por tareas de registro con cargo/rol, matriz de permisos y guardia de rutas al regenerar con `/speckit.tasks`.
 - [X] T079 [US9] Implement an audit log view with user/action/entity/date filters and before/after details in `src/components/audit-log.js`, `src/components/shell.js` and `src/app.js`
 - [X] T080 [US9] Extend audit records to document void and adjustment approval with before/after values in `src/storage.js`
 - [X] T081 [US9] Implement local demo access with first-use profile registration, browser session, sign-out, the authenticated user seeded as PERSONA_LOCAL and the actor selector fixed to that user in `src/auth.js`, `src/components/login.js`, `src/components/person-selector.js`, `src/app.js`, `src/storage.js` and `src/styles.css`
@@ -311,7 +315,36 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 ---
 
-## Phase 14: Polish & Cross-Cutting Concerns
+## Phase 14: User Story 12 - Registro con cargo/rol y acceso restringido por rol (Priority: P1)
+
+**Goal**: Exigir un cargo/rol obligatorio al registrar el perfil y hacer que el ingreso habilite solo la interfaz con las funciones de ese rol, con el Administrador como acceso total, usando una única matriz de permisos en `src/roles.js` y un guardia de rutas.
+
+**Independent Test**: Registrar un perfil Analista sin rol (bloqueado) y luego con rol; verificar que solo ve Panel, Búsqueda y consultas en lectura. Abrir `#/documents` por URL y comprobar la redirección con aviso. Repetir con Recepción, Despacho, Jefe de Bodega y Administrador, comprobando que cada uno ve solo sus funciones y que el Administrador ve todas. Cerrar sesión y confirmar que el rol no se puede cambiar dentro de la sesión.
+
+### Tests for User Story 12
+
+- [ ] T097 [P] [US12] Add unit tests for the role catalog and permission resolution (five roles, admin wildcard, unknown role, `canAccessRoute` and `firstAllowedRoute`) in `tests/unit/roles.test.js`
+- [ ] T098 [P] [US12] Extend integration tests to require a cargo at registration, store `role` in the session, reject unknown roles and handle legacy profiles without `role` in `tests/integration/auth.test.js`
+- [ ] T099 [P] [US12] Add integration tests for navigation filtering per role and deep-link denial/redirect with notice in `tests/integration/role-access.test.js`
+
+### Implementation for User Story 12
+
+- [ ] T100 [P] [US12] Implement the role catalog and permission matrix (`ROLES`, `ROLE_PERMISSIONS`, `ALL_PERMISSIONS`, `hasPermission`, `canAccessRoute`, `firstAllowedRoute`) in `src/roles.js`
+- [ ] T101 [US12] Extend access persistence to require/validate `role`, persist `{ username, salt, hash, role }`, store `{ username, role }` in the session and expose `getCurrentRole` in `src/auth.js` (depends on T100)
+- [ ] T102 [US12] Add the required Cargo/Rol select to registration and a one-time cargo completion for legacy profiles, passing `role` to `onSubmit`, in `src/components/login.js` (depends on T100)
+- [ ] T103 [US12] Wire the authenticated role into app state after sign-in, show the active cargo in the shell header and clear it on sign-out in `src/app.js` and `src/components/shell.js` (depends on T101)
+- [ ] T104 [US12] Filter sidebar modules and dashboard quick actions by `hasPermission` in `src/components/shell.js` and `src/components/dashboard.js` (depends on T100)
+- [ ] T105 [US12] Guard hash routing (`parseHash`, `handleNavigation`, quick actions) to block unauthorized views and redirect to the first allowed route with an accessible notice in `src/app.js` (depends on T104)
+- [ ] T106 [US12] Gate entity/document actions (create, edit, deactivate, entry, exit, transfer, adjust, void, count approval and product request) by permission in `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js`, `src/components/dashboard.js` and `src/app.js` (depends on T104)
+- [ ] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
+- [ ] T108 [US12] Update `README.md` and `specs/001-erp-base-module/quickstart.md` with the HU12 registration/access flow and per-role validation, replacing the no-role statements
+- [ ] T109 [US12] Run `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build`, and record the results in `specs/001-erp-base-module/quickstart.md`
+
+**Checkpoint**: US12 independently functional: registration requires a cargo, each role sees only its functions, unauthorized routes are blocked and the Administrator has full access.
+
+---
+
+## Phase 15: Polish & Cross-Cutting Concerns
 
 **Purpose**: Hardening, consistency, accessibility, performance and validation across stories.
 
@@ -319,7 +352,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T089 [P] Verify XSS-safe rendering and escaping for all user-provided data in `src/components/` and `src/components/dom.js`
 - [X] T090 [P] Verify accessibility and responsive behavior (labels, focus, keyboard navigation, `aria-current`, collapsed sidebar) in `src/components/` and `src/styles.css`
 - [X] T091 [P] Validate list/search performance with at least 500 entities and optimize hot paths in `src/storage.js` and `src/app.js`
-- [X] T092 [P] Reconcile documentation with the no-role decision and the implemented scope in `README.md` and `specs/001-erp-base-module/quickstart.md`
+- [X] T092 [P] Reconcile documentation with the role-based access decision and the implemented scope in `README.md` and `specs/001-erp-base-module/quickstart.md`
 - [X] T093 Run quickstart validation scenarios (HU1–HU5) and record results in `specs/001-erp-base-module/quickstart.md`
 - [X] T094 [P] Update developer documentation for setup, configuration and extension points in `README.md` and `specs/001-erp-base-module/quickstart.md`
 - [X] T095 [P] Add the pending tests for provider RUT, `doc_respaldo`, FIFO, opening balance, coverage and audit view in `tests/unit/` and `tests/integration/`
@@ -333,13 +366,14 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 
 - **Phase 1 (Setup)**: No dependencies — start immediately
 - **Phase 2 (Foundational)**: Depends on Phase 1 — blocks all user stories
-- **Phases 3–13 (User Stories)**: Depend on Phase 2 completion
-  - Recommended priority order: **US1 → US2 → US3 → US4 → US5 → US6 → US7 → US8 → US9 → US11**
+- **Phases 3–14 (User Stories)**: Depend on Phase 2 completion
+  - Recommended priority order: **US12 → US1 → US2 → US3 → US4 → US5 → US6 → US7 → US8 → US9 → US11** (US12 is P1, cross-cutting access control; US1–US11 are already implemented)
   - US5 and US7 share the dashboard component but have independent test criteria (alerts/replenishment vs. valuation/rotation/coverage)
   - US6 depends functionally on stock/movements from US2–US3 but must remain independently testable with seeded fixtures
   - US8 depends functionally on the movement model from US2 but must remain independently testable
   - US9 depends functionally on entity/document/audit hooks but must remain independently testable with seeded fixtures
-- **Phase 14 (Polish)**: Depends on the desired user stories being complete
+  - US12 depends functionally on the existing auth gate, shell and route handling but must remain independently testable with seeded profiles
+- **Phase 15 (Polish)**: Depends on the desired user stories being complete
 - **US10 (Deferred)**: No tasks; out of scope
 
 ### User Story Dependencies
@@ -354,6 +388,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - **US8 (P2)**: Starts after Foundational; uses the movement model and location balances
 - **US9 (P3)**: Starts after Foundational; consumes entity/document/audit data and the local-person selector
 - **US11 (P3)**: Starts after Foundational; consumes configuration across all screens
+- **US12 (P1)**: Starts after Foundational and the existing access gate; consumes `src/roles.js` from the shell, dashboard, forms and router
 
 ### Within Each User Story
 
@@ -376,6 +411,7 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - US8: `T069`, `T070` and `T071` can run in parallel; `T072` follows `T071`
 - US9: `T074`, `T075`, `T076`, `T077` and `T079` can run in parallel; `T080` follows `T076`
 - US11: `T081`, `T082`, `T083` and `T087` can run in parallel; `T084` and `T085` follow `T083`
+- US12: `T097`, `T098`, `T099` and `T107` can run in parallel; `T100` blocks `T101`–`T106`; `T103` follows `T101`; `T104` follows `T100`; `T105` and `T106` follow `T104` and touch `src/app.js`/`src/components/dashboard.js`, so run them sequentially
 - Polish: `T088`, `T089`, `T090`, `T091`, `T092`, `T094` and `T095` can run in parallel; `T096` runs after all pending tasks complete
 
 ## Parallel Example: User Story 1
@@ -404,6 +440,15 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - [X] T071 [P] [US8] Implement TRANSFERENCIA persistence and atomic origin/destination stock effects in `src/storage.js`
 ```
 
+## Parallel Example: User Story 12
+
+```text
+- [ ] T097 [P] [US12] Add unit tests for the role catalog and permission resolution in `tests/unit/roles.test.js`
+- [ ] T098 [P] [US12] Extend integration tests for role at registration/session in `tests/integration/auth.test.js`
+- [ ] T099 [P] [US12] Add integration tests for navigation filtering and deep-link denial in `tests/integration/role-access.test.js`
+- [ ] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
+```
+
 ## Implementation Strategy
 
 ### MVP First (User Story 1 Only)
@@ -425,9 +470,10 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 7. Add US6 → validate blind counts and approved adjustments
 8. Add US7 → validate consolidated indicators and period filters
 9. Add US8 → validate transfers without changing total stock
-10. Add US9 → validate audit review and the no-role decision
+10. Add US9 → validate audit review and local identity
 11. Add US11 → validate config-driven relabeling and custom fields
-12. Finish with Phase 14 polish and full quickstart validation
+12. Add US12 → validate cargo/rol registration, per-role interface and route denial
+13. Finish with Phase 15 polish and full quickstart validation
 
 ### Parallel Team Strategy
 
@@ -444,6 +490,6 @@ description: "Task list for feature implementation: Módulo Base ERP — Logíst
 - `[US#]` labels provide traceability from tasks to spec user stories
 - Keep domain rules (uniqueness, stock effects, immutability, history preservation, audit) centralized in `src/storage.js`
 - `costo_unitario` must never be an input in movement forms; costs and valuation are shown only in the panel and catalog (FR-044)
-- There is no role selector, permissions or role-based visibility (FR-047); the local demo access gate only blocks the UI until a browser profile is created, and the authenticated user becomes the active local person used in audit records, movements and approvals (FR-049)
+- The access gate requires a cargo/rol at registration and filters navigation, actions and routes through `src/roles.js` (FR-050–FR-056); the Administrator has full access. The authenticated user remains the active local person used in audit records, movements and approvals (FR-049). Local role control is presentation-only and backend authorization is still required in production (FR-056).
 - US10 (Compras/Ventas) is deferred (FR-046) and must not add `orden_compra_id`/`pedido_venta_id` in this version
 - Stop at each checkpoint to validate the story independently before proceeding

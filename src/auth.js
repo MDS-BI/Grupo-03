@@ -1,3 +1,5 @@
+import { isRole } from './roles.js';
+
 const USERS_KEY = 'erp.auth.users';
 export const AUTH_SESSION_KEY = 'erp.auth.session';
 
@@ -41,16 +43,40 @@ export function hasUsers() {
   return readUsers().length > 0;
 }
 
-export function getCurrentUser() {
+export function getCurrentSession() {
   try {
-    return window.sessionStorage.getItem(AUTH_SESSION_KEY) || '';
+    const raw = window.sessionStorage.getItem(AUTH_SESSION_KEY) || '';
+    if (!raw) return { username: '', role: '' };
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { username: raw, role: '' };
+    }
+    if (typeof parsed === 'string') return { username: parsed, role: '' };
+    if (parsed && typeof parsed === 'object') {
+      return {
+        username: String(parsed.username ?? ''),
+        role: String(parsed.role ?? '')
+      };
+    }
+    return { username: '', role: '' };
   } catch {
-    return '';
+    return { username: '', role: '' };
   }
 }
 
+export function getCurrentUser() {
+  return getCurrentSession().username;
+}
+
+export function getCurrentRole() {
+  return getCurrentSession().role;
+}
+
 export function isAuthenticated() {
-  return Boolean(getCurrentUser());
+  const { username, role } = getCurrentSession();
+  return Boolean(username) && isRole(role);
 }
 
 export function signOut() {
@@ -61,11 +87,13 @@ export function signOut() {
   }
 }
 
-export async function registerUser({ username = '', password = '' } = {}) {
+export async function registerUser({ username = '', password = '', role = '' } = {}) {
   const name = String(username).trim();
   if (!name) throw new Error('Ingrese un nombre de usuario.');
   if (String(password).length < 4)
     throw new Error('La contraseña debe tener al menos 4 caracteres.');
+  if (!role) throw new Error('Seleccione un cargo/rol.');
+  if (!isRole(role)) throw new Error('El cargo/rol seleccionado no es válido.');
 
   const users = readUsers();
   if (users.some((user) => String(user.username).toLowerCase() === name.toLowerCase())) {
@@ -73,22 +101,39 @@ export async function registerUser({ username = '', password = '' } = {}) {
   }
 
   const salt = createSalt();
-  users.push({ username: name, salt, hash: await digest(password, salt) });
+  users.push({ username: name, salt, hash: await digest(password, salt), role });
   writeUsers(users);
   return name;
 }
 
-export async function signIn({ username = '', password = '' } = {}) {
+export async function signIn({ username = '', password = '', role = '' } = {}) {
   const name = String(username).trim();
-  const user = readUsers().find(
-    (item) => String(item.username).toLowerCase() === name.toLowerCase()
-  );
+  const users = readUsers();
+  const user = users.find((item) => String(item.username).toLowerCase() === name.toLowerCase());
   if (!user || (await digest(String(password), user.salt)) !== user.hash) {
     throw new Error('Usuario o contraseña incorrectos.');
   }
 
+  let assignedRole = user.role;
+  if (!isRole(assignedRole)) {
+    if (!role) {
+      const error = new Error(
+        'Este perfil no tiene cargo/rol. Seleccione uno para completar el registro.'
+      );
+      error.code = 'ROLE_REQUIRED';
+      throw error;
+    }
+    if (!isRole(role)) throw new Error('El cargo/rol seleccionado no es válido.');
+    user.role = role;
+    writeUsers(users);
+    assignedRole = role;
+  }
+
   try {
-    window.sessionStorage.setItem(AUTH_SESSION_KEY, user.username);
+    window.sessionStorage.setItem(
+      AUTH_SESSION_KEY,
+      JSON.stringify({ username: user.username, role: assignedRole })
+    );
   } catch {
     throw new Error('No se pudo iniciar sesión en este navegador.');
   }

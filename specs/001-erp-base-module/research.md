@@ -1,6 +1,6 @@
 # Investigación (Phase 0): Módulo Base ERP — Logística e Inventario
 
-**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-17
+**Entrada**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Fecha**: 2026-11-23
 
 Este documento resuelve las decisiones técnicas y de dominio necesarias antes del diseño. No quedan marcadores `NEEDS CLARIFICATION`.
 
@@ -39,10 +39,10 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 **Justificación**: Integridad referencial y trazabilidad/auditoría (FR-003, FR-008/FR-009/FR-018, HU4).
 **Alternativas consideradas**: Borrado en cascada siempre o edición directa de confirmados (rompen historial).
 
-## Decisión 8: Sin roles operativos; identidad local de persona y acceso de demostración
-**Decisión**: Los roles son solo etiquetas descriptivas. No hay permisos, selector de rol ni visibilidad de costos/contactos condicionada por rol (FR-047). Desde 2026-11-23 existe un acceso local de demostración: el primer uso crea un perfil en `erp.auth.users`, la sesión vive en `erp.auth.session` y ese usuario se registra como PERSONA_LOCAL activa para auditoría y `aprobado_por` (FR-049). No valida identidad en servidor.
-**Justificación**: Aclaraciones de 2026-11-10 y 2026-11-17; el acceso de 2026-11-23 se documenta explícitamente como barrera visible y no como seguridad, y permite verificar que el aprobador de un ajuste no es quien contó (HU4#4).
-**Alternativas consideradas**: Selector de rol con ocultación visual (retirado), autenticación/permisos reales (diferida al backend) y usuario implícito sin separación de funciones (rechazado).
+## Decisión 8: Acceso local con cargo/rol obligatorio y permisos de interfaz
+**Decisión**: El registro exige seleccionar un cargo del catálogo del repositorio (Administrador del módulo, Operador de Recepción, Operador de Despacho, Jefe de Bodega, Analista de Inventario). El rol se persiste en `erp.auth.users`, la sesión (`erp.auth.session`) guarda usuario y rol, y una matriz única en `src/roles.js` filtra barra lateral, acciones rápidas, formularios y rutas profundas (FR-050–FR-056). El usuario sigue siendo la PERSONA_LOCAL activa para auditoría y `approvedByPerson` (FR-049).
+**Justificación**: Clarificación de 2026-11-23, que sustituye la de 2026-11-10: se necesita separación de funciones verificable (recepción no despacha, analista no registra movimientos, Administrador todo). Se mantiene explícito que es un control de presentación y no seguridad de servidor.
+**Alternativas consideradas**: Roles como etiquetas sin permisos (decisión anterior, ya no satisface la separación de funciones), permisos hardcodeados por pantalla (duplicación y riesgo de desincronización), autorización real en backend (diferida por no existir backend).
 
 ## Decisión 9: Conteos, ajustes y solicitudes como registros nativos
 **Decisión**: Modelar conteos físicos (ciegos, con diferencias) y solicitudes de reposición (con detalle y cantidad sugerida) como registros nativos vinculados a entidades/movimientos, con ajustes aprobados representados como movimientos de tipo Ajuste y referencias de trazabilidad.
@@ -58,3 +58,8 @@ Este documento resuelve las decisiones técnicas y de dominio necesarias antes d
 **Decisión**: No se implementa en esta versión la integración con Compras y Ventas: no hay `orden_compra_id`, `pedido_venta_id` ni `DemandaNoAtendida` operativos. El módulo queda preparado para añadirlos sin cambiar el núcleo.
 **Justificación**: Decisión de alcance de 2026-11-17 (FR-046); HU10 es P3 y el módulo funciona sin ella.
 **Alternativas consideradas**: Simular OC y pedidos con datos de ejemplo desde el inicio (añade superficie de prueba sin valor para HU1–HU5).
+
+## Decisión 12: Guardia de rutas y rol inmutable en la sesión
+**Decisión**: `app.js` resuelve la ruta solicitada y, antes de renderizar, comprueba el permiso del rol activo; si no está autorizado, redirige a la primera vista permitida (`#/dashboard` o consulta) y muestra un aviso en el marco. El rol no se puede modificar dentro del espacio de trabajo: se elige al registrar y solo cambia al iniciar sesión con otro perfil (FR-054, FR-055).
+**Justificación**: Evita que un hash manipulado o un enlace profundo rendericen funciones no permitidas, y evita un “selector de rol” que daría una falsa sensación de seguridad.
+**Alternativas consideradas**: Ocultar solo botones (deja accesibles las rutas), selector de rol en el marco (contradice FR-055) y redirigir silenciosamente (mala retroalimentación; la Constitución exige claridad).

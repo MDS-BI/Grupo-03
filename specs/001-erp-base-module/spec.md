@@ -52,6 +52,12 @@ La solución se materializa en el repositorio con el mock-up funcional, los arch
 
 - Q: ¿Debe el código (SKU) de una entidad ser único en todo el sistema, bloqueando el guardado cuando ya existe otro registro con el mismo código? → A: Sí, el código es único globalmente: crear o editar una entidad con un código ya existente se bloquea con un mensaje de error descriptivo.
 
+### Session 2026-11-23
+
+- Q: ¿Los roles siguen siendo etiquetas descriptivas sin permisos o pasan a controlar el acceso a la interfaz? → A: Pasan a controlar el acceso. **Esta respuesta sustituye la de 2026-11-10.** El registro exige indicar obligatoriamente el cargo/rol, el ingreso habilita únicamente la interfaz con las funciones disponibles para ese cargo y el rol Administrador accede a todas las funciones (FR-050–FR-056). Se mantiene la limitación de que, sin backend, es una barrera de presentación en el navegador y no sustituye la autorización en servidor.
+- Q: ¿Qué cargos/roles existen y de dónde se toman? → A: El catálogo se toma de los perfiles ya documentados en el repositorio: Administrador del módulo, Operador de Recepción, Operador de Despacho, Jefe de Bodega y Analista de Inventario.
+- Q: ¿El rol se puede cambiar sin volver a ingresar? → A: No. El rol se fija en el perfil al registrarse y se carga en la sesión al ingresar; cambiarlo exige cerrar sesión e ingresar con un perfil de ese rol. No hay selector de rol dentro del espacio de trabajo.
+
 ## Escenarios de Usuario y Pruebas *(obligatorio)*
 
 ### Historia de Usuario 1 – Catálogo maestro de productos y proveedores (Prioridad: P1)
@@ -188,7 +194,7 @@ Como Jefe de Bodega, quiero registrar un conteo físico por ubicación, ver las 
 **Escenarios de Aceptación**:
 
 1. **Dado** que se inicia un conteo físico de una ubicación, **cuando** se muestran los productos esperados, **entonces** el sistema oculta las cantidades registradas para permitir un conteo ciego y evitar sesgar a quien cuenta.
-2. **Dado** que se ingresan las cantidades contadas, **cuando** se cierra el conteo, **entonces** el sistema muestra la diferencia por producto en cantidad y porcentaje; la valorización se consulta en panel/catálogo y en el MVP no hay visibilidad condicionada por rol (FR-044, FR-047).
+2. **Dado** que se ingresan las cantidades contadas, **cuando** se cierra el conteo, **entonces** el sistema muestra la diferencia por producto en cantidad y porcentaje; la valorización se consulta en panel/catálogo y el rol no cambia qué datos se muestran (FR-044, FR-052).
 3. **Dado** que existe una diferencia entre el conteo y el sistema, **cuando** se genera un ajuste, **entonces** el motivo es obligatorio —Merma, Error de registro, Daño, Robo u Otro— y el ajuste queda pendiente de aprobación, sin modificar todavía el stock.
 4. **Dado** que quien realizó el conteo intenta aprobar su propio ajuste, **cuando** solicita la aprobación, **entonces** el sistema bloquea la acción e indica que debe aprobarlo otra persona.
 5. **Dado** un ajuste pendiente con motivo registrado, **cuando** una persona local distinta de quien contó lo aprueba, **entonces** el stock total se corrige según la diferencia y se registra un movimiento de tipo `AJUSTE` en el kardex.
@@ -214,7 +220,7 @@ Como Analista de Inventario, quiero un panel con los KPIs principales, filtrable
 2. **Dado** que hay historial suficiente, **cuando** se consultan los indicadores detallados, **entonces** se muestra la rotación y los días de cobertura (stock / consumo diario promedio) por producto.
 3. **Dado** que un producto tiene menos de 30 días de historial, **cuando** se evalúa su rotación, **entonces** se muestra como "Datos insuficientes" en vez de un número engañoso.
 4. **Dado** un filtro de categoría o fecha, **cuando** se aplica, **entonces** todas las tarjetas y la tabla se recalculan, y el filtro activo queda visible.
-5. **Dado** cualquier usuario de la demo, **cuando** entra al panel, **entonces** ve los KPIs de cantidades y la valorización; en el MVP no existe control de acceso por rol (FR-047) y la persona local solo identifica al responsable en auditoría y aprobaciones.
+5. **Dado** un Analista de Inventario, **cuando** entra al panel, **entonces** ve los KPIs de cantidades y la valorización en modo lectura (FR-044); el rol filtra las acciones disponibles (FR-052) y la persona local identifica al responsable en auditoría y aprobaciones.
 
 **Datos involucrados**: Lectura de `ENTIDAD` (Producto) y `MOVIMIENTO` (sin tablas nuevas). El saldo por ubicación se documenta como evolución futura en `plan.md`.
 
@@ -234,24 +240,24 @@ Como Operador de Recepción o de Despacho, quiero mover stock de una ubicación 
 
 ---
 
-### Historia de Usuario 9 – Auditoría e identidad local, sin roles operativos (Prioridad: P3)
+### Historia de Usuario 9 – Auditoría e identidad local con roles de acceso (Prioridad: P3)
 
-Como Administrador del módulo, quiero que cada acción quede registrada con la persona que la ejecuta, para poder auditar los cambios y verificar la separación de funciones sin crear una falsa sensación de seguridad.
+Como Administrador del módulo, quiero que cada acción quede registrada con la persona que la ejecuta, para poder auditar los cambios y verificar la separación de funciones, sabiendo que el rol controla la interfaz pero no reemplaza la seguridad del servidor.
 
-**Por qué esta prioridad**: El MVP es solo frontend y no tiene autenticación real en servidor. Ocultar costos o contactos mediante un selector de rol simulado daría una protección que cualquier usuario podría eludir desde el navegador; por eso se retiró esa funcionalidad (FR-047, decisiones de 2026-11-10 y 2026-11-17). El 2026-11-23 se incorporó un acceso local de demostración que crea un perfil en el primer uso y mantiene la sesión en el navegador; es una barrera visible, no seguridad, y no cambia la visibilidad de datos. La identidad local derivada del perfil sigue siendo la evidencia de auditoría (FR-049).
+**Por qué esta prioridad**: El MVP es solo frontend y no tiene autenticación real en servidor. Ocultar costos o contactos mediante un rol sería una protección que cualquier usuario podría eludir desde el navegador; por eso el rol gobierna qué pantallas y acciones se muestran (FR-052), no la confidencialidad de los datos. El 2026-11-23 se incorporó el cargo/rol al perfil de acceso local y el filtrado de la interfaz por rol (FR-050–FR-056); es una barrera visible, no seguridad, y la identidad del perfil sigue siendo la evidencia de auditoría (FR-049).
 
-**Prueba Independiente**: Elegir una persona en el selector local, crear y desactivar un producto y anular un movimiento; revisar la auditoría y comprobar que aparecen la persona, la acción, la fecha y el detalle con valores anterior y nuevo. Luego realizar un conteo con una persona y aprobarlo con otra distinta.
+**Prueba Independiente**: Ingresar como Administrador, crear y desactivar un producto y anular un movimiento; revisar la auditoría y comprobar que aparecen la persona, la acción, la fecha y el detalle con valores anterior y nuevo. Luego realizar un conteo con una persona y aprobarlo con otra distinta.
 
 **Escenarios de Aceptación**:
 
 1. **Dado** cualquier creación, edición, desactivación o anulación, **entonces** queda un registro de auditoría con persona local, acción, entidad, fecha y hora, y valores anterior y nuevo cuando aplica.
-2. **Dado** el MVP (solo frontend), **entonces** no existen roles, permisos ni visibilidad condicionada por rol; existe un acceso local de demostración con perfil creado en el primer uso y sesión por navegador, y la identidad del perfil se usa como persona local en auditoría/aprobaciones (FR-047, FR-049).
+2. **Dado** el MVP (solo frontend), **entonces** el rol del perfil filtra la navegación y las acciones visibles (FR-052), pero la autorización real, la confidencialidad de costos/contactos y la protección de datos deben validarse en el backend; el acceso local con rol no sustituye ese requisito.
 3. **Dado** un ajuste derivado de un conteo, **entonces** la persona que aprueba debe ser distinta de quien contó, y ambos datos quedan en el movimiento.
-4. **Dado** un despliegue a producción, **entonces** la autenticación, los permisos y la protección de datos sensibles deben validarse en el backend, no en la interfaz; el acceso local de demostración no sustituye este requisito.
+4. **Dado** un despliegue a producción, **entonces** la autenticación, los permisos y la protección de datos sensibles deben validarse en el backend, no en la interfaz; el acceso local con rol no sustituye este requisito.
 
-**Datos involucrados**: `PERSONA_LOCAL` (etiqueta derivada del perfil que entró), `AUDITORIA` (`audit_id`, `person`, `action`, `entityId`, `timestamp`, `details`) y `MOVIMIENTO` (`actorPerson`, `approvedByPerson`). El acceso local usa `erp.auth.users`/`erp.auth.session` fuera de `STORAGE_KEYS`; no es una cuenta de backend.
+**Datos involucrados**: `PERSONA_LOCAL` (etiqueta derivada del perfil que entró), `PERFIL_ACCESO` (`username`, `role`), `AUDITORIA` (`audit_id`, `person`, `action`, `entityId`, `timestamp`, `details`) y `MOVIMIENTO` (`actorPerson`, `approvedByPerson`). El acceso local usa `erp.auth.users`/`erp.auth.session` fuera de `STORAGE_KEYS`; no es una cuenta de backend.
 
-**Decisión de diseño**: Los roles quedan como etiquetas descriptivas en la documentación, sin permisos asociados en el MVP. El perfil del acceso local de demostración se convierte en la persona local activa y el selector de actor queda fijo; el botón “+” solo agrega etiquetas para aprobaciones/separación de funciones, sin permitir cambiar al responsable registrado. La auditoría se implementa en la capa de almacenamiento; el control real de acceso queda diferido al backend.
+**Decisión de diseño**: El rol se guarda en el perfil y viaja en la sesión; la matriz de permisos en `src/roles.js` decide qué módulos, rutas y acciones se renderizan. El selector de actor queda fijo en el perfil de la sesión y el botón “+” solo agrega etiquetas para aprobaciones/separación de funciones. La auditoría se implementa en la capa de almacenamiento; el control de acceso real queda diferido al backend.
 ### Historia de Usuario 10 – Integración con Compras y Ventas (Prioridad: P3)
 
 Como Analista de Inventario, quiero que las solicitudes de reposición lleguen al módulo de Compras y que los pedidos de Ventas aparezcan como despachos pendientes, para no digitar dos veces la misma información.
@@ -287,6 +293,42 @@ Como equipo de desarrollo del ERP, queremos que los nombres del módulo, las eti
 **Datos involucrados**: Configuración del módulo: nombre, etiquetas y definiciones de campos personalizados. No requiere nuevas entidades transaccionales.
 
 **Decisión de diseño**: Las etiquetas visibles se obtienen de una configuración central, conservando los identificadores internos de los datos. El detalle de `module-config.js` y `userConfig.customFields` se documenta en `plan.md` y `tasks.md`.
+
+---
+
+### Historia de Usuario 12 – Registro con cargo/rol y acceso restringido por rol (Prioridad: P1)
+
+Como responsable de acceso del módulo, quiero que al registrar un perfil se indique obligatoriamente el cargo/rol que cumple la persona y que al ingresar cada usuario acceda solo a la interfaz con las funciones disponibles para su cargo, para mantener la separación de funciones entre recepción, despacho, bodega y análisis, dejando al Administrador el control total del sistema.
+
+**Por qué esta prioridad**: Sin el cargo en el registro no se puede aplicar la separación de funciones que exigen las otras historias (p. ej. que recepción no despache ni edite el catálogo, o que el analista no registre movimientos). Es transversal a todas las pantallas; sin ella, cualquier perfil accede a todo.
+
+**Catálogo de roles (tomado de los perfiles ya documentados en el repositorio)**:
+
+| Rol / cargo | Código | Alcance en la interfaz |
+|---|---|---|
+| Administrador del módulo | `admin` | Todas las funciones: catálogo, altas/ediciones/desactivaciones, entradas, salidas, transferencias, ajustes, conteos y aprobaciones, kardex, auditoría, panel, búsqueda y configuración |
+| Operador de Recepción | `recepcion` | Panel, entradas y transferencias, kardex y búsqueda/consulta de catálogo; puede solicitar alta de producto. No edita el catálogo, no despacha, no aprueba conteos ni accede a auditoría |
+| Operador de Despacho | `despacho` | Panel, salidas y transferencias, kardex y búsqueda/consulta de catálogo. No edita el catálogo, no recibe, no aprueba conteos ni accede a auditoría |
+| Jefe de Bodega | `bodega` | Panel, entradas, salidas, transferencias, ajustes, conteos físicos y su aprobación, kardex, auditoría y consulta de catálogo. No edita el catálogo maestro |
+| Analista de Inventario | `analista` | Panel con KPIs, búsqueda y consulta de catálogo/kardex en modo lectura. No crea ni modifica registros ni registra movimientos |
+
+**Prueba Independiente**: Registrar un perfil con rol Analista e ingresar: se ve el panel, la búsqueda y la consulta de catálogo, pero no los formularios de producto ni de movimiento. Cerrar sesión, registrar/ingresar un perfil Administrador y comprobar que además ve Gestión de productos, movimientos, conteos y auditoría. Intentar abrir por URL `#/documents` con el perfil Analista y verificar que la app lo devuelve a una pantalla permitida con un aviso.
+
+**Escenarios de Aceptación**:
+
+1. **Dado** que se crea el primer perfil (o uno nuevo), **cuando** el formulario de registro se muestra, **entonces** el campo Cargo/Rol es obligatorio y ofrece únicamente el catálogo de roles; sin selección no se permite crear el perfil.
+2. **Dado** un perfil registrado con un rol, **cuando** el usuario ingresa con sus credenciales, **entonces** la sesión carga su nombre y su rol, y el marco muestra el cargo activo.
+3. **Dado** el rol Operador de Recepción, **cuando** entra al módulo, **entonces** la barra lateral y las acciones rápidas solo muestran Panel, Entradas/Transferencias, Kardex y Búsqueda; no aparecen formularios de alta/edición de producto, Salidas, Conteos ni Auditoría.
+4. **Dado** el rol Operador de Despacho, **cuando** entra al módulo, **entonces** solo ve Panel, Salidas/Transferencias, Kardex y Búsqueda; no ve recepciones, ajustes, conteos ni auditoría.
+5. **Dado** el rol Jefe de Bodega, **cuando** entra al módulo, **entonces** ve movimientos (entrada, salida, transferencia y ajuste), conteos con aprobación, kardex y auditoría, pero no la edición del catálogo maestro.
+6. **Dado** el rol Analista de Inventario, **cuando** entra al módulo, **entonces** ve el panel de KPIs, la búsqueda y las consultas en modo lectura, sin botones de crear, editar, eliminar, registrar movimientos ni aprobar ajustes.
+7. **Dado** el rol Administrador, **cuando** entra al módulo, **entonces** accede a todas las funciones sin restricción.
+8. **Dado** un usuario con un rol sin permiso para una vista, **cuando** intenta abrirla por hash/URL o por una acción residual, **entonces** el sistema la bloquea y lo redirige a la primera vista permitida mostrando un aviso; nunca renderiza el contenido prohibido.
+9. **Dado** un perfil ya registrado, **cuando** se quiere cambiar de rol, **entonces** debe cerrar sesión e ingresar con un perfil de ese rol; no existe selector de rol dentro del espacio de trabajo.
+
+**Datos involucrados**: `PERFIL_ACCESO` (`username`, `salt`, `hash`, `role`), `ROL` (`code`, `label`) y `MATRIZ_PERMISOS` (`role`, permisos de módulo/acción). La sesión (`erp.auth.session`) guarda usuario y rol para reconstruir el marco al recargar.
+
+**Decisión de diseño**: El rol se fija en el perfil al registrarse y se valida contra el catálogo; la matriz de permisos vive en `src/roles.js` y tanto la navegación como las acciones rápidas, formularios y rutas profundas se filtran con esa única fuente. En el MVP la restricción es de presentación en el navegador: la autorización real (y la confidencialidad de costos/contactos) debe aplicarse en backend al migrar de `localStorage`.
 
 ## Requisitos *(obligatorio)*
 
@@ -337,6 +379,22 @@ Como equipo de desarrollo del ERP, queremos que los nombres del módulo, las eti
 - **FR-043**: El sistema DEBE clasificar cada documento de inventario por tipo (Entrada o Salida) y aplicar el efecto correspondiente sobre el saldo de stock.
 - **FR-044**: El sistema DEBE calcular la valoración total del stock como la suma de (saldo de stock × costo_unitario) por entidad, mostrarla únicamente en el panel y el catálogo, y no ofrecerla como campo de entrada en los formularios de Entrada o Salida de Inventario.
 - **FR-045**: El sistema DEBE impedir crear o editar una entidad cuyo código coincida con el de otra entidad existente (excluyendo la propia entidad en edición), mostrando un mensaje de error descriptivo.
+- **FR-046**: El sistema NO DEBE incluir en esta versión la integración con los módulos de Compras y Ventas (HU10): quedan diferidos `orden_compra_id`, `pedido_venta_id` y la demanda no atendida operativa.
+- **FR-047**: El sistema DEBE aplicar control de acceso por rol sobre el catálogo y la matriz de permisos definidos en FR-050–FR-056. *(Redefinido en la sesión 2026-11-23; sustituye la decisión anterior de roles como etiquetas descriptivas.)*
+- **FR-048**: El sistema DEBE permitir transferir stock entre ubicaciones de la bodega sin alterar el stock total, registrando origen y destino en el kardex.
+- **FR-049**: El sistema DEBE usar la identidad del perfil autenticado como persona local en la auditoría, en el actor de los movimientos y en las aprobaciones de ajustes.
+
+### Requisitos de Control de Acceso por Rol
+
+> Sustituyen la decisión de 2026-11-10 («roles como etiquetas descriptivas»); ver Clarifications, sesión 2026-11-23.
+
+- **FR-050**: El formulario de registro de perfil DEBE exigir la selección obligatoria de un Cargo/Rol del catálogo (`Administrador del módulo`, `Operador de Recepción`, `Operador de Despacho`, `Jefe de Bodega`, `Analista de Inventario`) y persistirlo junto al perfil.
+- **FR-051**: El ingreso DEBE recuperar el rol del perfil autenticado y cargarlo en la sesión, mostrando el cargo activo en el marco del espacio de trabajo.
+- **FR-052**: La interfaz DEBE mostrar únicamente los módulos, botones, formularios y acciones permitidos para el rol de la sesión, derivados de una única matriz de permisos.
+- **FR-053**: El rol `Administrador del módulo` DEBE tener acceso irrestricto a todas las funciones del módulo.
+- **FR-054**: El sistema DEBE bloquear el acceso directo por hash/URL a una vista no permitida para el rol y redirigir a la primera vista autorizada con un aviso; el contenido prohibido no DEBE renderizarse.
+- **FR-055**: El rol DEBE fijarse al registrar el perfil; cambiarlo DEBE requerir cerrar sesión e ingresar con un perfil del rol deseado, sin selector de rol dentro del espacio de trabajo.
+- **FR-056**: El sistema DEBE documentar y mantener el rol como control de presentación del MVP; la autorización real y la confidencialidad de datos sensibles DEBEN validarse en el backend en producción.
 
 ### Requisitos de Extensibilidad *(obligaciones del módulo base)*
 
@@ -353,6 +411,7 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 - **Entidad**: Un registro de datos maestros gestionado por el módulo, que incluye su nombre, un código de negocio único en todo el sistema, una categoría de clasificación obligatoria, detalles descriptivos, una fecha objetivo opcional, un entity_id autogenerado, un saldo de stock disponible y, cuando aplica, unidad de medida, punto de reorden y un costo_unitario opcional para la valoración del stock. La ubicación física no se almacena en la entidad: se deriva del documento de entrada más reciente. Los módulos personalizados definen qué representa una Entidad en el mundo real (p. ej., cliente, producto, activo).
 - **Documento**: Detalles transaccionales adjuntos a una entidad, vinculados a ella por el entity_id de la entidad, clasificados por tipo (Entrada o Salida de Inventario), con la cantidad que afecta el saldo de stock, una marca de tiempo automática y notas opcionales. Los documentos de Entrada registran además la ubicación física (pasillo, estante, nivel). Los documentos no admiten rango de fechas inicial/final. Los módulos personalizados definen qué representa un Documento (p. ej., pedido, factura, contrato).
 - **ModuleConfig**: El objeto de adaptación cargado al arrancar que define el nombre del módulo, las etiquetas de terminología, las definiciones de campos personalizados y el ciclo de vida de estados de documentos. Consulte data-model.md para su forma completa.
+- **PerfilAcceso y Rol**: El perfil local de acceso guarda usuario, credenciales y un `role` obligatorio tomado del catálogo de cargos; la matriz de permisos asocia cada rol con los módulos y acciones visibles (FR-050–FR-056). Ver data-model.md para el catálogo y la matriz.
 
 ## Criterios de Éxito *(obligatorio)*
 
@@ -372,7 +431,7 @@ Los módulos personalizados construidos sobre esta base DEBEN poder:
 ## Suposiciones
 
 - El módulo base gestiona datos para un único espacio de trabajo en lugar de una base de datos multiinquilino compartida.
-- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Analista) son etiquetas descriptivas sin permisos ni visibilidad condicionada (FR-047). El acceso local de demostración usa un perfil creado en el primer uso y no es autenticación real; en producción los permisos deben validarse en el backend.
+- Los roles mencionados en las historias (Administrador, Operador de Recepción, Operador de Despacho, Jefe de Bodega, Analista de Inventario) son **cargos operativos con permisos de interfaz** desde la clarificación de 2026-11-23 (FR-050–FR-056). El perfil de acceso local, creado en el primer uso, guarda el rol obligatorio y filtra la navegación y las acciones; no es autenticación real y en producción los permisos deben validarse en el backend.
 - La valoración del stock usa un `costo_unitario` opcional por producto y se muestra solo en el panel y el catálogo; los formularios de Entrada y Salida de Inventario no incluyen campos de costo.
 - La adaptación a un módulo específico se realiza mediante un archivo de configuración del módulo en lugar de editando archivos fuente centrales.
 - Cada entidad incluye información básica suficiente para identificación y seguimiento; los módulos personalizados aportan los campos específicos del dominio.
