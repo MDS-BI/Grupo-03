@@ -10,6 +10,7 @@ import { renderSearch } from './components/search-bar.js';
 import { renderAuditLog } from './components/audit-log.js';
 import { renderLogin } from './components/login.js';
 import {
+  getCurrentRole,
   getCurrentUser,
   hasUsers,
   isAuthenticated,
@@ -17,6 +18,14 @@ import {
   signIn,
   signOut
 } from './auth.js';
+import {
+  MOVEMENT_PERMISSIONS,
+  MOVEMENT_TYPE_PERMISSIONS,
+  canAccessRoute,
+  firstAllowedRoute,
+  hasAnyPermission,
+  hasPermission
+} from './roles.js';
 import { DEMO_PERSONS, loadDemoData } from './demo-data.js';
 import {
   addDocument,
@@ -80,6 +89,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   let authenticated = isAuthenticated();
 
   const state = {
+    role: getCurrentRole(),
     view: initialRoute.view,
     section: initialRoute.section,
     editingEntityId: null,
@@ -136,6 +146,26 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     }
   }
 
+  function can(permission) {
+    return hasPermission(state.role, permission);
+  }
+
+  function canEditDocument(documentRecord) {
+    const permission = MOVEMENT_TYPE_PERMISSIONS[documentRecord?.type];
+    return Boolean(permission) && can(permission);
+  }
+
+  function ensureRouteAllowed() {
+    if (canAccessRoute(state.role, state.view, state.section)) return;
+    const fallback = firstAllowedRoute(state.role) ?? { view: 'dashboard', section: 'entities' };
+    state.view = fallback.view;
+    state.section = fallback.section;
+    state.notice =
+      'No tiene permiso para acceder a esa vista. Se mostró una vista permitida para su cargo.';
+    const hash = routeHash(fallback.view, fallback.section);
+    if (window.location.hash !== hash) window.location.hash = hash;
+  }
+
   function navigate(view, options = {}) {
     const nextSection = options.section ?? state.section;
     const leavingManage =
@@ -170,16 +200,25 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function handleQuickAction(action) {
     if (action === 'new-entity') {
+      if (!can('catalog.write')) return denyAction();
       state.editingEntityId = null;
       navigate('manage', { section: 'entities', pendingFocus: 'entity-form' });
     } else if (action === 'new-document') {
+      if (!hasAnyPermission(state.role, MOVEMENT_PERMISSIONS)) return denyAction();
       state.editingDocumentId = null;
       navigate('manage', { section: 'documents', pendingFocus: 'document-form' });
     } else if (action === 'manage-entities') {
+      if (!can('catalog.write')) return denyAction();
       navigate('manage', { section: 'entities' });
     } else if (action === 'search') {
+      if (!can('search.read')) return denyAction();
       navigate('search', { pendingFocus: 'search' });
     }
+  }
+
+  function denyAction() {
+    state.notice = 'No tiene permiso para realizar esta acción.';
+    render();
   }
 
   function handleLoadDemo() {
@@ -206,13 +245,13 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     );
   }
 
-  async function handleAuth({ mode, username, password, confirm }) {
+  async function handleAuth({ mode, username, password, confirm, role }) {
     const firstProfile = !hasUsers();
     if (mode === 'register') {
       if (password !== confirm) throw new Error('Las contraseñas no coinciden.');
-      await registerUser({ username, password });
+      await registerUser({ username, password, role });
     }
-    const person = await signIn({ username, password });
+    const person = await signIn({ username, password, role });
     const persons = getPersons();
     const legacyOnly = persons.length > 0 && persons.every((name) => DEMO_PERSONS.includes(name));
     const localPerson =
@@ -220,6 +259,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         ? savePersons([person])[0]
         : addPerson(person).person;
     authenticated = true;
+    state.role = getCurrentRole();
     state.selectedPerson = localPerson;
     personSelector.refresh();
     personSelector.setPerson(localPerson);
@@ -234,6 +274,8 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     const currentUser = getCurrentUser();
     signOut();
     authenticated = false;
+    state.role = '';
+    shell.setRole('');
     state.selectedPerson = currentUser || getPersons()[0] || 'local';
     personSelector.setPerson(state.selectedPerson);
     state.approverPerson = '';
@@ -243,6 +285,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleEntitySubmit(values) {
+    if (!can('catalog.write')) return denyAction();
     try {
       const payload = { ...values };
       if (payload.newProvider) {
@@ -292,6 +335,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleEntityDelete(entity) {
+    if (!can('catalog.write')) return denyAction();
     const message = `¿Eliminar ${config.labels.entity.article} ${config.labels.entity.singular.toLowerCase()} "${entity.name}"? Si tiene historial, solo se desactivará para conservarlo; si no lo tiene, se eliminará físicamente.`;
     if (!confirmAction(message)) return;
     try {
@@ -304,6 +348,12 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleDocumentSubmit(values) {
+    const editingRecord = state.editingDocumentId ? getDocument(state.editingDocumentId) : null;
+    const nextPermission = MOVEMENT_TYPE_PERMISSIONS[values.type];
+    const editingPermission = editingRecord ? MOVEMENT_TYPE_PERMISSIONS[editingRecord.type] : null;
+    if (!nextPermission || !can(nextPermission) || (editingPermission && !can(editingPermission))) {
+      return denyAction();
+    }
     try {
       if (state.editingDocumentId) {
         updateDocument(state.editingDocumentId, values, config, {
@@ -335,6 +385,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleDocumentDelete(documentRecord) {
+    if (!canEditDocument(documentRecord)) return denyAction();
     const isImmutable =
       documentRecord.state === 'confirmed' ||
       documentRecord.state === 'voided' ||
@@ -362,6 +413,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
   }
 
   function handleDocumentVoid(documentRecord) {
+    if (!can('movement.void')) return denyAction();
     const reason =
       window.prompt('Motivo de anulación (se generará un contramovimiento):', '') ?? '';
     try {
@@ -455,6 +507,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       entity: editingEntity,
       categories,
       providers: loadProviders(),
+      role: state.role,
       onSubmit: handleEntitySubmit,
       onCancel: handleEntityCancel,
       onDelete: handleEntityDelete
@@ -466,12 +519,19 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function renderDocumentPanel(entities, documents) {
     const labels = config.labels;
-    const editingDocument = state.editingDocumentId ? getDocument(state.editingDocumentId) : null;
+    const canManageCount = can('count.manage');
+    const canApproveCount = can('count.approve');
+    let editingDocument = state.editingDocumentId ? getDocument(state.editingDocumentId) : null;
     let missingDocument = false;
     if (state.editingDocumentId && !editingDocument) {
       missingDocument = true;
       state.editingDocumentId = null;
     }
+    if (editingDocument && !canEditDocument(editingDocument)) {
+      editingDocument = null;
+      state.editingDocumentId = null;
+    }
+    const editableDocuments = documents.filter(canEditDocument);
 
     const entityMap = new Map(entities.map((entity) => [entity.entity_id, entity]));
     const documentSelector = h(
@@ -489,7 +549,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         `${newLabel(labels.document)} ${labels.document.singular.toLowerCase()}`,
         !state.editingDocumentId
       ),
-      ...documents.map((document) => {
+      ...editableDocuments.map((document) => {
         const entity = entityMap.get(document.entity_id);
         const type =
           document.type === 'ENTRADA'
@@ -573,6 +633,9 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         },
         onDelete: handleDocumentDelete,
         onVoid: handleDocumentVoid,
+        canEdit: canEditDocument,
+        canDelete: canEditDocument,
+        canVoid: () => can('movement.void'),
         emptyMessage: 'No hay movimientos para los filtros seleccionados.'
       });
     }
@@ -643,6 +706,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         class: 'button',
         'data-testid': 'count-create',
         onclick: () => {
+          if (!canManageCount) return denyAction();
           try {
             const count = createPhysicalCount({ actorPerson: state.selectedPerson });
             state.activeCountId = count.count_id;
@@ -663,6 +727,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         class: 'button',
         'data-testid': 'count-record',
         onclick: () => {
+          if (!canManageCount) return denyAction();
           try {
             if (!state.activeCountId && !countIdInput.value)
               throw new Error('Indique o cree un conteo.');
@@ -689,6 +754,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         class: 'button',
         'data-testid': 'count-close',
         onclick: () => {
+          if (!canManageCount) return denyAction();
           try {
             const cid = countIdInput.value || state.activeCountId;
             const closed = closePhysicalCount(cid);
@@ -710,6 +776,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
         class: 'button button-primary',
         'data-testid': 'count-approve-adjustment',
         onclick: () => {
+          if (!canApproveCount) return denyAction();
           try {
             const cid = countIdInput.value || state.activeCountId;
             const result = approveCountAdjustment(cid, {
@@ -727,35 +794,43 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       'Aprobar ajuste'
     );
 
-    const countSection = h(
-      'section',
-      { class: 'panel', 'data-testid': 'count-section' },
-      h('div', { class: 'panel-header' }, h('h3', {}, 'Conteo físico y ajustes')),
-      countStatus,
-      h(
-        'div',
-        { class: 'form-grid' },
-        h('div', { class: 'field' }, h('label', {}, 'Persona que cuenta'), countActorInput),
-        h('div', { class: 'field' }, h('label', {}, 'ID conteo'), countIdInput),
-        h('div', { class: 'field' }, h('label', {}, 'Entidad'), countEntitySelect),
-        h('div', { class: 'field' }, h('label', {}, 'Cantidad contada'), countQtyInput),
-        h('div', { class: 'field' }, h('label', {}, 'Persona que aprueba'), approveActorInput),
-        h('div', { class: 'field' }, h('label', {}, 'Motivo ajuste'), adjustReasonInput)
-      ),
-      h(
-        'div',
-        { class: 'actions' },
-        createCountBtn,
-        recordCountBtn,
-        closeCountBtn,
-        approveAdjustBtn
-      ),
-      h(
-        'p',
-        { class: 'panel-subtitle' },
-        'Conteo ciego: no se muestra la cantidad del sistema durante la captura. La aprobación debe registrarse con una persona local distinta a la del conteo.'
-      )
-    );
+    const countSection =
+      canManageCount || canApproveCount
+        ? h(
+            'section',
+            { class: 'panel', 'data-testid': 'count-section' },
+            h('div', { class: 'panel-header' }, h('h3', {}, 'Conteo físico y ajustes')),
+            countStatus,
+            h(
+              'div',
+              { class: 'form-grid' },
+              h('div', { class: 'field' }, h('label', {}, 'Persona que cuenta'), countActorInput),
+              h('div', { class: 'field' }, h('label', {}, 'ID conteo'), countIdInput),
+              h('div', { class: 'field' }, h('label', {}, 'Entidad'), countEntitySelect),
+              h('div', { class: 'field' }, h('label', {}, 'Cantidad contada'), countQtyInput),
+              h(
+                'div',
+                { class: 'field' },
+                h('label', {}, 'Persona que aprueba'),
+                approveActorInput
+              ),
+              h('div', { class: 'field' }, h('label', {}, 'Motivo ajuste'), adjustReasonInput)
+            ),
+            h(
+              'div',
+              { class: 'actions' },
+              canManageCount ? createCountBtn : null,
+              canManageCount ? recordCountBtn : null,
+              canManageCount ? closeCountBtn : null,
+              canApproveCount ? approveAdjustBtn : null
+            ),
+            h(
+              'p',
+              { class: 'panel-subtitle' },
+              'Conteo ciego: no se muestra la cantidad del sistema durante la captura. La aprobación debe registrarse con una persona local distinta a la del conteo.'
+            )
+          )
+        : null;
 
     const kardexPanel = h(
       'section',
@@ -816,6 +891,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       providers: loadProviders(),
       document: editingDocument,
       actorPerson: state.selectedPerson,
+      role: state.role,
       onSubmit: handleDocumentSubmit,
       onCancel: handleDocumentCancel,
       onDelete: handleDocumentDelete
@@ -828,8 +904,6 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
 
   function renderManage(container) {
     clear(container);
-    const notice = state.notice;
-    state.notice = null;
 
     const entities = loadEntities();
     const documents = loadDocuments();
@@ -858,7 +932,6 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
           h('p', { class: 'page-subtitle' }, activeSectionSubtitle)
         )
       ),
-      notice ? h('p', { class: 'alert alert-warning', role: 'alert' }, notice) : null,
       h('div', { class: 'manage-grid' }, panel)
     );
 
@@ -873,8 +946,12 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
       renderLogin(loginHost, { config, onSubmit: handleAuth });
       return;
     }
+    ensureRouteAllowed();
+    const notice = state.notice;
+    state.notice = null;
     targetRoot.classList.remove('is-locked');
     clear(loginHost);
+    shell.setRole(state.role);
     shell.setActive(state.view, state.section);
     shell.setWarnings(errors);
     applyAccent(targetRoot, config);
@@ -898,6 +975,7 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
     } else {
       renderDashboard(shell.view, {
         config,
+        role: state.role,
         initialCategory: state.dashboardCategory,
         actorPerson: state.selectedPerson,
         onQuickAction: handleQuickAction,
@@ -907,6 +985,20 @@ export function initApp({ root, rawConfig = userConfig } = {}) {
           state.dashboardCategory = category;
         }
       });
+    }
+
+    if (notice) {
+      shell.view.prepend(
+        h(
+          'p',
+          {
+            class: 'alert alert-warning access-denied',
+            'data-testid': 'access-denied',
+            role: 'alert'
+          },
+          notice
+        )
+      );
     }
 
     if (state.pendingFocus === 'entity-form') {

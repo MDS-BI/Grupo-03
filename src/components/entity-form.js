@@ -1,4 +1,5 @@
 import { applyErrors, clearErrors, formField, h, option } from './dom.js';
+import { hasPermission } from '../roles.js';
 
 const UNIT_OPTIONS = ['Unidades', 'Cajas', 'Kg', 'Litros'];
 
@@ -38,10 +39,20 @@ function customControl(definition, value) {
 
 export function renderEntityForm(
   container,
-  { config, entity = null, categories = [], providers = [], onSubmit, onCancel, onDelete }
+  {
+    config,
+    entity = null,
+    categories = [],
+    providers = [],
+    role = '',
+    onSubmit,
+    onCancel,
+    onDelete
+  }
 ) {
   const labels = config.labels.entity;
   const isEditing = Boolean(entity);
+  const canWrite = hasPermission(role, 'catalog.write');
   let dirty = false;
 
   const nameInput = h('input', {
@@ -181,11 +192,13 @@ export function renderEntityForm(
     role: 'alert'
   });
 
-  const submitButton = h(
-    'button',
-    { type: 'submit', class: 'button button-primary', 'data-testid': 'entity-save' },
-    isEditing ? `Guardar ${labels.singular}` : `Crear ${labels.singular}`
-  );
+  const submitButton = canWrite
+    ? h(
+        'button',
+        { type: 'submit', class: 'button button-primary', 'data-testid': 'entity-save' },
+        isEditing ? `Guardar ${labels.singular}` : `Crear ${labels.singular}`
+      )
+    : null;
 
   const cancelButton = h(
     'button',
@@ -198,18 +211,19 @@ export function renderEntityForm(
     'Cancelar'
   );
 
-  const deleteButton = isEditing
-    ? h(
-        'button',
-        {
-          type: 'button',
-          class: 'button button-danger',
-          'data-testid': 'entity-delete',
-          onclick: () => onDelete?.(entity)
-        },
-        `Eliminar ${labels.singular}`
-      )
-    : null;
+  const deleteButton =
+    isEditing && canWrite
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'button button-danger',
+            'data-testid': 'entity-delete',
+            onclick: () => onDelete?.(entity)
+          },
+          `Eliminar ${labels.singular}`
+        )
+      : null;
 
   const form = h(
     'form',

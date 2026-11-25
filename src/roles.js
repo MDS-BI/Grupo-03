@@ -60,6 +60,13 @@ export const ROLE_PERMISSIONS = {
   analista: ['dashboard.read', 'search.read', 'catalog.read', 'kardex.read']
 };
 
+export const MOVEMENT_TYPE_PERMISSIONS = {
+  ENTRADA: 'movement.entry',
+  SALIDA: 'movement.exit',
+  TRANSFERENCIA: 'movement.transfer',
+  AJUSTE: 'movement.adjust'
+};
+
 export const MOVEMENT_PERMISSIONS = [
   'movement.entry',
   'movement.exit',

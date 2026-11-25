@@ -4,6 +4,13 @@ import {
   createProductRequest,
   getFifoLocationSuggestion
 } from '../storage.js';
+import { MOVEMENT_TYPE_PERMISSIONS, hasPermission } from '../roles.js';
+
+const MOVEMENT_TYPES = [
+  { value: 'ENTRADA', label: 'Entrada' },
+  { value: 'SALIDA', label: 'Salida' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia' }
+];
 
 function customControl(definition, value) {
   const name = `custom_${definition.key}`;
@@ -47,6 +54,7 @@ export function renderDocumentForm(
     providers = [],
     document = null,
     actorPerson = 'local',
+    role = '',
     onSubmit,
     onCancel,
     onDelete
@@ -56,6 +64,8 @@ export function renderDocumentForm(
   const entityLabels = config.labels.entity;
   const lifecycle = config.statusLifecycle;
   const isEditing = Boolean(document);
+  const canUseType = (type) => hasPermission(role, MOVEMENT_TYPE_PERMISSIONS[type]);
+  const canRequestProduct = hasPermission(role, 'product.request');
   let dirty = false;
   let fifoLocation = null;
 
@@ -72,13 +82,22 @@ export function renderDocumentForm(
     )
   );
 
-  const typeSelect = h(
-    'select',
-    { name: 'type', 'data-testid': 'document-type' },
-    option('ENTRADA', 'Entrada', (document?.type ?? 'ENTRADA') === 'ENTRADA'),
-    option('SALIDA', 'Salida', document?.type === 'SALIDA'),
-    option('TRANSFERENCIA', 'Transferencia', document?.type === 'TRANSFERENCIA')
-  );
+  const currentType = document?.type ?? 'ENTRADA';
+  const allowedTypes = MOVEMENT_TYPES.filter(({ value }) => canUseType(value));
+  const currentTypeAllowed = !document || allowedTypes.some(({ value }) => value === currentType);
+  const typeOptions = [
+    ...(currentTypeAllowed
+      ? []
+      : [
+          h(
+            'option',
+            { value: currentType, selected: true, disabled: true },
+            MOVEMENT_TYPES.find(({ value }) => value === currentType)?.label ?? currentType
+          )
+        ]),
+    ...allowedTypes.map(({ value, label }) => option(value, label, currentType === value))
+  ];
+  const typeSelect = h('select', { name: 'type', 'data-testid': 'document-type' }, ...typeOptions);
 
   const quantityInput = h('input', {
     type: 'number',
@@ -423,18 +442,19 @@ export function renderDocumentForm(
     'Cancelar'
   );
 
-  const deleteButton = isEditing
-    ? h(
-        'button',
-        {
-          type: 'button',
-          class: 'button button-danger',
-          'data-testid': 'document-delete',
-          onclick: () => onDelete?.(document)
-        },
-        `Eliminar ${labels.singular}`
-      )
-    : null;
+  const deleteButton =
+    isEditing && canUseType(document.type)
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'button button-danger',
+            'data-testid': 'document-delete',
+            onclick: () => onDelete?.(document)
+          },
+          `Eliminar ${labels.singular}`
+        )
+      : null;
 
   const form = h(
     'form',
@@ -542,7 +562,7 @@ export function renderDocumentForm(
     locationSection,
     transferSection,
     formField({ label: 'Notas', name: 'notes', control: notesInput }),
-    productRequestSection,
+    canRequestProduct ? productRequestSection : null,
     h('div', { class: 'form-actions' }, saveButton, cancelButton, deleteButton)
   );
 
@@ -622,7 +642,7 @@ export function renderDocumentForm(
       stockError.textContent = '';
       stockError.hidden = true;
     }
-    saveButton.disabled = insufficient;
+    saveButton.disabled = insufficient || !canUseType(typeSelect.value);
   }
 
   container.append(form);

@@ -582,6 +582,34 @@ a {
   color: var(--danger);
 }
 
+.cargo-badge {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-muted));
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  white-space: nowrap;
+}
+
+.access-denied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.access-denied::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warning);
+  color: var(--bg);
+  font-weight: 800;
+}
+
 .empty-state {
   border: 1px dashed var(--border);
   border-radius: var(--radius);
@@ -758,6 +786,11 @@ a {
 
 .auth-card .field {
   margin-top: 16px;
+}
+
+.auth-card select[name='role'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
 .auth-error {

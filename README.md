@@ -16,7 +16,7 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 - **Gestión de Entidades (Productos y Proveedores):** Administración del maestro de productos, SKU, ubicaciones y datos de proveedores.
 - **Gestión de Documentos (Movimientos de Inventario):** Registro de guías de recepción, despachos y transferencias de stock.
 - **Persistencia Local:** Los datos se guardan en el almacenamiento local del navegador (`localStorage`).
-- **Acceso Local:** Registro de perfil en el primer ingreso y sesión por navegador (`sessionStorage`), con cierre de sesión desde la barra superior. No sustituye autenticación de servidor.
+- **Acceso Local por Rol:** Registro de perfil con Cargo/Rol obligatorio en el primer ingreso y sesión por navegador (`sessionStorage`). La interfaz se filtra con la matriz de `src/roles.js` y el cierre de sesión se hace desde la barra superior. No sustituye autenticación de servidor.
 - **Datos Demo:** Botón “Datos demo” en la barra superior carga 2 productos, 1 proveedor, 4 movimientos y las etiquetas locales Ana/Bruno/Carlos/Diana como ejemplo.
 - **Integridad Referencial:** Eliminación física solo sin historial; con historial se desactiva conservando documentos y trazabilidad.
 
@@ -33,7 +33,7 @@ El módulo permite gestionar el ciclo operativo de bodegas, control de existenci
 - **US5 Panel y reposición**: KPIs (activos, valoración, alertas, sin movimiento 90 días, cobertura), filtros por categoría y período que recalculan tarjetas y tablas, alertas con cantidad sugerida editable y generación de solicitudes de reposición agrupadas por proveedor.
 - **Búsqueda y UX**: búsqueda por nombre/código/categoría/descripción/fecha/campos personalizados, estados vacíos, renderizado seguro (sin innerHTML con datos de usuario), etiquetas y mensajes de validación accesibles.
 
-> No existen roles operativos ni selector de rol: la identidad queda fija en un selector local deshabilitado con el perfil que entró y solo identifica al responsable en auditoría y movimientos (FR-047, FR-049). El botón “+” agrega etiquetas para aprobaciones, sin cambiar al actor. El ingreso usa un perfil local (usuario/contraseña) creado en el primer acceso; es una barrera de demostración, no seguridad real: las credenciales y la sesión viven en el navegador y pueden borrarse o modificarse. Costos y valorización se muestran solo en panel y catálogo (FR-044).
+> El acceso local exige un Cargo/Rol obligatorio al registrar el perfil (Administrador del módulo, Operador de Recepción, Operador de Despacho, Jefe de Bodega o Analista de Inventario). El cargo queda guardado en el perfil y en la sesión, se muestra en el encabezado y filtra navegación, acciones rápidas, formularios y rutas según `src/roles.js`; el Administrador accede a todo (FR-050–FR-055). No hay selector de rol dentro del espacio de trabajo: para cambiar de cargo se debe cerrar sesión e ingresar con otro perfil. La identidad queda fija en un selector local deshabilitado con el perfil que entró y se usa en auditoría y movimientos (FR-049). El botón “+” agrega etiquetas para aprobaciones, sin cambiar al actor. Es una barrera de demostración, no seguridad real: credenciales y sesión viven en el navegador y la autorización debe validarse en backend (FR-056). Costos y valorización se muestran solo en panel y catálogo (FR-044).
 
 > Nota: la configuración declarativa en src/module-config.js permite adaptar etiquetas, campos personalizados, ciclo de vida y tema. Las capacidades nativas de inventario descritas arriba forman parte del módulo base implementado.
 

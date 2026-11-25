@@ -6,7 +6,7 @@ export function renderLogin(container, { config, onSubmit }) {
   let mode = hasUsers() ? 'login' : 'register';
   let requireRole = false;
 
-  function render(error = '', { forceRole = false } = {}) {
+  function render(error = '', { forceRole = false, values = {} } = {}) {
     if (forceRole) requireRole = true;
     container.replaceChildren();
 
@@ -14,6 +14,7 @@ export function renderLogin(container, { config, onSubmit }) {
       id: 'auth-username',
       name: 'username',
       autocomplete: 'username',
+      value: values.username ?? '',
       required: true,
       'data-testid': 'auth-username'
     });
@@ -22,6 +23,7 @@ export function renderLogin(container, { config, onSubmit }) {
       name: 'password',
       type: 'password',
       autocomplete: mode === 'login' ? 'current-password' : 'new-password',
+      value: values.password ?? '',
       required: true,
       'data-testid': 'auth-password'
     });
@@ -120,7 +122,10 @@ export function renderLogin(container, { config, onSubmit }) {
         });
       } catch (submittedError) {
         if (submittedError?.code === 'ROLE_REQUIRED') {
-          render(submittedError.message, { forceRole: true });
+          render(submittedError.message, {
+            forceRole: true,
+            values: { username: usernameInput.value, password: passwordInput.value }
+          });
           return;
         }
         errorNode.textContent = submittedError.message;

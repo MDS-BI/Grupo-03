@@ -19,13 +19,20 @@ export const baseConfig = {
 
 export const configuredConfig = userConfig;
 
-export function mountApp(rawConfig = baseConfig, { authenticated = true } = {}) {
+export function mountApp(
+  rawConfig = baseConfig,
+  { authenticated = true, role = 'admin', username = 'Ana' } = {}
+) {
   const root = document.createElement('div');
   root.id = 'app';
   document.body.append(root);
   if (authenticated) {
-    window.sessionStorage.setItem(AUTH_SESSION_KEY, 'Ana');
-    savePersons(['Ana', 'Bruno', 'Carlos', 'Diana']);
+    window.sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({ username, role }));
+    savePersons(
+      [username, 'Bruno', 'Carlos', 'Diana'].filter(
+        (name, index, all) => all.indexOf(name) === index
+      )
+    );
   }
   return initApp({ root, rawConfig });
 }

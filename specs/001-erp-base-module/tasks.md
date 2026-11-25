@@ -323,22 +323,22 @@ This list maps every spec story to a phase: US1–US9, US11 and US12 are actiona
 
 ### Tests for User Story 12
 
-- [ ] T097 [P] [US12] Add unit tests for the role catalog and permission resolution (five roles, admin wildcard, unknown role, `canAccessRoute` and `firstAllowedRoute`) in `tests/unit/roles.test.js`
-- [ ] T098 [P] [US12] Extend integration tests to require a cargo at registration, store `role` in the session, reject unknown roles and handle legacy profiles without `role` in `tests/integration/auth.test.js`
-- [ ] T099 [P] [US12] Add integration tests for navigation filtering per role and deep-link denial/redirect with notice in `tests/integration/role-access.test.js`
+- [X] T097 [P] [US12] Add unit tests for the role catalog and permission resolution (five roles, admin wildcard, unknown role, `canAccessRoute` and `firstAllowedRoute`) in `tests/unit/roles.test.js`
+- [X] T098 [P] [US12] Extend integration tests to require a cargo at registration, store `role` in the session, reject unknown roles and handle legacy profiles without `role` in `tests/integration/auth.test.js`
+- [X] T099 [P] [US12] Add integration tests for navigation filtering per role and deep-link denial/redirect with notice in `tests/integration/role-access.test.js`
 
 ### Implementation for User Story 12
 
-- [ ] T100 [P] [US12] Implement the role catalog and permission matrix (`ROLES`, `ROLE_PERMISSIONS`, `ALL_PERMISSIONS`, `hasPermission`, `canAccessRoute`, `firstAllowedRoute`) in `src/roles.js`
-- [ ] T101 [US12] Extend access persistence to require/validate `role`, persist `{ username, salt, hash, role }`, store `{ username, role }` in the session and expose `getCurrentRole` in `src/auth.js` (depends on T100)
-- [ ] T102 [US12] Add the required Cargo/Rol select to registration and a one-time cargo completion for legacy profiles, passing `role` to `onSubmit`, in `src/components/login.js` (depends on T100)
-- [ ] T103 [US12] Wire the authenticated role into app state after sign-in, show the active cargo in the shell header and clear it on sign-out in `src/app.js` and `src/components/shell.js` (depends on T101)
-- [ ] T104 [US12] Filter sidebar modules and dashboard quick actions by `hasPermission` in `src/components/shell.js` and `src/components/dashboard.js` (depends on T100)
-- [ ] T105 [US12] Guard hash routing (`parseHash`, `handleNavigation`, quick actions) to block unauthorized views and redirect to the first allowed route with an accessible notice in `src/app.js` (depends on T104)
-- [ ] T106 [US12] Gate entity/document actions (create, edit, deactivate, entry, exit, transfer, adjust, void, count approval and product request) by permission in `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js`, `src/components/dashboard.js` and `src/app.js` (depends on T104)
-- [ ] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
-- [ ] T108 [US12] Update `README.md` and `specs/001-erp-base-module/quickstart.md` with the HU12 registration/access flow and per-role validation, replacing the no-role statements
-- [ ] T109 [US12] Run `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build`, and record the results in `specs/001-erp-base-module/quickstart.md`
+- [X] T100 [P] [US12] Implement the role catalog and permission matrix (`ROLES`, `ROLE_PERMISSIONS`, `ALL_PERMISSIONS`, `hasPermission`, `canAccessRoute`, `firstAllowedRoute`) in `src/roles.js`
+- [X] T101 [US12] Extend access persistence to require/validate `role`, persist `{ username, salt, hash, role }`, store `{ username, role }` in the session and expose `getCurrentRole` in `src/auth.js` (depends on T100)
+- [X] T102 [US12] Add the required Cargo/Rol select to registration and a one-time cargo completion for legacy profiles, passing `role` to `onSubmit`, in `src/components/login.js` (depends on T100)
+- [X] T103 [US12] Wire the authenticated role into app state after sign-in, show the active cargo in the shell header and clear it on sign-out in `src/app.js` and `src/components/shell.js` (depends on T101)
+- [X] T104 [US12] Filter sidebar modules and dashboard quick actions by `hasPermission` in `src/components/shell.js` and `src/components/dashboard.js` (depends on T100)
+- [X] T105 [US12] Guard hash routing (`parseHash`, `handleNavigation`, quick actions) to block unauthorized views and redirect to the first allowed route with an accessible notice in `src/app.js` (depends on T104)
+- [X] T106 [US12] Gate entity/document actions (create, edit, deactivate, entry, exit, transfer, adjust, void, count approval and product request) by permission in `src/components/entity-form.js`, `src/components/document-form.js`, `src/components/document-list.js`, `src/components/dashboard.js` and `src/app.js` (depends on T104)
+- [X] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
+- [X] T108 [US12] Update `README.md` and `specs/001-erp-base-module/quickstart.md` with the HU12 registration/access flow and per-role validation, replacing the no-role statements
+- [X] T109 [US12] Run `npm run lint`, `npm run format:check`, `npm run test:run` and `npm run build`, and record the results in `specs/001-erp-base-module/quickstart.md`
 
 **Checkpoint**: US12 independently functional: registration requires a cargo, each role sees only its functions, unauthorized routes are blocked and the Administrator has full access.
 
@@ -443,10 +443,10 @@ This list maps every spec story to a phase: US1–US9, US11 and US12 are actiona
 ## Parallel Example: User Story 12
 
 ```text
-- [ ] T097 [P] [US12] Add unit tests for the role catalog and permission resolution in `tests/unit/roles.test.js`
-- [ ] T098 [P] [US12] Extend integration tests for role at registration/session in `tests/integration/auth.test.js`
-- [ ] T099 [P] [US12] Add integration tests for navigation filtering and deep-link denial in `tests/integration/role-access.test.js`
-- [ ] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
+- [X] T097 [P] [US12] Add unit tests for the role catalog and permission resolution in `tests/unit/roles.test.js`
+- [X] T098 [P] [US12] Extend integration tests for role at registration/session in `tests/integration/auth.test.js`
+- [X] T099 [P] [US12] Add integration tests for navigation filtering and deep-link denial in `tests/integration/role-access.test.js`
+- [X] T107 [P] [US12] Add styles for the cargo badge, role select and access-denied notice in `src/styles.css`
 ```
 
 ## Implementation Strategy

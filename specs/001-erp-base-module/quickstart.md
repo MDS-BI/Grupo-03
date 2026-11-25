@@ -123,12 +123,13 @@ npm run preview
 - La integración con Compras y Ventas (HU10) está fuera de esta versión.
 
 
-## Resultados de validación (2026-11-22; tareas pendientes completadas)
+## Resultados de validación (2026-11-24; HU12 completada)
 
-- `npm run test:run`: **PASS** (13 archivos, 103 pruebas).
-- `npm run build`: **PASS** (Vite 8.2.1; 18 módulos transformados; salida en `dist/`).
+- `npm run test:run`: **PASS** (16 archivos, 124 pruebas).
+- `npm run build`: **PASS** (Vite 8.2.1; 22 módulos transformados; salida en `dist/`).
 - `npm run lint`: **PASS** (ESLint sin errores ni advertencias).
 - `npm run format:check`: **PASS** (Prettier: todos los archivos cumplen el estilo).
+- HU12 verificada: cargo obligatorio al registrar, sesión con rol, cargo visible, perfiles heredados completan su cargo una vez, navegación/acciones/rutas filtradas por `src/roles.js`, redirección con aviso accesible y Administrador con acceso total.
 - HU1–HU5 cubiertas por pruebas unitarias/integración y flujos implementados (catálogo, entradas/transferencias/salidas, kardex/inmutabilidad/anulación, conteos/ajustes, panel/alertas/solicitudes de reposición).
 - Nuevas coberturas verificadas: proveedor con RUT chileno y vínculo producto-proveedor, `doc_respaldo` y proveedor obligatorios en entradas, solicitud de alta sin crear el producto, sugerencia FIFO, saldo inicial de período en kardex, días de cobertura y filtro de período del panel, y vista de auditoría con filtros y valores antes/después.
 - Corrección de fechas: los filtros por rango de fechas usan límites de día en UTC, evitando desfases en zonas horarias con offset negativo (p. ej. `America/Santiago`).

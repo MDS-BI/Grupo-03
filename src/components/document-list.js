@@ -47,6 +47,9 @@ export function renderDocumentList(
     onDelete,
     onVoid,
     onCreate,
+    canEdit = null,
+    canDelete = null,
+    canVoid = null,
     showActions = true,
     showSaldo = false,
     openingBalance = null,
@@ -153,13 +156,20 @@ export function renderDocumentList(
     });
 
     if (actionsEnabled) {
-      const canVoid =
+      const allowVoid =
         isImmutable &&
         state !== 'voided' &&
         !document.voidsMovementId &&
-        typeof onVoid === 'function';
-      const canEdit = !isImmutable && typeof onEdit === 'function';
-      const canDelete = !isImmutable && typeof onDelete === 'function';
+        typeof onVoid === 'function' &&
+        (typeof canVoid !== 'function' || canVoid(document));
+      const allowEdit =
+        !isImmutable &&
+        typeof onEdit === 'function' &&
+        (typeof canEdit !== 'function' || canEdit(document));
+      const allowDelete =
+        !isImmutable &&
+        typeof onDelete === 'function' &&
+        (typeof canDelete !== 'function' || canDelete(document));
       cells.push(
         h(
           'td',
@@ -167,7 +177,7 @@ export function renderDocumentList(
           h(
             'div',
             { class: 'actions' },
-            canEdit
+            allowEdit
               ? h(
                   'button',
                   {
@@ -179,7 +189,7 @@ export function renderDocumentList(
                   'Editar'
                 )
               : null,
-            canVoid
+            allowVoid
               ? h(
                   'button',
                   {
@@ -191,7 +201,7 @@ export function renderDocumentList(
                   'Anular'
                 )
               : null,
-            canDelete
+            allowDelete
               ? h(
                   'button',
                   {
@@ -203,7 +213,7 @@ export function renderDocumentList(
                   'Eliminar'
                 )
               : null,
-            isImmutable && !canVoid
+            isImmutable && !allowVoid
               ? h(
                   'span',
                   { class: 'muted', 'data-testid': `document-immutable-${document.document_id}` },

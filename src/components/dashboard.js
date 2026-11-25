@@ -8,6 +8,7 @@ import {
   loadEntities,
   searchEntities
 } from '../storage.js';
+import { MOVEMENT_PERMISSIONS, hasAnyPermission, hasPermission } from '../roles.js';
 import { renderEntityList } from './entity-list.js';
 import { renderDocumentList } from './document-list.js';
 import { icon } from './shell.js';
@@ -34,6 +35,7 @@ export function renderDashboard(
   container,
   {
     config,
+    role = '',
     initialCategory = '',
     onQuickAction,
     onEditEntity,
@@ -47,6 +49,9 @@ export function renderDashboard(
   let selectedFrom = '';
   let selectedTo = '';
   let replenishmentNotice = '';
+  const canWriteCatalog = hasPermission(role, 'catalog.write');
+  const canCreateDocument = hasAnyPermission(role, MOVEMENT_PERMISSIONS);
+  const canSearch = hasPermission(role, 'search.read');
 
   function render() {
     container.replaceChildren();
@@ -79,30 +84,38 @@ export function renderDashboard(
     const quickActions = h(
       'section',
       { class: 'quick-actions', 'aria-label': 'Acciones rapidas' },
-      quickAction({
-        id: 'new-entity',
-        label: `${newLabel(labels.entity)} ${labels.entity.singular.toLowerCase()}`,
-        iconName: 'plus',
-        onClick: () => onQuickAction?.('new-entity')
-      }),
-      quickAction({
-        id: 'new-document',
-        label: `${newLabel(labels.document)} ${labels.document.singular.toLowerCase()}`,
-        iconName: 'plus',
-        onClick: () => onQuickAction?.('new-document')
-      }),
-      quickAction({
-        id: 'manage-entities',
-        label: `Gestionar ${labels.entity.plural.toLowerCase()}`,
-        iconName: 'entities',
-        onClick: () => onQuickAction?.('manage-entities')
-      }),
-      quickAction({
-        id: 'search',
-        label: `Buscar ${labels.entity.plural.toLowerCase()}`,
-        iconName: 'search',
-        onClick: () => onQuickAction?.('search')
-      })
+      canWriteCatalog
+        ? quickAction({
+            id: 'new-entity',
+            label: `${newLabel(labels.entity)} ${labels.entity.singular.toLowerCase()}`,
+            iconName: 'plus',
+            onClick: () => onQuickAction?.('new-entity')
+          })
+        : null,
+      canCreateDocument
+        ? quickAction({
+            id: 'new-document',
+            label: `${newLabel(labels.document)} ${labels.document.singular.toLowerCase()}`,
+            iconName: 'plus',
+            onClick: () => onQuickAction?.('new-document')
+          })
+        : null,
+      canWriteCatalog
+        ? quickAction({
+            id: 'manage-entities',
+            label: `Gestionar ${labels.entity.plural.toLowerCase()}`,
+            iconName: 'entities',
+            onClick: () => onQuickAction?.('manage-entities')
+          })
+        : null,
+      canSearch
+        ? quickAction({
+            id: 'search',
+            label: `Buscar ${labels.entity.plural.toLowerCase()}`,
+            iconName: 'search',
+            onClick: () => onQuickAction?.('search')
+          })
+        : null
     );
 
     const kpiCards = h(
@@ -255,15 +268,17 @@ export function renderDashboard(
               {},
               `Cree ${labels.article} ${labels.entity.singular.toLowerCase()} o registre un ${labels.document.singular.toLowerCase()} para comenzar.`
             ),
-            h(
-              'button',
-              {
-                type: 'button',
-                class: 'button button-primary',
-                onclick: () => onQuickAction?.('new-entity')
-              },
-              `Crear ${labels.entity.singular}`
-            )
+            canWriteCatalog
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'button button-primary',
+                    onclick: () => onQuickAction?.('new-entity')
+                  },
+                  `Crear ${labels.entity.singular}`
+                )
+              : null
           )
         : null;
 
@@ -438,10 +453,10 @@ export function renderDashboard(
     renderEntityList(productTable, {
       config,
       entities: filteredEntities,
-      onEdit: onEditEntity,
-      onDelete: onDeleteEntity,
-      onCreate: () => onQuickAction?.('new-entity'),
-      showActions: true
+      onEdit: canWriteCatalog ? onEditEntity : undefined,
+      onDelete: canWriteCatalog ? onDeleteEntity : undefined,
+      onCreate: canWriteCatalog ? () => onQuickAction?.('new-entity') : undefined,
+      showActions: canWriteCatalog
     });
 
     const recentMovements = h('div');
@@ -451,7 +466,7 @@ export function renderDashboard(
       entities: allEntities,
       showActions: false,
       limit: 5,
-      onCreate: () => onQuickAction?.('new-document')
+      onCreate: canCreateDocument ? () => onQuickAction?.('new-document') : undefined
     });
 
     container.append(
